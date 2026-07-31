@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import NfcManager, { NfcTech, Ndef } from 'react-native-nfc-manager';
 
 import { useAppStore } from '../store/useAppStore';
@@ -16,6 +16,8 @@ import { useAppStore } from '../store/useAppStore';
  * glog CHECK → SIGABRT under New Arch. After the patch it returns a clean error instead.
  *
  * NFC hardware does not exist on the iOS Simulator — a real tag read requires a device.
+ *
+ * Styled with Uniwind className + the semantic VetTrack theme (src/global.css).
  */
 type Line = { id: number; ts: string; msg: string };
 let nextLogId = 0;
@@ -87,31 +89,41 @@ export function NfcSpikeScreen() {
   };
 
   return (
-    <View style={styles.root}>
-      <View style={styles.header}>
-        <Text style={styles.badge}>
+    <View className="flex-1 bg-background">
+      <View className="px-5 pb-5 pt-3">
+        <Text className="text-[15px] font-semibold text-info">
           NFC supported: {nfcSupported === null ? '…' : nfcSupported ? 'YES' : 'NO'}
         </Text>
-        <Text style={styles.hint}>Simulator has no NFC — real tag read needs a device.</Text>
+        <Text className="mt-1 text-xs text-muted">
+          Simulator has no NFC — real tag read needs a device.
+        </Text>
       </View>
 
-      <View style={styles.buttons}>
-        <TouchableOpacity style={styles.btn} onPress={scanTag} accessibilityRole="button">
-          <Text style={styles.btnText}>Scan NFC tag (needs device)</Text>
+      <View className="gap-3 px-5">
+        <TouchableOpacity
+          className="items-center rounded-xl bg-primary py-3.5 active:opacity-80"
+          onPress={scanTag}
+          accessibilityRole="button"
+        >
+          <Text className="text-[15px] font-semibold text-primary-foreground">
+            Scan NFC tag (needs device)
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.btn, styles.btnAlt]}
+          className="items-center rounded-xl bg-accent py-3.5 active:opacity-80"
           onPress={repro833}
           accessibilityRole="button"
         >
-          <Text style={styles.btnText}>Test #833 (getTag, no session)</Text>
+          <Text className="text-[15px] font-semibold text-primary-foreground">
+            Test #833 (getTag, no session)
+          </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.logBox} contentContainerStyle={styles.logContent}>
+      <ScrollView className="m-5 flex-1 rounded-xl bg-surface" contentContainerClassName="p-3.5">
         {log.map((l) => (
-          <Text key={l.id} style={styles.logLine}>
-            <Text style={styles.logTs}>{l.ts} </Text>
+          <Text key={l.id} className="mb-1.5 font-mono text-xs text-slate-300">
+            <Text className="text-slate-600">{l.ts} </Text>
             {l.msg}
           </Text>
         ))}
@@ -119,18 +131,3 @@ export function NfcSpikeScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0f172a' },
-  header: { padding: 20, paddingTop: 12 },
-  badge: { color: '#38bdf8', fontSize: 15, fontWeight: '600' },
-  hint: { color: '#64748b', fontSize: 12, marginTop: 4 },
-  buttons: { paddingHorizontal: 20, gap: 12 },
-  btn: { backgroundColor: '#2563eb', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  btnAlt: { backgroundColor: '#7c3aed' },
-  btnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  logBox: { flex: 1, margin: 20, backgroundColor: '#020617', borderRadius: 12 },
-  logContent: { padding: 14 },
-  logLine: { color: '#cbd5e1', fontSize: 12, fontFamily: 'Courier', marginBottom: 6 },
-  logTs: { color: '#475569' },
-});
