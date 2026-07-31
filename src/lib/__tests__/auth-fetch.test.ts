@@ -7,12 +7,17 @@ import {
 } from "../auth-fetch";
 
 function toBase64Url(json: string): string {
+  const Buf = (globalThis as unknown as {
+    Buffer?: { from(data: string): { toString(enc: string): string } };
+  }).Buffer;
   const b64 =
     typeof btoa === "function"
       ? btoa(json)
-      : (globalThis as { Buffer: { from(data: string): { toString(enc: string): string } } }).Buffer.from(
-          json,
-        ).toString("base64");
+      : Buf
+        ? Buf.from(json).toString("base64")
+        : (() => {
+            throw new Error("No base64 encoder available in test env");
+          })();
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
