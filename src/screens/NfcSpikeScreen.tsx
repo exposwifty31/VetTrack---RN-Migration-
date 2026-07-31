@@ -27,10 +27,12 @@ export function NfcSpikeScreen() {
   const setNfcSupported = useAppStore((state) => state.setNfcSupported);
   const [log, setLog] = useState<Line[]>([]);
 
-  const append = (msg: string) =>
-    setLog((prev) =>
-      [{ id: nextLogId++, ts: new Date().toLocaleTimeString(), msg }, ...prev].slice(0, 40),
-    );
+  const append = (msg: string) => {
+    // Build the line outside the updater so the setState callback stays pure —
+    // React 19.2 Strict Mode double-invokes updaters in dev, which would skip ids.
+    const line: Line = { id: nextLogId++, ts: new Date().toLocaleTimeString(), msg };
+    setLog((prev) => [line, ...prev].slice(0, 40));
+  };
 
   useEffect(() => {
     let isActive = true;

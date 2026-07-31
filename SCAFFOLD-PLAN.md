@@ -26,14 +26,17 @@
 - Install (via `npx expo install`, Expo-pinned): `@react-navigation/native` + `native-stack`, `react-native-screens`, `react-native-safe-area-context`, `zustand`.
 - `RootNavigator` (native-stack) + `HomeScreen` + move the NFC spike to `screens/NfcSpikeScreen.tsx`; `App.tsx` mounts the navigator.
 - **Verify:** `npx expo prebuild` + `npx expo run:ios` green on the sim → app boots into navigation. (New-Arch nav stack composes = the G1 bridge foundation.)
-- **NativeWind deferred (attempted and reverted):** `npx expo install nativewind` (4.2.6) transitively
-  pulls in `react-native-reanimated` 4.5.3 + worklets, and NativeWind 4.2.6 is **incompatible with
-  Expo SDK 57's Metro** — the bundler dies with `Cannot read properties of undefined (reading
-  'transformFile')` (transformer-init failure, confirmed via 3 bisects). Reverted cleanly; the
-  foundation stays on `StyleSheet` for slice 1. Deferred to a follow-up slice pending a NativeWind
-  release compatible with Expo SDK 57 / RN 0.86.2 — its reanimated+worklets stack arrives with it,
-  and `babel-preset-expo` auto-adds the worklets Babel plugin, so don't add it manually when that
-  slice lands.
+**Slice 1b — Uniwind styling (adopted; replaced the NativeWind mandate).** NativeWind 4.2.6 pulls in
+`react-native-reanimated` 4.5.3 + worklets and is **incompatible with Expo SDK 57's Metro** — the
+bundler dies with `Cannot read properties of undefined (reading 'transformFile')` (transformer-init
+failure from its Babel integration, confirmed via 3 bisects); the v5 engine (`react-native-css`) is
+frozen since Apr 2026 with no SDK-57-compatible release. Adopted **Uniwind 1.10.0** instead —
+Tailwind v4, CSS-first, **Babel-free** (`withUniwindConfig` in Metro only), no reanimated dependency.
+`src/global.css` holds the semantic VetTrack theme (dark default, light for parity per Uniwind rule 9);
+`App.tsx` forces dark; `HomeScreen` + `NfcSpikeScreen` use `className`. Verified on the iPhone 17 sim
+(bundle 5.58 MB + `tsc` 0 + both screens rendered). The Anchor §1 (UI/UX) and §6 were amended
+NativeWind v4 → Uniwind with owner approval. Reanimated 4.x stays in the Anchor for the G2 delight
+stack but is no longer force-pulled by styling.
 
 **Slice 2 — Storage port (MMKV, fail-loud).** The Anchor-mandated adapter (R1 residual). `infrastructure/storage/` port interface + MMKV impl + a test asserting a **loud throw** when storage is unavailable (Anchor: no silent no-op).
 
