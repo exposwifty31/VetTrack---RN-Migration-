@@ -3,6 +3,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 /** Root navigation param list — typed so screens get type-safe navigation + route props. */
 export type RootStackParamList = {
   Home: undefined;
+  SignIn: undefined;
   NfcSpike: undefined;
   StorageDebug: undefined;
 };

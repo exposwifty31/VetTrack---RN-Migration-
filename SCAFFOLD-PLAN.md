@@ -45,7 +45,10 @@ memory (MMKV v4 has no in-memory mode). Deps: `react-native-mmkv` 4.x + `react-n
 Dirs: `core/ports`, `infrastructure`, `lib`, `i18n`, `features`, `components` + `@/` alias.
 Skipped `src/app/` — Expo treats that path as Expo Router root and would hijack the entry.
 
-**Slice 3 — Clerk-Expo auth.** `@clerk/clerk-expo`, `ClerkProvider` + token cache via the MMKV/SecureStore port, minimal sign-in screen. **Empirically decode a real Clerk-Expo token to confirm the `azp` claim** against `resolveClerkAuthorizedParties` (plan G1 check — traced as likely no-op, confirm on device).
+**Slice 3 — Clerk-Expo auth.** ✅ on `scaffold/g1-slice-3-clerk` (PR; merge deferred).
+`@clerk/clerk-expo` + SecureStore `tokenCache` (not MMKV), `ClerkTokenBridge` →
+`setClerkTokenGetter`, SignInScreen with azp decode helper. Live azp confirm gated
+on `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` + real sign-in → record in PROOF.
 
 **Slice 4 — API client.** Port the `auth-store` token-indirection pattern; typed fetch client against the existing server over **Bearer** (server already accepts it — plan, `realtime.ts:721`).
 

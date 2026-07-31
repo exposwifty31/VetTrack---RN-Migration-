@@ -30,7 +30,9 @@
           "nfcPermission": "VetTrack reads NFC equipment stickers to identify and track hospital equipment.",
           "includeNdefEntitlement": true
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-web-browser"
     ]
   }
 }

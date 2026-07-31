@@ -1,9 +1,10 @@
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import { HomeScreen } from '../screens/HomeScreen';
-import { NfcSpikeScreen } from '../screens/NfcSpikeScreen';
-import { StorageDebugScreen } from '../screens/StorageDebugScreen';
-import type { RootStackParamList } from './types';
+import { HomeScreen } from "../screens/HomeScreen";
+import { NfcSpikeScreen } from "../screens/NfcSpikeScreen";
+import { SignInScreen } from "../screens/SignInScreen";
+import { StorageDebugScreen } from "../screens/StorageDebugScreen";
+import type { RootStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -12,22 +13,23 @@ export function RootNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#0f172a' },
-        headerTintColor: '#f8fafc',
-        headerTitleStyle: { fontWeight: '700' },
-        contentStyle: { backgroundColor: '#0f172a' },
+        headerStyle: { backgroundColor: "#0f172a" },
+        headerTintColor: "#f8fafc",
+        headerTitleStyle: { fontWeight: "700" },
+        contentStyle: { backgroundColor: "#0f172a" },
       }}
     >
-      <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'VetTrack · RN' }} />
+      <Stack.Screen name="Home" component={HomeScreen} options={{ title: "VetTrack · RN" }} />
+      <Stack.Screen name="SignIn" component={SignInScreen} options={{ title: "Sign in" }} />
       <Stack.Screen
         name="NfcSpike"
         component={NfcSpikeScreen}
-        options={{ title: 'NFC de-risk spike' }}
+        options={{ title: "NFC de-risk spike" }}
       />
       <Stack.Screen
         name="StorageDebug"
         component={StorageDebugScreen}
-        options={{ title: 'Storage debug' }}
+        options={{ title: "Storage debug" }}
       />
     </Stack.Navigator>
   );

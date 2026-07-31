@@ -1,28 +1,42 @@
-import './src/global.css';
+import "./src/global.css";
 
-import { NavigationContainer } from '@react-navigation/native';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Uniwind } from 'uniwind';
+import { ClerkProvider } from "@clerk/clerk-expo";
+import { tokenCache } from "@clerk/clerk-expo/token-cache";
+import { NavigationContainer } from "@react-navigation/native";
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Uniwind } from "uniwind";
 
-import { RootNavigator } from './src/navigation/RootNavigator';
+import { ClerkTokenBridge } from "./src/infrastructure/auth/ClerkTokenBridge";
+import { RootNavigator } from "./src/navigation/RootNavigator";
 
-// VetTrack ships a dark clinical UI. Force dark above the component tree so the
-// theme is resolved once, before first paint, instead of switching at runtime.
-Uniwind.setTheme('dark');
+Uniwind.setTheme("dark");
+
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
 
 /**
- * VetTrack RN — app root (G1 scaffold slice 1).
- * SafeAreaProvider → NavigationContainer → native-stack RootNavigator.
- * The NFC de-risk spike now lives at src/screens/NfcSpikeScreen.tsx.
+ * VetTrack RN — app root.
+ * ClerkProvider uses SecureStore-backed tokenCache (not MMKV) for session tokens.
+ * Without a publishable key the tree still mounts so scaffolding screens work offline.
  */
 export default function App() {
-  return (
+  const tree = (
     <SafeAreaProvider>
       <StatusBar style="light" />
       <NavigationContainer>
+        {publishableKey ? <ClerkTokenBridge /> : null}
         <RootNavigator />
       </NavigationContainer>
     </SafeAreaProvider>
+  );
+
+  if (!publishableKey) {
+    return tree;
+  }
+
+  return (
+    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+      {tree}
+    </ClerkProvider>
   );
 }
