@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { HomeScreen } from '../screens/HomeScreen';
 import { NfcSpikeScreen } from '../screens/NfcSpikeScreen';
+import { StorageDebugScreen } from '../screens/StorageDebugScreen';
 import type { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -22,6 +23,11 @@ export function RootNavigator() {
         name="NfcSpike"
         component={NfcSpikeScreen}
         options={{ title: 'NFC de-risk spike' }}
+      />
+      <Stack.Screen
+        name="StorageDebug"
+        component={StorageDebugScreen}
+        options={{ title: 'Storage debug' }}
       />
     </Stack.Navigator>
   );
