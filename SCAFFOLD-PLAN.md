@@ -6,7 +6,8 @@
 
 ## Frozen stack (Anchor — do not deviate)
 - **Expo SDK 57 / RN 0.86.2 / React 19.2.3**, New Architecture **mandatory** (Bridgeless: Fabric + TurboModules)
-- Workflow: **Bare RN under Expo Prebuild (CNG)** — full `ios/`+`android/` control, not Managed
+- Workflow: **Bare RN under Expo Prebuild (CNG)** — `ios/`+`android/` are generated and gitignored;
+  `app.json` + config plugins are the native configuration source of truth, never hand-edited
 - State: **Zustand** (client) + **TanStack Query** (server) — no React Context for high-frequency state
 - UI: **NativeWind v4** (Tailwind), **FlashList 2.x** (mandatory for lists), **Reanimated 4.x** + **Gesture Handler 3.x**
 - Persistence: **op-sqlite** (WatermelonDB forbidden). Storage access **only via a Port adapter (MMKV)** — **fail-loud**, never silent no-op
@@ -22,9 +23,17 @@
 
 **Slice 1 — Structure + navigation + state + styling foundation.**
 - `src/` architecture: `app/`, `navigation/`, `screens/`, `features/`, `components/`, `lib/`, `store/`, `i18n/`, `infrastructure/`.
-- Install (via `npx expo install`, Expo-pinned): `@react-navigation/native` + `native-stack`, `react-native-screens`, `react-native-safe-area-context`, `zustand`, NativeWind v4 + `tailwindcss`.
+- Install (via `npx expo install`, Expo-pinned): `@react-navigation/native` + `native-stack`, `react-native-screens`, `react-native-safe-area-context`, `zustand`.
 - `RootNavigator` (native-stack) + `HomeScreen` + move the NFC spike to `screens/NfcSpikeScreen.tsx`; `App.tsx` mounts the navigator.
 - **Verify:** `npx expo prebuild` + `npx expo run:ios` green on the sim → app boots into navigation. (New-Arch nav stack composes = the G1 bridge foundation.)
+- **NativeWind deferred (attempted and reverted):** `npx expo install nativewind` (4.2.6) transitively
+  pulls in `react-native-reanimated` 4.5.3 + worklets, and NativeWind 4.2.6 is **incompatible with
+  Expo SDK 57's Metro** — the bundler dies with `Cannot read properties of undefined (reading
+  'transformFile')` (transformer-init failure, confirmed via 3 bisects). Reverted cleanly; the
+  foundation stays on `StyleSheet` for slice 1. Deferred to a follow-up slice pending a NativeWind
+  release compatible with Expo SDK 57 / RN 0.86.2 — its reanimated+worklets stack arrives with it,
+  and `babel-preset-expo` auto-adds the worklets Babel plugin, so don't add it manually when that
+  slice lands.
 
 **Slice 2 — Storage port (MMKV, fail-loud).** The Anchor-mandated adapter (R1 residual). `infrastructure/storage/` port interface + MMKV impl + a test asserting a **loud throw** when storage is unavailable (Anchor: no silent no-op).
 

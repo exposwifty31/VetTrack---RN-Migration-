@@ -17,7 +17,8 @@ import { useAppStore } from '../store/useAppStore';
  *
  * NFC hardware does not exist on the iOS Simulator — a real tag read requires a device.
  */
-type Line = { ts: string; msg: string };
+type Line = { id: number; ts: string; msg: string };
+let nextLogId = 0;
 
 export function NfcSpikeScreen() {
   const nfcSupported = useAppStore((state) => state.nfcSupported);
@@ -25,24 +26,31 @@ export function NfcSpikeScreen() {
   const [log, setLog] = useState<Line[]>([]);
 
   const append = (msg: string) =>
-    setLog((prev) => [{ ts: new Date().toLocaleTimeString(), msg }, ...prev].slice(0, 40));
+    setLog((prev) =>
+      [{ id: nextLogId++, ts: new Date().toLocaleTimeString(), msg }, ...prev].slice(0, 40),
+    );
 
   useEffect(() => {
+    let isActive = true;
     void (async () => {
       try {
         const ok = await NfcManager.isSupported();
+        if (!isActive) return;
         setNfcSupported(ok);
         append(`isSupported() = ${ok}`);
         if (ok) {
           await NfcManager.start();
+          if (!isActive) return;
           append('NfcManager.start() ok');
         }
       } catch (e: any) {
+        if (!isActive) return;
         setNfcSupported(false);
         append(`init error: ${e?.message ?? String(e)}`);
       }
     })();
     return () => {
+      isActive = false;
       NfcManager.cancelTechnologyRequest().catch(() => {});
     };
   }, [setNfcSupported]);
@@ -101,8 +109,8 @@ export function NfcSpikeScreen() {
       </View>
 
       <ScrollView style={styles.logBox} contentContainerStyle={styles.logContent}>
-        {log.map((l, i) => (
-          <Text key={i} style={styles.logLine}>
+        {log.map((l) => (
+          <Text key={l.id} style={styles.logLine}>
             <Text style={styles.logTs}>{l.ts} </Text>
             {l.msg}
           </Text>

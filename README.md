@@ -18,7 +18,8 @@ Frozen through G4; one deliberate upgrade before G5 submission.
 
 ## Where this is in the plan
 
-Gate ladder lives in the consolidated plan (`goofy-mapping-hellman.md`, owner's Mac).
+Gate ladder lives in the consolidated migration plan (owner-maintained, tracked outside this
+repo); the table below is the repo-visible summary of gate status.
 G0 (Capacitor safety net) is nearly done; store submissions are intentionally on hold.
 
 | Gate | State |
@@ -34,13 +35,13 @@ G0 (Capacitor safety net) is nearly done; store submissions are intentionally on
 NFC is the wedge flow. If `react-native-nfc-manager` can't work under the New Architecture,
 the migration is a no-go — so it is de-risked first, before any other foundation work.
 
-- `react-native-nfc-manager@^3.17.2` (stable / legacy-arch, runs via the New-Arch interop layer)
+- `react-native-nfc-manager@3.17.2` (stable / legacy-arch, runs via the New-Arch interop layer)
   with its Expo config plugin (NFC entitlement + NDEF entitlement + usage string, in `app.json`).
 - **Issue #833 patch** — `patches/react-native-nfc-manager+3.17.2.patch` adds the one-line `return`
   in `ios/NfcManager.m` `getTag:` that otherwise double-invokes its callback → fatal `SIGABRT`
   under New Arch. Applied via `patch-package` on `postinstall`.
-- `App.tsx` — spike screen with a real NDEF scan button and a **direct #833 repro** (calls
-  `getTag()` with no session; must return a clean error, not crash).
+- `src/screens/NfcSpikeScreen.tsx` — spike screen with a real NDEF scan button and a **direct
+  #833 repro** (calls `getTag()` with no session; must return a clean error, not crash).
 
 **NFC hardware does not exist on the iOS Simulator** — the simulator build only proves the module
 compiles/links under New Arch. The decisive on-device tag read runs on a physical iPhone.
