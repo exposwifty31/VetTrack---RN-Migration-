@@ -1,0 +1,42 @@
+@import 'tailwindcss';
+@import 'uniwind';
+
+/*
+ * VetTrack theme — semantic tokens (Uniwind / Tailwind v4 CSS-first).
+ * Dark is the product default (clinical dark UI); light is defined for parity
+ * per Uniwind rule 9 (every variant must define the same variable set).
+ */
+@theme {
+  --font-mono: 'Courier';
+}
+
+@layer theme {
+  :root {
+    @variant light {
+      --color-background: #f8fafc;
+      --color-surface: #ffffff;
+      --color-foreground: #0f172a;
+      --color-muted: #64748b;
+      --color-border: #e2e8f0;
+      --color-primary: #2563eb;
+      --color-primary-foreground: #ffffff;
+      --color-accent: #7c3aed;
+      --color-info: #0284c7;
+      --color-danger: #dc2626;
+      --color-success: #16a34a;
+    }
+    @variant dark {
+      --color-background: #0f172a;
+      --color-surface: #020617;
+      --color-foreground: #f8fafc;
+      --color-muted: #94a3b8;
+      --color-border: #1e293b;
+      --color-primary: #2563eb;
+      --color-primary-foreground: #ffffff;
+      --color-accent: #a78bfa;
+      --color-info: #38bdf8;
+      --color-danger: #f87171;
+      --color-success: #4ade80;
+    }
+  }
+}
