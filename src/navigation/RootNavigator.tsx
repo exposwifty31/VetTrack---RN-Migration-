@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+import { ApiSmokeScreen } from "../screens/ApiSmokeScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { NfcSpikeScreen } from "../screens/NfcSpikeScreen";
 import { SignInScreen } from "../screens/SignInScreen";
@@ -21,6 +22,7 @@ export function RootNavigator() {
     >
       <Stack.Screen name="Home" component={HomeScreen} options={{ title: "VetTrack · RN" }} />
       <Stack.Screen name="SignIn" component={SignInScreen} options={{ title: "Sign in" }} />
+      <Stack.Screen name="ApiSmoke" component={ApiSmokeScreen} options={{ title: "API smoke" }} />
       <Stack.Screen
         name="NfcSpike"
         component={NfcSpikeScreen}

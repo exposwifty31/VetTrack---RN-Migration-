@@ -5,6 +5,7 @@ import {
   resolveToken,
   setClerkTokenGetter,
 } from "../auth-fetch";
+import { setStoredBearerToken } from "../auth-store";
 
 function toBase64Url(json: string): string {
   const Buf = (globalThis as unknown as {
@@ -30,6 +31,7 @@ function makeJwt(payload: Record<string, unknown>): string {
 describe("auth-fetch token seam", () => {
   afterEach(() => {
     setClerkTokenGetter(null);
+    setStoredBearerToken(null);
   });
 
   it("injects and clears the Clerk token getter", async () => {
@@ -40,9 +42,15 @@ describe("auth-fetch token seam", () => {
     expect(await resolveToken()).toBeNull();
   });
 
-  it("prefers the injected getter when set", async () => {
-    setClerkTokenGetter(async () => "  x.y.z  ");
-    expect(await resolveToken()).toBe("x.y.z");
+  it("prefers the injected getter over stored bearer", async () => {
+    setStoredBearerToken("stored.token.value");
+    setClerkTokenGetter(async () => "  getter.token.value  ");
+    expect(await resolveToken()).toBe("getter.token.value");
+  });
+
+  it("falls back to stored bearer when getter is unset", async () => {
+    setStoredBearerToken("stored.token.value");
+    expect(await resolveToken()).toBe("stored.token.value");
   });
 
   it("validates 3-segment JWTs", () => {
@@ -58,7 +66,7 @@ describe("auth-fetch token seam", () => {
     expect(payload?.sub).toBe("user_1");
   });
 
-  it("returns null payload when azp claim is absent", () => {
+  it("returns payload without azp when claim is absent", () => {
     const token = makeJwt({ sub: "user_1" });
     const payload = decodeJwtPayload(token);
     expect(payload).not.toBeNull();

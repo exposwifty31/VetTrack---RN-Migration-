@@ -1,7 +1,10 @@
 /**
- * Token-indirection seam for authenticated fetch (Slice 4 fills in authFetch).
- * Mirrors vettrack `setClerkTokenGetter` — Clerk wiring injects; API client reads.
+ * Token-indirection + Bearer authFetch for RN.
+ * RN has no cookie jar — Bearer-only (no credentials: "include").
  */
+
+import { resolveApiUrl } from "@/lib/api-origin";
+import { getCurrentUserId, getStoredBearerToken } from "@/lib/auth-store";
 
 type ClerkTokenGetter = (() => Promise<string | null>) | null;
 
@@ -25,9 +28,9 @@ function base64UrlToUtf8(segment: string): string {
   if (typeof atob === "function") {
     return atob(padded);
   }
-  // Jest/node without atob — decode via globalThis.Buffer when present.
-  const Buf = (globalThis as { Buffer?: { from(data: string, enc: string): { toString(enc: string): string } } })
-    .Buffer;
+  const Buf = (
+    globalThis as { Buffer?: { from(data: string, enc: string): { toString(enc: string): string } } }
+  ).Buffer;
   if (Buf) {
     return Buf.from(padded, "base64").toString("utf8");
   }
@@ -48,10 +51,61 @@ export function decodeJwtPayload(token: string): Record<string, unknown> | null 
   }
 }
 
+/** Prefer Clerk getter; fall back to stored/dev bearer. */
 export async function resolveToken(): Promise<string | null> {
   if (clerkTokenGetter) {
     const token = await clerkTokenGetter();
-    return typeof token === "string" ? token.trim() : null;
+    if (typeof token === "string" && token.trim()) return token.trim();
   }
-  return null;
+  const stored = getStoredBearerToken();
+  return typeof stored === "string" ? stored.trim() : null;
+}
+
+export async function resolveBearerToken(): Promise<string | null> {
+  return resolveToken();
+}
+
+export class AuthFetchError extends Error {
+  readonly status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "AuthFetchError";
+    this.status = status;
+  }
+}
+
+/**
+ * Authenticated fetch — attaches Bearer only for valid 3-segment JWTs.
+ * Uses RN's global `fetch` (set EXPO_PUBLIC_USE_RN_FETCH=1; avoid expo/fetch races).
+ */
+export async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  const resolvedUrl = resolveApiUrl(path);
+
+  if (path.startsWith("/api/")) {
+    const token = await resolveToken();
+    if (!isValidJwt(token)) {
+      throw new AuthFetchError("AUTH_INVALID: invalid token");
+    }
+
+    // Bootstrap: /api/users/me may run before setCurrentUserId; other routes require it.
+    const userId = getCurrentUserId()?.trim();
+    if (!userId && path !== "/api/users/me") {
+      throw new AuthFetchError("AUTH_INVALID: missing userId");
+    }
+
+    const headers = new Headers(options.headers ?? {});
+    headers.set("Authorization", `Bearer ${token}`);
+    if (!headers.has("Content-Type") && options.body && typeof options.body === "string") {
+      headers.set("Content-Type", "application/json");
+    }
+
+    const res = await fetch(resolvedUrl, { ...options, headers });
+    if (res.status === 401) {
+      throw new AuthFetchError("UNAUTHORIZED", 401);
+    }
+    return res;
+  }
+
+  return fetch(resolvedUrl, options);
 }
