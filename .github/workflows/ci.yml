@@ -24,17 +24,31 @@ jobs:
   quality:
     name: typecheck + test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # No git push happens here; don't leave the token in .git/config where
+          # a lifecycle script could read it.
+          persist-credentials: false
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
           cache: 'npm'
 
-      # preinstall clones public vettrack@SHA (contracts/shared); postinstall runs patch-package.
+      # githubactions:S6505 — run `npm ci` with --ignore-scripts so no dependency
+      # lifecycle script auto-executes, then run this repo's REQUIRED first-party
+      # scripts explicitly:
+      #   * vendor-vettrack (the preinstall) sparse-clones the PUBLIC vettrack repo
+      #     for @vettrack/contracts + @vettrack/shared — must run BEFORE install so
+      #     the file: deps resolve.
+      #   * patch-package (the postinstall) applies the nfc-manager #833 patch.
       - name: Install
-        run: npm ci
+        run: |
+          node scripts/vendor-vettrack.mjs
+          npm ci --ignore-scripts
+          npx patch-package
 
       - name: Type check
         run: npm run typecheck
