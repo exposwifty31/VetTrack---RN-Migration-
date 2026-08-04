@@ -10,7 +10,7 @@ describe("ClerkAuthAdapter", () => {
     setClerkTokenGetter(async () => "a.b.c");
     const signOut = jest.fn(async () => undefined);
     const adapter = new ClerkAuthAdapter(signOut);
-    const seen: Array<string | null> = [];
+    const seen: (string | null)[] = [];
     const unsubscribe = adapter.onSessionChange((token) => {
       seen.push(token);
     });

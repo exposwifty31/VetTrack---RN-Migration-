@@ -11,6 +11,7 @@ export const DEFAULT_NS = "translation" as const;
 if (!i18n.isInitialized) {
   // Resources are inlined, so init resolves synchronously — no async backend,
   // no Suspense boundary required.
+  // eslint-disable-next-line import/no-named-as-default-member -- i18n.use() is i18next's fluent builder API; the named `use` export is a different thing.
   void i18n.use(initReactI18next).init({
     resources: {
       he: { translation: he },

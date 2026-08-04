@@ -24,7 +24,8 @@ jobs:
   quality:
     name: typecheck + test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 20 (was 15) to cover the Expo export bundle step (~1-2 min).
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -55,5 +56,14 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Lint
+        run: npm run lint
+
       - name: Test
         run: npm test
+
+      # Bundle gate: proves the production Metro bundle resolves end-to-end
+      # (regression guard for the clerk-expo -> clerk-react -> react-dom peer).
+      # Call the local binary directly, never `npx` (githubactions:S6505/S8543).
+      - name: Expo export (bundle gate)
+        run: ./node_modules/.bin/expo export --platform ios --output-dir /tmp/expo-export-check
