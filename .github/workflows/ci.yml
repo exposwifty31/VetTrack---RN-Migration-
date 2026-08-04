@@ -48,7 +48,9 @@ jobs:
         run: |
           node scripts/vendor-vettrack.mjs
           npm ci --ignore-scripts
-          npx patch-package
+          # Call the locally-installed binary directly (not `npx`, which can
+          # fetch an unpinned release and run its scripts — githubactions:S6505/S8543).
+          ./node_modules/.bin/patch-package
 
       - name: Type check
         run: npm run typecheck
