@@ -21,10 +21,18 @@ export function HomeScreen({ navigation }: RootStackScreenProps<"Home">) {
 
       <Pressable
         className="items-center rounded-xl bg-primary py-3.5 active:opacity-80"
+        onPress={() => navigation.navigate("SignIn")}
+        accessibilityRole="button"
+      >
+        <Text className="text-[15px] font-semibold text-primary-foreground">Sign in (Clerk)</Text>
+      </Pressable>
+
+      <Pressable
+        className="items-center rounded-xl border border-border py-3.5 active:opacity-80"
         onPress={() => navigation.navigate("NfcSpike")}
         accessibilityRole="button"
       >
-        <Text className="text-[15px] font-semibold text-primary-foreground">
+        <Text className="text-[15px] font-semibold text-foreground">
           Open NFC de-risk spike
         </Text>
       </Pressable>
