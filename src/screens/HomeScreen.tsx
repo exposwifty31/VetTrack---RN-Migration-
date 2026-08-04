@@ -29,6 +29,14 @@ export function HomeScreen({ navigation }: RootStackScreenProps<"Home">) {
 
       <Pressable
         className="items-center rounded-xl border border-border py-3.5 active:opacity-80"
+        onPress={() => navigation.navigate("ApiSmoke")}
+        accessibilityRole="button"
+      >
+        <Text className="text-[15px] font-semibold text-foreground">API smoke (Slice 4)</Text>
+      </Pressable>
+
+      <Pressable
+        className="items-center rounded-xl border border-border py-3.5 active:opacity-80"
         onPress={() => navigation.navigate("NfcSpike")}
         accessibilityRole="button"
       >

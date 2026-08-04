@@ -50,7 +50,9 @@ Skipped `src/app/` — Expo treats that path as Expo Router root and would hijac
 `setClerkTokenGetter`, SignInScreen with azp decode helper. Live azp confirm gated
 on `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` + real sign-in → record in PROOF.
 
-**Slice 4 — API client.** Port the `auth-store` token-indirection pattern; typed fetch client against the existing server over **Bearer** (server already accepts it — plan, `realtime.ts:721`).
+**Slice 4 — API client + TanStack Query.** ✅ on `scaffold/g1-slice-4-api` (PR; merge deferred).
+`resolveApiUrl` + Bearer `authFetch` + thin `api` (`users.me`, realtime, `equipment.quickToggle`)
++ QueryClientProvider. RN native `fetch` only.
 
 **Slice 5 — SSE (react-native-sse).** Foreground-only: `AppState` → `close()` on background, `open()` + replay-from-cursor on foreground (#14, #18 — no consumer cursor bookkeeping).
 
