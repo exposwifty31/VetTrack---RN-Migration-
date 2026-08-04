@@ -1,0 +1,76 @@
+{
+  "common": {
+    "appName": "VetTrack",
+    "back": "Back",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "language": "Language",
+    "hebrew": "עברית",
+    "english": "English"
+  },
+  "nav": {
+    "home": "Home",
+    "signIn": "Sign in",
+    "apiSmoke": "API smoke",
+    "nfcSpike": "NFC spike",
+    "storageDebug": "Storage",
+    "i18nDebug": "i18n & RTL"
+  },
+  "home": {
+    "title": "VetTrack",
+    "subtitle": "React Native migration · G1 · contracts {{allowlist}} · inactive {{days}}d",
+    "signIn": "Sign in (Clerk)",
+    "apiSmoke": "API smoke (Slice 4)",
+    "nfcSpike": "Open NFC de-risk spike",
+    "storageDebug": "Open storage debug (Slice 2)",
+    "i18nDebug": "i18n & RTL (Slice 6)"
+  },
+  "signIn": {
+    "title": "Sign in",
+    "subtitle": "Clerk-Expo · SecureStore token cache",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "missingKey": "Set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in .env, rebuild, then sign in to decode azp against resolveClerkAuthorizedParties.",
+    "signedInTitle": "Signed in",
+    "goHome": "Go home",
+    "incomplete": "Sign-in incomplete: status={{status}}"
+  },
+  "apiSmoke": {
+    "title": "API smoke",
+    "subtitle": "Requires EXPO_PUBLIC_API_ORIGIN + signed-in Clerk (or stored bearer), then users.me",
+    "fetch": "GET /api/users/me",
+    "loading": "Loading…"
+  },
+  "storageDebug": {
+    "title": "Storage debug",
+    "subtitle": "Local persists across restart. Session is process-lifetime memory.",
+    "writeBoth": "Write both kinds",
+    "readBoth": "Read both kinds",
+    "clearBoth": "Clear both",
+    "localLabel": "local: {{value}}",
+    "sessionLabel": "session: {{value}}",
+    "nullValue": "(null)"
+  },
+  "nfcSpike": {
+    "supportedLabel": "NFC supported: {{state}}",
+    "simulatorNote": "Simulator has no NFC — real tag read needs a device.",
+    "scan": "Scan NFC tag (needs device)",
+    "test833": "Test #833 (getTag, no session)",
+    "yes": "Yes",
+    "no": "No",
+    "pending": "…"
+  },
+  "i18nDebug": {
+    "title": "i18n & RTL",
+    "localeLabel": "Active locale: {{locale}}",
+    "directionLabel": "I18nManager.isRTL: {{isRtl}}",
+    "desiredLabel": "Desired RTL for locale: {{desired}}",
+    "reloadPending": "Reload required for direction to apply — reload the dev client.",
+    "reloadNotPending": "Direction matches locale.",
+    "toggle": "Toggle Hebrew / English",
+    "sample": "Sample: {{save}} · {{cancel}} · {{loading}}"
+  }
+}

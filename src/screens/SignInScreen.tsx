@@ -1,6 +1,7 @@
 import { useAuth, useSignIn } from "@clerk/clerk-expo";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { decodeJwtPayload, isValidJwt, resolveToken } from "@/lib/auth-fetch";
 import type { RootStackScreenProps } from "../navigation/types";
@@ -12,20 +13,18 @@ const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
  * After success, decodes the session JWT to report azp presence (gating check).
  */
 export function SignInScreen(props: RootStackScreenProps<"SignIn">) {
+  const { t } = useTranslation();
   if (!publishableKey) {
     return (
       <View className="flex-1 gap-3 bg-background px-6 pt-6">
-        <Text className="text-2xl font-bold text-foreground">Sign in</Text>
-        <Text className="text-[14px] text-muted">
-          Set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in .env, rebuild, then sign in to
-          decode azp against resolveClerkAuthorizedParties.
-        </Text>
+        <Text className="text-2xl font-bold text-foreground">{t("signIn.title")}</Text>
+        <Text className="text-[14px] text-muted">{t("signIn.missingKey")}</Text>
         <Pressable
           className="items-center rounded-xl border border-border py-3.5 active:opacity-80"
           accessibilityRole="button"
           onPress={() => props.navigation.navigate("Home")}
         >
-          <Text className="text-[15px] font-semibold text-foreground">Back</Text>
+          <Text className="text-[15px] font-semibold text-foreground">{t("common.back")}</Text>
         </Pressable>
       </View>
     );
@@ -35,6 +34,7 @@ export function SignInScreen(props: RootStackScreenProps<"SignIn">) {
 }
 
 function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
+  const { t } = useTranslation();
   const { isLoaded, signIn, setActive } = useSignIn();
   const { isSignedIn } = useAuth();
   const [email, setEmail] = useState("");
@@ -46,14 +46,14 @@ function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
   if (isSignedIn) {
     return (
       <View className="flex-1 gap-3 bg-background px-6 pt-6">
-        <Text className="text-2xl font-bold text-foreground">Signed in</Text>
+        <Text className="text-2xl font-bold text-foreground">{t("signIn.signedInTitle")}</Text>
         {azpNote ? <Text className="text-[14px] text-muted">{azpNote}</Text> : null}
         <Pressable
           className="items-center rounded-xl bg-primary py-3.5 active:opacity-80"
           accessibilityRole="button"
           onPress={() => navigation.navigate("Home")}
         >
-          <Text className="text-[15px] font-semibold text-primary-foreground">Go home</Text>
+          <Text className="text-[15px] font-semibold text-primary-foreground">{t("signIn.goHome")}</Text>
         </Pressable>
       </View>
     );
@@ -85,7 +85,7 @@ function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
           );
         }
       } else {
-        setError(`Sign-in incomplete: status=${result.status}`);
+        setError(t("signIn.incomplete", { status: result.status }));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -96,15 +96,15 @@ function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
 
   return (
     <View className="flex-1 gap-3 bg-background px-6 pt-6">
-      <Text className="text-2xl font-bold text-foreground">Sign in</Text>
-      <Text className="text-[14px] text-muted">Clerk-Expo · SecureStore token cache</Text>
+      <Text className="text-2xl font-bold text-foreground">{t("signIn.title")}</Text>
+      <Text className="text-[14px] text-muted">{t("signIn.subtitle")}</Text>
 
       <TextInput
         className="rounded-xl border border-border bg-surface px-4 py-3 text-foreground"
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="email-address"
-        placeholder="Email"
+        placeholder={t("signIn.email")}
         placeholderTextColor="#64748b"
         value={email}
         onChangeText={setEmail}
@@ -112,7 +112,7 @@ function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
       <TextInput
         className="rounded-xl border border-border bg-surface px-4 py-3 text-foreground"
         secureTextEntry
-        placeholder="Password"
+        placeholder={t("signIn.password")}
         placeholderTextColor="#64748b"
         value={password}
         onChangeText={setPassword}
@@ -129,7 +129,7 @@ function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
         {busy ? (
           <ActivityIndicator color="#ffffff" />
         ) : (
-          <Text className="text-[15px] font-semibold text-primary-foreground">Sign in</Text>
+          <Text className="text-[15px] font-semibold text-primary-foreground">{t("signIn.submit")}</Text>
         )}
       </Pressable>
 

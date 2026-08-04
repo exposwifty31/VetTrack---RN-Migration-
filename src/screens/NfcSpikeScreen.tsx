@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import NfcManager, { NfcTech, Ndef } from 'react-native-nfc-manager';
 
 import { useAppStore } from '../store/useAppStore';
@@ -23,6 +24,7 @@ type Line = { id: number; ts: string; msg: string };
 let nextLogId = 0;
 
 export function NfcSpikeScreen() {
+  const { t } = useTranslation();
   const nfcSupported = useAppStore((state) => state.nfcSupported);
   const setNfcSupported = useAppStore((state) => state.setNfcSupported);
   const [log, setLog] = useState<Line[]>([]);
@@ -94,11 +96,16 @@ export function NfcSpikeScreen() {
     <View className="flex-1 bg-background">
       <View className="px-5 pb-5 pt-3">
         <Text className="text-[15px] font-semibold text-info">
-          NFC supported: {nfcSupported === null ? '…' : nfcSupported ? 'YES' : 'NO'}
+          {t('nfcSpike.supportedLabel', {
+            state:
+              nfcSupported === null
+                ? t('nfcSpike.pending')
+                : nfcSupported
+                  ? t('nfcSpike.yes')
+                  : t('nfcSpike.no'),
+          })}
         </Text>
-        <Text className="mt-1 text-xs text-muted">
-          Simulator has no NFC — real tag read needs a device.
-        </Text>
+        <Text className="mt-1 text-xs text-muted">{t('nfcSpike.simulatorNote')}</Text>
       </View>
 
       <View className="gap-3 px-5">
@@ -107,18 +114,14 @@ export function NfcSpikeScreen() {
           onPress={scanTag}
           accessibilityRole="button"
         >
-          <Text className="text-[15px] font-semibold text-primary-foreground">
-            Scan NFC tag (needs device)
-          </Text>
+          <Text className="text-[15px] font-semibold text-primary-foreground">{t('nfcSpike.scan')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           className="items-center rounded-xl bg-accent py-3.5 active:opacity-80"
           onPress={repro833}
           accessibilityRole="button"
         >
-          <Text className="text-[15px] font-semibold text-primary-foreground">
-            Test #833 (getTag, no session)
-          </Text>
+          <Text className="text-[15px] font-semibold text-primary-foreground">{t('nfcSpike.test833')}</Text>
         </TouchableOpacity>
       </View>
 

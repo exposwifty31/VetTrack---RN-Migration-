@@ -7,6 +7,7 @@ export type RootStackParamList = {
   ApiSmoke: undefined;
   NfcSpike: undefined;
   StorageDebug: undefined;
+  I18nDebug: undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<
