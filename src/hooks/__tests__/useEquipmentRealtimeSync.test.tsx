@@ -10,6 +10,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import type { RealtimeEvent, RealtimePort } from "@/core/ports/realtime.port";
 
+import { useEquipmentRealtimeSync } from "../useEquipmentRealtimeSync";
+
 let capturedListener: ((event: RealtimeEvent) => void) | null = null;
 const unsubscribe = jest.fn();
 const openSpy = jest.fn();
@@ -29,8 +31,6 @@ const fakePort: RealtimePort = {
 jest.mock("@/infrastructure/realtime/defaultRealtime", () => ({
   getDefaultRealtimePort: () => fakePort,
 }));
-
-import { useEquipmentRealtimeSync } from "../useEquipmentRealtimeSync";
 
 function makeWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {

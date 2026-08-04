@@ -14,13 +14,12 @@
  */
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
 
-import { equipmentKeys } from "@/lib/api";
-import { api } from "@/lib/api";
+import { equipmentKeys , api } from "@/lib/api";
 import { haptics } from "@/lib/haptics";
 import { mark, MARK } from "@/lib/instrumentation/perf";
 import type { EquipmentListPage, EquipmentRow, ScanResult } from "@/types/api";
 
-type CacheSnapshot = Array<[QueryKey, unknown]>;
+type CacheSnapshot = [QueryKey, unknown][];
 
 const CHECKED_OUT = "checked_out";
 const AVAILABLE = "available";

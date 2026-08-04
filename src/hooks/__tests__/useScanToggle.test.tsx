@@ -8,6 +8,15 @@
  * We mock `authFetch` (not `@/lib/api`) so the REAL `api.equipment.scan` runs its
  * status→variant mapping — the same seam the api shape test uses.
  */
+import type { ReactNode } from "react";
+import { renderHook, waitFor } from "@testing-library/react-native";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+import { equipmentKeys } from "@/lib/api";
+import type { EquipmentListPage, EquipmentRow } from "@/types/api";
+
+import { useScanToggle } from "../useScanToggle";
+
 jest.mock("expo-crypto", () => ({ randomUUID: () => "test-request-id" }));
 jest.mock("@/lib/haptics", () => ({
   haptics: { scanSuccess: jest.fn(), error: jest.fn(), tap: jest.fn() },
@@ -26,15 +35,6 @@ const mockAuthFetch = jest.fn();
 jest.mock("@/lib/auth-fetch", () => ({
   authFetch: (path: string, init?: RequestInit) => mockAuthFetch(path, init),
 }));
-
-import type { ReactNode } from "react";
-import { renderHook, waitFor } from "@testing-library/react-native";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-
-import { equipmentKeys } from "@/lib/api";
-import type { EquipmentListPage, EquipmentRow } from "@/types/api";
-
-import { useScanToggle } from "../useScanToggle";
 
 function fakeResponse(status: number, body: unknown) {
   return {

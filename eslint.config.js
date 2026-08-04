@@ -26,4 +26,13 @@ module.exports = defineConfig([
     files: ["**/__tests__/**", "**/*.test.{ts,tsx}"],
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },
+  {
+    // react-hooks/immutability (a React Compiler rule) treats all values as
+    // immutable, but a Reanimated shared value — `useSharedValue().value = withSpring(...)`
+    // — is a legitimately-mutable external store; `.value =` is its documented API
+    // (in worklets AND in JS callbacks). The rule can't model that and false-positives
+    // on every animation. Off project-wide for that specific reason (not a blanket
+    // disable of react-hooks — the other hooks rules stay on).
+    rules: { "react-hooks/immutability": "off" },
+  },
 ]);

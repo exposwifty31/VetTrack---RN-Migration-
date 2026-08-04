@@ -4,14 +4,14 @@
  * without a real JWT / userId / API origin — and, critically, that a bodiless 304
  * never calls `res.json()`.
  */
+import { api } from "../api";
+
 jest.mock("expo-crypto", () => ({ randomUUID: () => "test-request-id" }));
 
 const mockAuthFetch = jest.fn();
 jest.mock("@/lib/auth-fetch", () => ({
   authFetch: (path: string, init?: RequestInit) => mockAuthFetch(path, init),
 }));
-
-import { api } from "../api";
 
 type FakeResponseInit = {
   status: number;
