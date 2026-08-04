@@ -16,6 +16,7 @@
     "apiSmoke": "בדיקת API",
     "nfcSpike": "בדיקת NFC",
     "storageDebug": "אחסון",
+    "realtimeDebug": "זמן אמת",
     "i18nDebug": "שפה ו-RTL"
   },
   "home": {

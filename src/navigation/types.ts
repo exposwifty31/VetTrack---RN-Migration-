@@ -7,6 +7,7 @@ export type RootStackParamList = {
   ApiSmoke: undefined;
   NfcSpike: undefined;
   StorageDebug: undefined;
+  RealtimeDebug: undefined;
   I18nDebug: undefined;
 };
 

@@ -16,6 +16,7 @@
     "apiSmoke": "API smoke",
     "nfcSpike": "NFC spike",
     "storageDebug": "Storage",
+    "realtimeDebug": "Realtime debug",
     "i18nDebug": "i18n & RTL"
   },
   "home": {
