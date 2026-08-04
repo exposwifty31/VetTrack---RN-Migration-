@@ -1,0 +1,76 @@
+{
+  "common": {
+    "appName": "VetTrack",
+    "back": "חזרה",
+    "loading": "טוען...",
+    "save": "שמור",
+    "cancel": "ביטול",
+    "close": "סגור",
+    "language": "שפה",
+    "hebrew": "עברית",
+    "english": "English"
+  },
+  "nav": {
+    "home": "בית",
+    "signIn": "התחברות",
+    "apiSmoke": "בדיקת API",
+    "nfcSpike": "בדיקת NFC",
+    "storageDebug": "אחסון",
+    "i18nDebug": "שפה ו-RTL"
+  },
+  "home": {
+    "title": "VetTrack",
+    "subtitle": "מעבר ל-React Native · G1 · חוזים {{allowlist}} · לא פעיל {{days}} ימים",
+    "signIn": "התחברות (Clerk)",
+    "apiSmoke": "בדיקת API (שלב 4)",
+    "nfcSpike": "פתח בדיקת NFC",
+    "storageDebug": "פתח דיבאג אחסון (שלב 2)",
+    "i18nDebug": "שפה ו-RTL (שלב 6)"
+  },
+  "signIn": {
+    "title": "התחברות",
+    "subtitle": "Clerk-Expo · מטמון אסימונים ב-SecureStore",
+    "email": "אימייל",
+    "password": "סיסמה",
+    "submit": "התחבר",
+    "missingKey": "הגדר EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ב-.env, בנה מחדש, ואז התחבר כדי לפענח azp מול resolveClerkAuthorizedParties.",
+    "signedInTitle": "מחובר",
+    "goHome": "מעבר לבית",
+    "incomplete": "ההתחברות לא הושלמה: סטטוס={{status}}"
+  },
+  "apiSmoke": {
+    "title": "בדיקת API",
+    "subtitle": "דורש EXPO_PUBLIC_API_ORIGIN והתחברות Clerk (או bearer מאוחסן), ואז users.me",
+    "fetch": "GET /api/users/me",
+    "loading": "טוען..."
+  },
+  "storageDebug": {
+    "title": "דיבאג אחסון",
+    "subtitle": "מקומי נשמר בין הפעלות. Session הוא זיכרון לכל חיי התהליך.",
+    "writeBoth": "כתוב את שני הסוגים",
+    "readBoth": "קרא את שני הסוגים",
+    "clearBoth": "נקה את שניהם",
+    "localLabel": "מקומי: {{value}}",
+    "sessionLabel": "Session: {{value}}",
+    "nullValue": "(null)"
+  },
+  "nfcSpike": {
+    "supportedLabel": "NFC נתמך: {{state}}",
+    "simulatorNote": "לסימולטור אין NFC — קריאת תווית אמיתית דורשת מכשיר.",
+    "scan": "סרוק תווית NFC (דורש מכשיר)",
+    "test833": "בדוק #833 (getTag, ללא סשן)",
+    "yes": "כן",
+    "no": "לא",
+    "pending": "…"
+  },
+  "i18nDebug": {
+    "title": "שפה ו-RTL",
+    "localeLabel": "שפה פעילה: {{locale}}",
+    "directionLabel": "I18nManager.isRTL: {{isRtl}}",
+    "desiredLabel": "RTL רצוי לשפה: {{desired}}",
+    "reloadPending": "נדרש רענון כדי שהכיוון יחול — רענן את ה-dev client.",
+    "reloadNotPending": "הכיוון תואם לשפה.",
+    "toggle": "החלף עברית / אנגלית",
+    "sample": "דוגמה: {{save}} · {{cancel}} · {{loading}}"
+  }
+}

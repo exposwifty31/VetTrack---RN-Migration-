@@ -5,10 +5,12 @@ import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { NavigationContainer } from "@react-navigation/native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
+import { I18nextProvider } from "react-i18next";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Uniwind } from "uniwind";
 
 import { ClerkTokenBridge } from "./src/infrastructure/auth/ClerkTokenBridge";
+import { i18n } from "./src/i18n";
 import { queryClient } from "./src/lib/query-client";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 
@@ -19,18 +21,21 @@ const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
 /**
  * VetTrack RN — app root.
  * QueryClient owns server state; Zustand stays client-only (Slice 1).
+ * i18next (Slice 6) is initialized on import of ./src/i18n; Hebrew is default.
  */
 export default function App() {
   const tree = (
-    <QueryClientProvider client={queryClient}>
-      <SafeAreaProvider>
-        <StatusBar style="light" />
-        <NavigationContainer>
-          {publishableKey ? <ClerkTokenBridge /> : null}
-          <RootNavigator />
-        </NavigationContainer>
-      </SafeAreaProvider>
-    </QueryClientProvider>
+    <I18nextProvider i18n={i18n}>
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <StatusBar style="light" />
+          <NavigationContainer>
+            {publishableKey ? <ClerkTokenBridge /> : null}
+            <RootNavigator />
+          </NavigationContainer>
+        </SafeAreaProvider>
+      </QueryClientProvider>
+    </I18nextProvider>
   );
 
   if (!publishableKey) {
