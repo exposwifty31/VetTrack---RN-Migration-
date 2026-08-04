@@ -24,7 +24,7 @@ G0 (Capacitor safety net) is nearly done; store submissions are intentionally on
 
 | Gate | State |
 |---|---|
-| **G1 — Foundation** | **in progress** — NFC de-risk done; slices 0/1/1b/2/3/4/7 merged to `main`; next: SSE (slice 5) |
+| **G1 — Foundation** | **done** — slices 0–7 merged to `main` (incl. 5 SSE + 6 i18n/RTL); CI (typecheck + test) green. One open item: slice 8 NFC real-tag (hardware-blocked). Next: **G2** |
 | G2 — Hero flow (delight) | not started |
 | G3 — Daily-driver parity | not started |
 | G4 — Code Blue + full offline | not started |
@@ -32,10 +32,11 @@ G0 (Capacitor safety net) is nearly done; store submissions are intentionally on
 
 ## G1 — progress
 
-Foundation slices are merged to `main`: 0 (baseline), 1 (nav + Zustand), 1b (Uniwind styling),
+All foundation slices are merged to `main`: 0 (baseline), 1 (nav + Zustand), 1b (Uniwind styling),
 2 (fail-loud MMKV storage port), 3 (Clerk-Expo auth), 4 (API client + TanStack Query),
-7 (contracts/shared + Metro `.js`→`.ts` resolver). `tsc` is clean on the combined `main`.
-**Next: slice 5 — SSE (react-native-sse, foreground-only).**
+5 (SSE, foreground-only), 6 (i18n + RTL), 7 (contracts/shared + Metro `.js`→`.ts` resolver).
+`tsc` is clean and CI (typecheck + test) is green on `main`. The one open G1 item is slice 8
+(NFC real-tag read), blocked on a physical NTAG tag. **Next: G2 — hero flow.**
 
 ### NFC de-risk (done — kept here as reference)
 

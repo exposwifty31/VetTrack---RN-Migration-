@@ -14,9 +14,9 @@
 - Auth: **@clerk/clerk-expo**. Realtime: **react-native-sse** (foreground-only). i18n: i18next + **I18nManager RTL**
 
 ## Current repo state (verified 2026-08-04)
-- `main` holds **slices 0 / 1 / 1b / 2 / 3 / 4 / 7 — all MERGED.** RN PRs #2–#5 (storage / contracts / Clerk / API) were un-stuck and merged in dependency order (#3→#2→#4→#5) on 2026-08-04; `tsc --noEmit` = 0 on the combined `main` after `npm install` (incl. `@vettrack/contracts` + `@vettrack/shared` resolving).
+- `main` holds **slices 0 / 1 / 1b / 2 / 3 / 4 / 5 / 6 / 7 — all MERGED.** RN PRs #2–#5 (storage / contracts / Clerk / API) were un-stuck and merged in dependency order (#3→#2→#4→#5) on 2026-08-04; then slice 5 (SSE, #6) + slice 6 (i18n/RTL, #8) landed, plus the jest-preset fix (#7) and CI (#9). `tsc --noEmit` = 0 and CI (typecheck + test) is green on `main` after `npm install` (incl. `@vettrack/contracts` + `@vettrack/shared` resolving).
 - Verified GREEN on iPhone 17 sim (nav) + physical Pixel 7 (NFC `isSupported=true` under New Arch).
-- **Next: slice 5 (SSE).**
+- **G1 is complete except slice 8 (NFC real-tag, hardware-blocked on an NTAG). Next: G2 — hero flow.**
 
 ## Slice sequence (each slice: build/run green on the booted sim, THEN commit *with approval*)
 
@@ -54,9 +54,9 @@ on `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` + real sign-in → record in PROOF.
 `resolveApiUrl` + Bearer `authFetch` + thin `api` (`users.me`, realtime, `equipment.quickToggle`)
 + QueryClientProvider. RN native `fetch` only.
 
-**Slice 5 — SSE (react-native-sse).** ⏭️ **NEXT.** Foreground-only: `AppState` → `close()` on background, `open()` + replay-from-cursor on foreground (#14, #18 — no consumer cursor bookkeeping).
+**Slice 5 — SSE (react-native-sse).** ✅ **MERGED to main (#6, 2026-08-04).** Foreground-only: `AppState` → `close()` on background, `open()` + replay-from-cursor on foreground (#14, #18 — no consumer cursor bookkeeping).
 
-**Slice 6 — i18n + RTL.** i18next + he/en locales, `I18nManager.forceRTL` — reuse the vettrack locale JSON where portable.
+**Slice 6 — i18n + RTL.** ✅ **MERGED to main (#8, 2026-08-04).** i18next + he/en locales, `I18nManager.forceRTL` — reuse the vettrack locale JSON where portable.
 
 **Slice 7 — Shared/contracts + Metro `.js`→`.ts` resolver (R5).** ✅ **MERGED to main (2026-08-04).** npm cannot install git `#ref:path` subdirs — pin
 vettrack SHA via `scripts/vendor-vettrack.mjs` + `file:.vendor/...` deps.
