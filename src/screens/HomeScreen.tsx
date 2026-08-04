@@ -54,6 +54,16 @@ export function HomeScreen({ navigation }: RootStackScreenProps<"Home">) {
           Open storage debug (Slice 2)
         </Text>
       </Pressable>
+
+      <Pressable
+        className="items-center rounded-xl border border-border py-3.5 active:opacity-80"
+        onPress={() => navigation.navigate("RealtimeDebug")}
+        accessibilityRole="button"
+      >
+        <Text className="text-[15px] font-semibold text-foreground">
+          Open realtime debug (Slice 5)
+        </Text>
+      </Pressable>
     </View>
   );
 }

@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ApiSmokeScreen } from "../screens/ApiSmokeScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { NfcSpikeScreen } from "../screens/NfcSpikeScreen";
+import { RealtimeDebugScreen } from "../screens/RealtimeDebugScreen";
 import { SignInScreen } from "../screens/SignInScreen";
 import { StorageDebugScreen } from "../screens/StorageDebugScreen";
 import type { RootStackParamList } from "./types";
@@ -32,6 +33,11 @@ export function RootNavigator() {
         name="StorageDebug"
         component={StorageDebugScreen}
         options={{ title: "Storage debug" }}
+      />
+      <Stack.Screen
+        name="RealtimeDebug"
+        component={RealtimeDebugScreen}
+        options={{ title: "Realtime debug" }}
       />
     </Stack.Navigator>
   );
