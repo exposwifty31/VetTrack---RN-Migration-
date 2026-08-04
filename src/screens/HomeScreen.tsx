@@ -2,6 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { contractsBridgeSmoke } from "@/lib/contracts-bridge";
+import { DelightSpike } from "./DelightSpike";
 import type { RootStackScreenProps } from "../navigation/types";
 
 /**
@@ -20,6 +21,8 @@ export function HomeScreen({ navigation }: RootStackScreenProps<"Home">) {
           days: bridge.inactiveThresholdDays,
         })}
       </Text>
+
+      <DelightSpike />
 
       <Pressable
         className="items-center rounded-xl bg-primary py-3.5 active:opacity-80"
