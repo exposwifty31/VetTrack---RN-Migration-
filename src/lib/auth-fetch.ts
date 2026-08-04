@@ -10,29 +10,45 @@ type ClerkTokenGetter = (() => Promise<string | null>) | null;
 
 let clerkTokenGetter: ClerkTokenGetter = null;
 
-type AuthReadyListener = () => void;
-const authReadyListeners = new Set<AuthReadyListener>();
+/**
+ * Auth-identity transition kinds surfaced to Clerk-free consumers (e.g. RealtimeBridge):
+ *   - "ready"   — a token getter was installed where none existed (sign-in).
+ *   - "changed" — a DIFFERENT getter replaced a non-null one (account switch): the
+ *                 Bearer identity changed, so an open stream must reconnect.
+ *   - "cleared" — the getter was removed (sign-out): no valid token remains.
+ */
+export type AuthChange = "ready" | "changed" | "cleared";
+type AuthChangeListener = (change: AuthChange) => void;
+const authChangeListeners = new Set<AuthChangeListener>();
 
 /**
- * Subscribe to "auth became ready" transitions — fired when a non-null Clerk token
- * getter is installed (i.e. sign-in wired the seam). Lets Clerk-free consumers
- * (e.g. RealtimeBridge) re-open a stream that opened before a valid token existed,
- * without an app background→foreground transition. Returns an unsubscribe fn.
+ * Subscribe to auth-identity transitions. Lets the transport layer keep the SSE
+ * stream aligned with the current Bearer identity WITHOUT importing Clerk: reopen
+ * on sign-in, close-then-reopen on account switch, and close on sign-out. Returns
+ * an unsubscribe fn. (auth-fetch owns the signal; the consumer owns open/close.)
  */
-export function subscribeAuthReady(listener: AuthReadyListener): () => void {
-  authReadyListeners.add(listener);
+export function subscribeAuthChange(listener: AuthChangeListener): () => void {
+  authChangeListeners.add(listener);
   return () => {
-    authReadyListeners.delete(listener);
+    authChangeListeners.delete(listener);
   };
 }
 
-function notifyAuthReady(): void {
-  for (const listener of authReadyListeners) listener();
+function notifyAuthChange(change: AuthChange): void {
+  for (const listener of authChangeListeners) listener(change);
 }
 
 export function setClerkTokenGetter(getter: ClerkTokenGetter): void {
+  const previous = clerkTokenGetter;
   clerkTokenGetter = getter;
-  if (getter) notifyAuthReady();
+  if (getter === previous) return; // no identity transition
+  if (getter === null) {
+    notifyAuthChange("cleared"); // sign-out
+  } else if (previous === null) {
+    notifyAuthChange("ready"); // sign-in (was: notifyAuthReady)
+  } else {
+    notifyAuthChange("changed"); // account switch — different non-null getter
+  }
 }
 
 export function getClerkTokenGetter(): ClerkTokenGetter {
