@@ -41,3 +41,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Git worktrees (agent isolation)
+.worktrees/
+
+# Pinned vettrack checkout for @vettrack/* file: deps (see scripts/vendor-vettrack.mjs)
+.vendor/

@@ -38,7 +38,12 @@ Tailwind v4, CSS-first, **Babel-free** (`withUniwindConfig` in Metro only), no r
 NativeWind v4 → Uniwind with owner approval. Reanimated 4.x stays in the Anchor for the G2 delight
 stack but is no longer force-pulled by styling.
 
-**Slice 2 — Storage port (MMKV, fail-loud).** The Anchor-mandated adapter (R1 residual). `infrastructure/storage/` port interface + MMKV impl + a test asserting a **loud throw** when storage is unavailable (Anchor: no silent no-op).
+**Slice 2 — Storage port (MMKV, fail-loud).** ✅ built on `scaffold/g1-slice-2-storage` (awaiting
+commit approval). `StoragePort` + `MmkvStorageAdapter` (fail-loud `StorageUnavailableError`) +
+`safe-storage` shim + StorageDebugScreen. Local = MMKV `vt.local`; session = process-lifetime
+memory (MMKV v4 has no in-memory mode). Deps: `react-native-mmkv` 4.x + `react-native-nitro-modules`.
+Dirs: `core/ports`, `infrastructure`, `lib`, `i18n`, `features`, `components` + `@/` alias.
+Skipped `src/app/` — Expo treats that path as Expo Router root and would hijack the entry.
 
 **Slice 3 — Clerk-Expo auth.** `@clerk/clerk-expo`, `ClerkProvider` + token cache via the MMKV/SecureStore port, minimal sign-in screen. **Empirically decode a real Clerk-Expo token to confirm the `azp` claim** against `resolveClerkAuthorizedParties` (plan G1 check — traced as likely no-op, confirm on device).
 
@@ -48,7 +53,10 @@ stack but is no longer force-pulled by styling.
 
 **Slice 6 — i18n + RTL.** i18next + he/en locales, `I18nManager.forceRTL` — reuse the vettrack locale JSON where portable.
 
-**Slice 7 — Shared/contracts + Metro `.js`→`.ts` resolver (R5).** Consume `@vettrack/shared`/`@vettrack/contracts` (via git/path dependency — no registry needed yet); add Metro `resolveRequest` for the NodeNext `.js` specifiers.
+**Slice 7 — Shared/contracts + Metro `.js`→`.ts` resolver (R5).** ✅ on
+`scaffold/g1-slice-7-contracts`. npm cannot install git `#ref:path` subdirs — pin
+vettrack SHA via `scripts/vendor-vettrack.mjs` + `file:.vendor/...` deps.
+`metro.resolve-ts-js.js` retries `.js`→`.ts`/`.tsx`; Uniwind stays outermost.
 
 **Slice 8 — NFC device + real tag.** Close the wedge-flow no-go: run on a **physical iPhone** with an **NTAG** (owner has iPhone; no NTAG yet → blocked on a tag). Until then, slice 1's spike-on-device (isSupported=true + scan sheet opens) is the partial close.
 
