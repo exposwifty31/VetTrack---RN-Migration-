@@ -46,7 +46,9 @@ export function RealtimeDebugScreen(_props: RootStackScreenProps<"RealtimeDebug"
       }
     });
     // Reconcile the snapshot AFTER subscribing so a state/cursor change that fired
-    // between the initial useState reads and this effect isn't missed.
+    // between the initial useState reads and this effect isn't missed. This is the
+    // external-store init-read pattern (debug screen); intentional, not a cascade.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate one-shot reconcile after subscribe
     setState(port.getState());
     setCursor(port.getCursor());
     return unsubscribe;

@@ -13,7 +13,7 @@ import { RealtimeBridge } from "../RealtimeBridge";
  * account switch MUST close before it reopens to swap the Bearer token.
  */
 function makeFakePort() {
-  const calls: Array<"open" | "close"> = [];
+  const calls: ("open" | "close")[] = [];
   const port: RealtimePort = {
     open: () => {
       calls.push("open");
