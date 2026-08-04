@@ -1,0 +1,59 @@
+name: CI
+
+# Quality gate for the VetTrack RN migration.
+# Runs on every PR and on pushes to main. `npm ci` triggers the repo's
+# preinstall (vendor-vettrack.mjs: sparse-clones the PUBLIC vettrack repo at a
+# pinned SHA into .vendor/ for @vettrack/contracts + @vettrack/shared) and
+# postinstall (patch-package: applies the react-native-nfc-manager #833 patch),
+# so a clean CI checkout reproduces the exact local toolchain.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. force-push / rapid pushes).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: the quality gate only needs to read the repo.
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: typecheck + test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # No git push happens here; don't leave the token in .git/config where
+          # a lifecycle script could read it.
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # githubactions:S6505 — run `npm ci` with --ignore-scripts so no dependency
+      # lifecycle script auto-executes, then run this repo's REQUIRED first-party
+      # scripts explicitly:
+      #   * vendor-vettrack (the preinstall) sparse-clones the PUBLIC vettrack repo
+      #     for @vettrack/contracts + @vettrack/shared — must run BEFORE install so
+      #     the file: deps resolve.
+      #   * patch-package (the postinstall) applies the nfc-manager #833 patch.
+      - name: Install
+        run: |
+          node scripts/vendor-vettrack.mjs
+          npm ci --ignore-scripts
+          # Call the locally-installed binary directly (not `npx`, which can
+          # fetch an unpinned release and run its scripts — githubactions:S6505/S8543).
+          ./node_modules/.bin/patch-package
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test

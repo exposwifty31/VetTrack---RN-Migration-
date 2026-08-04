@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import {
   safeStorageGetItem,
@@ -16,6 +17,7 @@ const SESSION_KEY = "vt.storage.debug.session";
  * Local should survive app restart; session should not.
  */
 export function StorageDebugScreen(_props: RootStackScreenProps<"StorageDebug">) {
+  const { t } = useTranslation();
   const [localValue, setLocalValue] = useState<string | null>(null);
   const [sessionValue, setSessionValue] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,10 +33,8 @@ export function StorageDebugScreen(_props: RootStackScreenProps<"StorageDebug">)
 
   return (
     <View className="flex-1 gap-3 bg-background px-6 pt-6">
-      <Text className="text-2xl font-bold text-foreground">Storage debug</Text>
-      <Text className="text-[14px] text-muted">
-        Local persists across restart. Session is process-lifetime memory.
-      </Text>
+      <Text className="text-2xl font-bold text-foreground">{t("storageDebug.title")}</Text>
+      <Text className="text-[14px] text-muted">{t("storageDebug.subtitle")}</Text>
 
       <Pressable
         className="items-center rounded-xl bg-primary py-3.5 active:opacity-80"
@@ -50,7 +50,7 @@ export function StorageDebugScreen(_props: RootStackScreenProps<"StorageDebug">)
         }
       >
         <Text className="text-[15px] font-semibold text-primary-foreground">
-          Write both kinds
+          {t("storageDebug.writeBoth")}
         </Text>
       </Pressable>
 
@@ -64,7 +64,7 @@ export function StorageDebugScreen(_props: RootStackScreenProps<"StorageDebug">)
           })
         }
       >
-        <Text className="text-[15px] font-semibold text-foreground">Read both kinds</Text>
+        <Text className="text-[15px] font-semibold text-foreground">{t("storageDebug.readBoth")}</Text>
       </Pressable>
 
       <Pressable
@@ -79,11 +79,15 @@ export function StorageDebugScreen(_props: RootStackScreenProps<"StorageDebug">)
           })
         }
       >
-        <Text className="text-[15px] font-semibold text-foreground">Clear both</Text>
+        <Text className="text-[15px] font-semibold text-foreground">{t("storageDebug.clearBoth")}</Text>
       </Pressable>
 
-      <Text className="mt-2 text-[14px] text-foreground">local: {localValue ?? "(null)"}</Text>
-      <Text className="text-[14px] text-foreground">session: {sessionValue ?? "(null)"}</Text>
+      <Text className="mt-2 text-[14px] text-foreground">
+        {t("storageDebug.localLabel", { value: localValue ?? t("storageDebug.nullValue") })}
+      </Text>
+      <Text className="text-[14px] text-foreground">
+        {t("storageDebug.sessionLabel", { value: sessionValue ?? t("storageDebug.nullValue") })}
+      </Text>
       {error ? <Text className="text-[14px] text-danger">{error}</Text> : null}
     </View>
   );
