@@ -9,13 +9,14 @@
 - Workflow: **Bare RN under Expo Prebuild (CNG)** — `ios/`+`android/` are generated and gitignored;
   `app.json` + config plugins are the native configuration source of truth, never hand-edited
 - State: **Zustand** (client) + **TanStack Query** (server) — no React Context for high-frequency state
-- UI: **NativeWind v4** (Tailwind), **FlashList 2.x** (mandatory for lists), **Reanimated 4.x** + **Gesture Handler 3.x**
+- UI: **Uniwind 1.10.0** (Tailwind v4, CSS-first — adopted in slice 1b, replaced the NativeWind v4 mandate), **FlashList 2.x** (mandatory for lists), **Reanimated 4.x** + **Gesture Handler 3.x**
 - Persistence: **op-sqlite** (WatermelonDB forbidden). Storage access **only via a Port adapter (MMKV)** — **fail-loud**, never silent no-op
 - Auth: **@clerk/clerk-expo**. Realtime: **react-native-sse** (foreground-only). i18n: i18next + **I18nManager RTL**
 
-## Current repo state (verified 2026-07-31)
-- `git`: **"Initial commit" only** — App.tsx (NFC #833 spike, built+ran on iOS Sim), app.json, assets/, .gitignore, patch are **all untracked**. No `src/`. None of the scaffold deps installed.
-- iPhone 17 simulator is booted.
+## Current repo state (verified 2026-08-04)
+- `main` holds **slices 0 / 1 / 1b / 2 / 3 / 4 / 7 — all MERGED.** RN PRs #2–#5 (storage / contracts / Clerk / API) were un-stuck and merged in dependency order (#3→#2→#4→#5) on 2026-08-04; `tsc --noEmit` = 0 on the combined `main` after `npm install` (incl. `@vettrack/contracts` + `@vettrack/shared` resolving).
+- Verified GREEN on iPhone 17 sim (nav) + physical Pixel 7 (NFC `isSupported=true` under New Arch).
+- **Next: slice 5 (SSE).**
 
 ## Slice sequence (each slice: build/run green on the booted sim, THEN commit *with approval*)
 
@@ -38,28 +39,26 @@ Tailwind v4, CSS-first, **Babel-free** (`withUniwindConfig` in Metro only), no r
 NativeWind v4 → Uniwind with owner approval. Reanimated 4.x stays in the Anchor for the G2 delight
 stack but is no longer force-pulled by styling.
 
-**Slice 2 — Storage port (MMKV, fail-loud).** ✅ built on `scaffold/g1-slice-2-storage` (awaiting
-commit approval). `StoragePort` + `MmkvStorageAdapter` (fail-loud `StorageUnavailableError`) +
+**Slice 2 — Storage port (MMKV, fail-loud).** ✅ **MERGED to main (2026-08-04).** `StoragePort` + `MmkvStorageAdapter` (fail-loud `StorageUnavailableError`) +
 `safe-storage` shim + StorageDebugScreen. Local = MMKV `vt.local`; session = process-lifetime
 memory (MMKV v4 has no in-memory mode). Deps: `react-native-mmkv` 4.x + `react-native-nitro-modules`.
 Dirs: `core/ports`, `infrastructure`, `lib`, `i18n`, `features`, `components` + `@/` alias.
 Skipped `src/app/` — Expo treats that path as Expo Router root and would hijack the entry.
 
-**Slice 3 — Clerk-Expo auth.** ✅ on `scaffold/g1-slice-3-clerk` (PR; merge deferred).
+**Slice 3 — Clerk-Expo auth.** ✅ **MERGED to main (2026-08-04).**
 `@clerk/clerk-expo` + SecureStore `tokenCache` (not MMKV), `ClerkTokenBridge` →
 `setClerkTokenGetter`, SignInScreen with azp decode helper. Live azp confirm gated
 on `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` + real sign-in → record in PROOF.
 
-**Slice 4 — API client + TanStack Query.** ✅ on `scaffold/g1-slice-4-api` (PR; merge deferred).
+**Slice 4 — API client + TanStack Query.** ✅ **MERGED to main (2026-08-04).**
 `resolveApiUrl` + Bearer `authFetch` + thin `api` (`users.me`, realtime, `equipment.quickToggle`)
 + QueryClientProvider. RN native `fetch` only.
 
-**Slice 5 — SSE (react-native-sse).** Foreground-only: `AppState` → `close()` on background, `open()` + replay-from-cursor on foreground (#14, #18 — no consumer cursor bookkeeping).
+**Slice 5 — SSE (react-native-sse).** ⏭️ **NEXT.** Foreground-only: `AppState` → `close()` on background, `open()` + replay-from-cursor on foreground (#14, #18 — no consumer cursor bookkeeping).
 
 **Slice 6 — i18n + RTL.** i18next + he/en locales, `I18nManager.forceRTL` — reuse the vettrack locale JSON where portable.
 
-**Slice 7 — Shared/contracts + Metro `.js`→`.ts` resolver (R5).** ✅ on
-`scaffold/g1-slice-7-contracts`. npm cannot install git `#ref:path` subdirs — pin
+**Slice 7 — Shared/contracts + Metro `.js`→`.ts` resolver (R5).** ✅ **MERGED to main (2026-08-04).** npm cannot install git `#ref:path` subdirs — pin
 vettrack SHA via `scripts/vendor-vettrack.mjs` + `file:.vendor/...` deps.
 `metro.resolve-ts-js.js` retries `.js`→`.ts`/`.tsx`; Uniwind stays outermost.
 

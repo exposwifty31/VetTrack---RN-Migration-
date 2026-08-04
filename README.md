@@ -24,16 +24,25 @@ G0 (Capacitor safety net) is nearly done; store submissions are intentionally on
 
 | Gate | State |
 |---|---|
-| **G1 — Foundation** | **in progress** — NFC de-risk spike first (the wedge flow / #1 no-go) |
+| **G1 — Foundation** | **in progress** — NFC de-risk done; slices 0/1/1b/2/3/4/7 merged to `main`; next: SSE (slice 5) |
 | G2 — Hero flow (delight) | not started |
 | G3 — Daily-driver parity | not started |
 | G4 — Code Blue + full offline | not started |
 | G5 — RN to stores | not started |
 
-## G1 — current step: NFC de-risk spike
+## G1 — progress
+
+Foundation slices are merged to `main`: 0 (baseline), 1 (nav + Zustand), 1b (Uniwind styling),
+2 (fail-loud MMKV storage port), 3 (Clerk-Expo auth), 4 (API client + TanStack Query),
+7 (contracts/shared + Metro `.js`→`.ts` resolver). `tsc` is clean on the combined `main`.
+**Next: slice 5 — SSE (react-native-sse, foreground-only).**
+
+### NFC de-risk (done — kept here as reference)
 
 NFC is the wedge flow. If `react-native-nfc-manager` can't work under the New Architecture,
-the migration is a no-go — so it is de-risked first, before any other foundation work.
+the migration is a no-go — so it was de-risked first, before any other foundation work.
+On a physical Pixel 7 the spike reports `isSupported=true` and the module initializes under New Arch;
+the decisive real-tag read is the remaining partial (slice 8, blocked on an NTAG).
 
 - `react-native-nfc-manager@3.17.2` (stable / legacy-arch, runs via the New-Arch interop layer)
   with its Expo config plugin (NFC entitlement + NDEF entitlement + usage string, in `app.json`).
