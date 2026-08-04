@@ -17,7 +17,9 @@
     "nfcSpike": "NFC spike",
     "storageDebug": "Storage",
     "realtimeDebug": "Realtime debug",
-    "i18nDebug": "i18n & RTL"
+    "i18nDebug": "i18n & RTL",
+    "equipment": "Equipment",
+    "scan": "Scan"
   },
   "home": {
     "title": "VetTrack",
@@ -26,7 +28,43 @@
     "apiSmoke": "API smoke (Slice 4)",
     "nfcSpike": "Open NFC de-risk spike",
     "storageDebug": "Open storage debug (Slice 2)",
-    "i18nDebug": "i18n & RTL (Slice 6)"
+    "i18nDebug": "i18n & RTL (Slice 6)",
+    "equipment": "Equipment list",
+    "scan": "Scan to check out",
+    "realtimeDebug": "Open realtime debug (Slice 5)"
+  },
+  "bootstrap": {
+    "reauth": "Session expired. Sign in again to continue."
+  },
+  "equipment": {
+    "listTitle": "Equipment",
+    "empty": "No equipment found.",
+    "searchPlaceholder": "Search equipment",
+    "loadError": "Could not load equipment.",
+    "checkedOutBy": "Checked out by {{email}}",
+    "available": "Available"
+  },
+  "scan": {
+    "prompt": "Launch scan, then hold the tag to the phone.",
+    "readReady": "Ready — present the tag.",
+    "start": "Scan tag",
+    "reading": "Reading…",
+    "unsupported": "NFC is not available on this device.",
+    "readFailed": "Could not read the tag. Try again.",
+    "noId": "No equipment id on this tag."
+  },
+  "confirm": {
+    "title": "Confirm checkout",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "undo": "Undo",
+    "checkedOut": "{{name}} checked out",
+    "returned": "{{name}} returned",
+    "blocked": "Held by {{email}}",
+    "onlineRequired": "You must be online to scan.",
+    "conflict": "This item's state changed. Try again.",
+    "notFound": "Equipment not found.",
+    "failed": "Checkout failed. Try again."
   },
   "signIn": {
     "title": "Sign in",

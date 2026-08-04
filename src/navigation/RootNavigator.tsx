@@ -2,10 +2,13 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useTranslation } from "react-i18next";
 
 import { ApiSmokeScreen } from "../screens/ApiSmokeScreen";
+import { CheckoutConfirm } from "../screens/CheckoutConfirm";
+import { EquipmentListScreen } from "../screens/EquipmentListScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { I18nDebugScreen } from "../screens/I18nDebugScreen";
 import { NfcSpikeScreen } from "../screens/NfcSpikeScreen";
 import { RealtimeDebugScreen } from "../screens/RealtimeDebugScreen";
+import { ScanScreen } from "../screens/ScanScreen";
 import { SignInScreen } from "../screens/SignInScreen";
 import { StorageDebugScreen } from "../screens/StorageDebugScreen";
 import type { RootStackParamList } from "./types";
@@ -25,6 +28,17 @@ export function RootNavigator() {
       }}
     >
       <Stack.Screen name="Home" component={HomeScreen} options={{ title: t("nav.home") }} />
+      <Stack.Screen
+        name="EquipmentList"
+        component={EquipmentListScreen}
+        options={{ title: t("nav.equipment") }}
+      />
+      <Stack.Screen name="Scan" component={ScanScreen} options={{ title: t("nav.scan") }} />
+      <Stack.Screen
+        name="ScanConfirm"
+        component={CheckoutConfirm}
+        options={{ presentation: "transparentModal", headerShown: false }}
+      />
       <Stack.Screen name="SignIn" component={SignInScreen} options={{ title: t("nav.signIn") }} />
       <Stack.Screen name="ApiSmoke" component={ApiSmokeScreen} options={{ title: t("nav.apiSmoke") }} />
       <Stack.Screen name="NfcSpike" component={NfcSpikeScreen} options={{ title: t("nav.nfcSpike") }} />

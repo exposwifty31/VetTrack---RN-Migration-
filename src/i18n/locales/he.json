@@ -17,7 +17,9 @@
     "nfcSpike": "בדיקת NFC",
     "storageDebug": "אחסון",
     "realtimeDebug": "זמן אמת",
-    "i18nDebug": "שפה ו-RTL"
+    "i18nDebug": "שפה ו-RTL",
+    "equipment": "ציוד",
+    "scan": "סריקה"
   },
   "home": {
     "title": "VetTrack",
@@ -26,7 +28,43 @@
     "apiSmoke": "בדיקת API (שלב 4)",
     "nfcSpike": "פתח בדיקת NFC",
     "storageDebug": "פתח דיבאג אחסון (שלב 2)",
-    "i18nDebug": "שפה ו-RTL (שלב 6)"
+    "i18nDebug": "שפה ו-RTL (שלב 6)",
+    "equipment": "רשימת ציוד",
+    "scan": "סריקה להשאלה",
+    "realtimeDebug": "פתח דיבאג זמן אמת (שלב 5)"
+  },
+  "bootstrap": {
+    "reauth": "פג תוקף החיבור. התחבר שוב כדי להמשיך."
+  },
+  "equipment": {
+    "listTitle": "ציוד",
+    "empty": "לא נמצא ציוד.",
+    "searchPlaceholder": "חיפוש ציוד",
+    "loadError": "לא ניתן לטעון ציוד.",
+    "checkedOutBy": "מושאל על ידי {{email}}",
+    "available": "זמין"
+  },
+  "scan": {
+    "prompt": "התחל סריקה, ואז קרב את התווית לטלפון.",
+    "readReady": "מוכן — קרב את התווית.",
+    "start": "סרוק תווית",
+    "reading": "קורא…",
+    "unsupported": "NFC אינו זמין במכשיר זה.",
+    "readFailed": "לא ניתן לקרוא את התווית. נסה שוב.",
+    "noId": "אין מזהה ציוד בתווית זו."
+  },
+  "confirm": {
+    "title": "אישור השאלה",
+    "confirm": "אישור",
+    "cancel": "ביטול",
+    "undo": "ביטול פעולה",
+    "checkedOut": "{{name}} הושאל",
+    "returned": "{{name}} הוחזר",
+    "blocked": "מושאל על ידי {{email}}",
+    "onlineRequired": "יש להיות מחובר לרשת כדי לסרוק.",
+    "conflict": "מצב הפריט השתנה. נסה שוב.",
+    "notFound": "הציוד לא נמצא.",
+    "failed": "ההשאלה נכשלה. נסה שוב."
   },
   "signIn": {
     "title": "התחברות",
