@@ -1,6 +1,7 @@
 // ESLint flat config (ESLint 9). CommonJS — the repo has no "type":"module".
-// eslint-config-expo/flat is the canonical Expo SDK-57 config (an array of 13
-// flat blocks). We only add ignores on top of it.
+// eslint-config-expo/flat is the canonical Expo SDK-57 base config (an array of
+// 13 flat blocks). On top of it we add two things: (1) ignore patterns for
+// non-source paths, and (2) a scoped test-only rule override (both defined below).
 const { defineConfig } = require("eslint/config");
 const expoConfig = require("eslint-config-expo/flat");
 
