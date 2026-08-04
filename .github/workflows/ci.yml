@@ -1,0 +1,39 @@
+name: CI
+
+# Quality gate for the VetTrack RN migration.
+# Runs on every PR and on pushes to main. `npm ci` triggers the repo's
+# preinstall (vendor-vettrack.mjs: sparse-clones the PUBLIC vettrack repo at a
+# pinned SHA into .vendor/ for @vettrack/contracts + @vettrack/shared) and
+# postinstall (patch-package: applies the react-native-nfc-manager #833 patch),
+# so a clean CI checkout reproduces the exact local toolchain.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. force-push / rapid pushes).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: typecheck + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # preinstall clones public vettrack@SHA (contracts/shared); postinstall runs patch-package.
+      - name: Install
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
