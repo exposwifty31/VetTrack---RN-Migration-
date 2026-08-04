@@ -22,6 +22,10 @@ if (!i18n.isInitialized) {
     ns: [DEFAULT_NS],
     interpolation: { escapeValue: false }, // RN has no HTML injection surface
     returnNull: false,
+    // Resources are bundled (imported JSON), so there is no async backend to
+    // await — force synchronous init so t() resolves on the first render and
+    // no translation-less flash can occur.
+    initAsync: false,
     react: { useSuspense: false },
   });
 }
