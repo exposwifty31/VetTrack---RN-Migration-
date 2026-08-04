@@ -58,7 +58,7 @@ Capacitor `vettrack` repo. It runs automatically at **preinstall**, and `postins
 
 ## Structure
 
-```
+```text
 App.tsx              Mounts the root navigator
 app.json             Native configuration source of truth (config plugins; bundle id uk.vettrack.rnmigration)
 metro.config.js      Metro + Uniwind (withUniwindConfig); metro.resolve-ts-js.js for TS/JS resolution
