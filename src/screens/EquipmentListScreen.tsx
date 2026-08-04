@@ -1,7 +1,7 @@
 import { memo, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import { FlashList } from "@shopify/flash-list";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import Animated, {
   useAnimatedStyle,
@@ -66,10 +66,16 @@ const EquipmentRow = memo(function EquipmentRow({
       <Text className="text-[16px] font-semibold text-foreground" numberOfLines={1}>
         {item.name}
       </Text>
-      {held && item.checkedOutByEmail ? (
-        <Text className="mt-0.5 text-[13px] text-muted" numberOfLines={1} style={{ writingDirection: "ltr" }}>
-          {t("equipment.checkedOutBy", { email: item.checkedOutByEmail })}
-        </Text>
+      {held ? (
+        item.checkedOutByEmail ? (
+          <Text className="mt-0.5 text-[13px] text-muted" numberOfLines={1} style={{ writingDirection: "ltr" }}>
+            {t("equipment.checkedOutBy", { email: item.checkedOutByEmail })}
+          </Text>
+        ) : (
+          <Text className="mt-0.5 text-[13px] text-muted" numberOfLines={1}>
+            {t("equipment.held")}
+          </Text>
+        )
       ) : (
         <Text className="mt-0.5 text-[13px] text-info" numberOfLines={1}>
           {t("equipment.available")}
@@ -81,31 +87,48 @@ const EquipmentRow = memo(function EquipmentRow({
 
 function EquipmentListBody({ navigation }: RootStackScreenProps<"EquipmentList">) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   useEquipmentRealtimeSync();
 
   const [query, setQuery] = useState("");
   // useDeferredValue keeps typing responsive while the filtered query re-runs.
   const deferredQuery = useDeferredValue(query);
   const params: EquipmentListParams = deferredQuery ? { q: deferredQuery } : {};
+  const queryKey = equipmentKeys.list(params);
 
-  // ETag threading: reuse the last ETag; a 304 short-circuits to the cached page.
-  const etagRef = useRef<string | undefined>(undefined);
-  const pageRef = useRef<EquipmentListPage | undefined>(undefined);
+  // ETag threading scoped PER query key: a shared single-slot ref would send one
+  // search's ETag on another search's request, so a 304 would return the wrong
+  // page. Key the ETag + cached page on the (normalized) query key.
+  const cacheRef = useRef<Map<string, { etag?: string; page: EquipmentListPage }>>(new Map());
 
   const listQuery = useQuery<EquipmentListPage>({
-    queryKey: equipmentKeys.list(params),
+    queryKey,
     queryFn: async () => {
-      const res = await api.equipment.list(params, etagRef.current);
-      if (res.status === 304) return pageRef.current ?? EMPTY_PAGE;
-      etagRef.current = res.etag;
-      pageRef.current = res.data;
+      const cacheKey = JSON.stringify(queryKey);
+      const cached = cacheRef.current.get(cacheKey);
+      const res = await api.equipment.list(params, cached?.etag);
+      if (res.status === 304) {
+        return (
+          cached?.page ??
+          queryClient.getQueryData<EquipmentListPage>(queryKey) ??
+          EMPTY_PAGE
+        );
+      }
+      cacheRef.current.set(cacheKey, { etag: res.etag, page: res.data });
       return res.data;
     },
   });
 
-  // Cold-TTI (O4) end marker: the list is interactive on its first successful render.
+  // Cold-TTI (O4) end marker: the list is interactive on its FIRST successful
+  // render. A ref latches for the screen lifetime so a later search re-entering
+  // `isSuccess` cannot overwrite the mark with user-search time (measureTTI picks
+  // the latest `screenInteractive`).
+  const markedInteractive = useRef(false);
   useEffect(() => {
-    if (listQuery.isSuccess) mark(MARK.screenInteractive);
+    if (listQuery.isSuccess && !markedInteractive.current) {
+      markedInteractive.current = true;
+      mark(MARK.screenInteractive);
+    }
   }, [listQuery.isSuccess]);
 
   const onRowPress = useCallback<RowPressHandler>(

@@ -21,11 +21,18 @@ export function extractEquipmentId(raw: string): string | null {
   if (!trimmed) return null;
   try {
     const url = new URL(trimmed);
-    const parts = url.pathname.split("/");
-    const idx = parts.indexOf("equipment");
-    if (idx >= 0 && parts[idx + 1]) return parts[idx + 1];
+    // A URL record is only trusted when it is the canonical production tag:
+    // exactly `https://vettrack.uk/equipment/<id>`. Reject foreign origins and
+    // noncanonical paths (`/anything/equipment/<id>`) so an attacker-written tag
+    // cannot smuggle an arbitrary id into the custody-confirmation flow.
+    if (url.origin !== UNIVERSAL_LINK_ORIGIN) return null;
+    const parts = url.pathname.split("/").filter((p) => p.length > 0);
+    if (parts.length === 2 && parts[0] === "equipment" && parts[1]) {
+      return parts[1];
+    }
     return null;
   } catch {
+    // Not a URL → the documented bare-id pilot syntax (e.g. `eq1`).
     if (!trimmed.includes(" ") && trimmed.length > 0) return trimmed;
     return null;
   }

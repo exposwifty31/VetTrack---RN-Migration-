@@ -79,6 +79,25 @@ export function measureTapServerConfirmed(): number | null {
 
 export type FrameSample = { framesTotal: number; framesOverBudget: number };
 
+// --- Frame-sample sink (O1/O2) ---------------------------------------------
+// The JS-thread and UI-thread samples are published + stored SEPARATELY (never
+// merged) so the gate can report both threads. This is a bounded record keyed by
+// a closed `FrameSampleSource` union — NOT free-form marks, so the MARK vocab
+// stays closed (no high-cardinality/free-form telemetry).
+export type FrameSampleSource = "js" | "ui";
+
+const frameSamples: Record<FrameSampleSource, FrameSample | null> = { js: null, ui: null };
+
+/** Publish a captured frame sample to the sink under its thread source. */
+export function publishFrameSample(source: FrameSampleSource, sample: FrameSample): void {
+  frameSamples[source] = sample;
+}
+
+/** Read the last published sample for a thread source (null if none yet). */
+export function getFrameSample(source: FrameSampleSource): FrameSample | null {
+  return frameSamples[source];
+}
+
 type FrameSamplerHandle = {
   stop: () => FrameSample;
 };

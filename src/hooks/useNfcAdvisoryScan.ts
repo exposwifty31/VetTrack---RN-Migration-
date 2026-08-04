@@ -26,10 +26,20 @@ function idFromRecord(record: NdefRecord): string | null {
   }
 }
 
+/**
+ * A read either yields an id, completes with no id on the tag, or the reader
+ * session itself rejected (cancel / tag lost / hardware). The three are distinct
+ * so the caller can surface `scan.readFailed` vs `scan.noId`.
+ */
+export type NfcScanResult =
+  | { status: "ok"; equipmentId: string }
+  | { status: "no_id" }
+  | { status: "read_failed" };
+
 export type NfcAdvisoryScan = {
   supported: boolean | null;
   reading: boolean;
-  scan: () => Promise<string | null>;
+  scan: () => Promise<NfcScanResult>;
 };
 
 export function useNfcAdvisoryScan(): NfcAdvisoryScan {
@@ -54,7 +64,7 @@ export function useNfcAdvisoryScan(): NfcAdvisoryScan {
     };
   }, []);
 
-  const scan = useCallback(async (): Promise<string | null> => {
+  const scan = useCallback(async (): Promise<NfcScanResult> => {
     setReading(true);
     try {
       await NfcManager.requestTechnology(NfcTech.Ndef);
@@ -62,9 +72,13 @@ export function useNfcAdvisoryScan(): NfcAdvisoryScan {
       const records: NdefRecord[] = tag?.ndefMessage ?? [];
       for (const record of records) {
         const id = idFromRecord(record);
-        if (id) return id;
+        if (id) return { status: "ok", equipmentId: id };
       }
-      return null;
+      return { status: "no_id" };
+    } catch {
+      // requestTechnology()/getTag() reject on user cancel, tag lost, or a
+      // hardware error — surface these as a read failure, not a "no id" tag.
+      return { status: "read_failed" };
     } finally {
       NfcManager.cancelTechnologyRequest().catch(() => {});
       setReading(false);

@@ -6,7 +6,7 @@
  * message. `(rn-architecture: gate side-effects in a container, keep screens pure.)`
  */
 import type { ReactNode } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { getCurrentUserId } from "@/lib/auth-store";
@@ -34,10 +34,21 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
 
   if (!ready) {
     return (
-      <View className="flex-1 items-center justify-center gap-2 bg-background px-6">
+      <View className="flex-1 items-center justify-center gap-3 bg-background px-6">
         <Text className="text-center text-[15px] font-semibold text-danger">
           {t("bootstrap.reauth")}
         </Text>
+        <Pressable
+          className="items-center rounded-xl bg-primary px-6 py-3 active:opacity-80"
+          accessibilityRole="button"
+          onPress={() => {
+            void identity.refetch();
+          }}
+        >
+          <Text className="text-[15px] font-semibold text-primary-foreground">
+            {t("bootstrap.retry")}
+          </Text>
+        </Pressable>
       </View>
     );
   }

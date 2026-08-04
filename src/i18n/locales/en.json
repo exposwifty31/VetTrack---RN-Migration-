@@ -30,11 +30,12 @@
     "storageDebug": "Open storage debug (Slice 2)",
     "i18nDebug": "i18n & RTL (Slice 6)",
     "equipment": "Equipment list",
-    "scan": "Scan to check out",
+    "scan": "Scan a tag",
     "realtimeDebug": "Open realtime debug (Slice 5)"
   },
   "bootstrap": {
-    "reauth": "Session expired. Sign in again to continue."
+    "reauth": "Session expired. Sign in again to continue.",
+    "retry": "Try again"
   },
   "equipment": {
     "listTitle": "Equipment",
@@ -42,6 +43,7 @@
     "searchPlaceholder": "Search equipment",
     "loadError": "Could not load equipment.",
     "checkedOutBy": "Checked out by {{email}}",
+    "held": "Checked out",
     "available": "Available"
   },
   "scan": {
@@ -54,7 +56,7 @@
     "noId": "No equipment id on this tag."
   },
   "confirm": {
-    "title": "Confirm checkout",
+    "title": "Confirm scan",
     "confirm": "Confirm",
     "cancel": "Cancel",
     "undo": "Undo",

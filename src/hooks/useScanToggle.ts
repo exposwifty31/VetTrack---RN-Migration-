@@ -101,8 +101,19 @@ export function useScanToggle() {
     onSuccess: (result, _equipmentId, context) => {
       if (result.kind === "ok") {
         mark(MARK.scanServerConfirmed);
-        // Reconcile the detail + list caches to the authoritative server row.
-        queryClient.setQueryData(equipmentKeys.detail(result.equipment.id), result.equipment);
+        const serverRow = result.equipment;
+        // Reconcile the detail + every cached list page to the authoritative
+        // server row (not just the detail cache) so the list reflects the true
+        // version/status/holder immediately, before the SSE-driven invalidation.
+        queryClient.setQueryData(equipmentKeys.detail(serverRow.id), serverRow);
+        for (const [key, data] of queryClient.getQueriesData({ queryKey: equipmentKeys.all })) {
+          if (isListPage(data)) {
+            queryClient.setQueryData(key, {
+              ...data,
+              items: data.items.map((item) => (item.id === serverRow.id ? serverRow : item)),
+            });
+          }
+        }
         haptics.scanSuccess();
         return;
       }

@@ -119,6 +119,55 @@ describe("api.equipment.scan", () => {
     const result = await api.equipment.scan("eq1");
     expect(result.kind).toBe("blocked_precondition");
   });
+
+  it("maps a malformed 200 body (missing `equipment`) to blocked_precondition — no downstream TypeError", async () => {
+    const { response } = makeResponse({
+      status: 200,
+      body: { action: "checkout", scanLogId: "log_1", undoToken: "undo_1" },
+    });
+    mockAuthFetch.mockResolvedValue(response);
+
+    const result = await api.equipment.scan("eq1");
+    expect(result.kind).toBe("blocked_precondition");
+    if (result.kind === "blocked_precondition") {
+      expect(result.code).toBe("MALFORMED_SCAN_RESPONSE");
+    }
+  });
+});
+
+describe("api.equipment.revert", () => {
+  it("returns the bare updated row on success", async () => {
+    const row = { id: "eq1", name: "Ultrasound", status: "available", custodyState: "available", version: 3 };
+    const { response } = makeResponse({ status: 200, body: row });
+    mockAuthFetch.mockResolvedValue(response);
+
+    const result = await api.equipment.revert("eq1", "undo_1");
+
+    expect(result).toEqual(row);
+    expect(mockAuthFetch).toHaveBeenCalledWith(
+      "/api/equipment/eq1/revert",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("throws through requestJson on an error status", async () => {
+    const { response } = makeResponse({ status: 403, ok: false, body: { error: "FORBIDDEN" } });
+    mockAuthFetch.mockResolvedValue(response);
+
+    await expect(api.equipment.revert("eq1", "undo_1")).rejects.toThrow("FORBIDDEN");
+  });
+
+  it("percent-encodes an id with path-significant characters", async () => {
+    const { response } = makeResponse({ status: 200, body: { id: "a/b" } });
+    mockAuthFetch.mockResolvedValue(response);
+
+    await api.equipment.revert("a/b", "undo_1");
+
+    expect(mockAuthFetch).toHaveBeenCalledWith(
+      "/api/equipment/a%2Fb/revert",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
 });
 
 describe("api.equipment.list", () => {

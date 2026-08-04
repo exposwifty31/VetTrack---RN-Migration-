@@ -112,6 +112,33 @@ describe("useScanToggle", () => {
     expect(cachedCustody(queryClient)).toBe("available");
   });
 
+  it("reconciles the authoritative list row (version/status/holder) on success", async () => {
+    const { queryClient, view } = await setup();
+    mockAuthFetch.mockResolvedValue(
+      fakeResponse(200, {
+        equipment: {
+          id: "eq1",
+          name: "Ultrasound",
+          status: "in_use",
+          custodyState: "checked_out",
+          checkedOutByEmail: "me@clinic.test",
+          version: 2,
+        },
+        action: "checkout",
+        scanLogId: "log_1",
+        undoToken: "undo_1",
+      }),
+    );
+
+    view.result.current.mutate("eq1");
+    await waitFor(() => expect(view.result.current.isPending).toBe(false));
+
+    const row = queryClient.getQueryData<EquipmentListPage>(equipmentKeys.list())?.items[0];
+    expect(row?.version).toBe(2);
+    expect(row?.status).toBe("in_use");
+    expect(row?.checkedOutByEmail).toBe("me@clinic.test");
+  });
+
   it("reconciles the detail cache to the server row on success", async () => {
     const { queryClient, view } = await setup();
     mockAuthFetch.mockResolvedValue(

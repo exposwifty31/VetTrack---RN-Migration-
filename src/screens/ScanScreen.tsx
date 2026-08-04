@@ -18,12 +18,12 @@ export function ScanScreen({ navigation }: RootStackScreenProps<"Scan">) {
 
   const onScan = async () => {
     setNote(null);
-    const equipmentId = await scan();
-    if (equipmentId) {
-      navigation.navigate("ScanConfirm", { equipmentId });
+    const result = await scan();
+    if (result.status === "ok") {
+      navigation.navigate("ScanConfirm", { equipmentId: result.equipmentId });
       return;
     }
-    setNote(t("scan.noId"));
+    setNote(result.status === "read_failed" ? t("scan.readFailed") : t("scan.noId"));
   };
 
   return (

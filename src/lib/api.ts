@@ -26,8 +26,16 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 /** Canonical equipment query key — the single invalidation target for the hero flow. */
 export const equipmentKeys = {
   all: ["equipment"] as const,
-  list: (params?: EquipmentListParams) =>
-    params ? (["equipment", "list", params] as const) : (["equipment", "list"] as const),
+  list: (params?: EquipmentListParams) => {
+    // Normalize empty params to "no params" so one logical page maps to one
+    // query key: `EquipmentListScreen` builds `{}` when the search box is empty,
+    // and `equipmentKeys.list({})` must target the same entry as `list()`.
+    const hasParams =
+      params != null && Object.values(params).some((v) => v != null && v !== "");
+    return hasParams
+      ? (["equipment", "list", params] as const)
+      : (["equipment", "list"] as const);
+  },
   detail: (id: string) => ["equipment", "detail", id] as const,
 };
 
@@ -100,18 +108,28 @@ export const api = {
       });
 
       if (res.ok) {
-        const ok = (await res.json()) as {
-          equipment: EquipmentRow;
-          action: "checkout" | "return";
-          scanLogId: string;
-          undoToken: string;
-        };
+        // Validate the 200 body before returning `kind: "ok"`. A malformed body
+        // (missing `equipment`/`action`) would otherwise make `onSuccess` in
+        // `useScanToggle` read `result.equipment.id` and throw inside the
+        // mutation callback. `readJsonSafe` also honors the non-throwing contract
+        // if `res.json()` rejects. Degrade to `blocked_precondition` on a bad shape.
+        const body = await readJsonSafe(res);
+        const equipment = body.equipment;
+        const action = body.action;
+        const validShape =
+          !!equipment &&
+          typeof equipment === "object" &&
+          typeof (equipment as EquipmentRow).id === "string" &&
+          (action === "checkout" || action === "return");
+        if (!validShape) {
+          return { kind: "blocked_precondition", code: "MALFORMED_SCAN_RESPONSE" };
+        }
         return {
           kind: "ok",
-          equipment: ok.equipment,
-          action: ok.action,
-          scanLogId: ok.scanLogId,
-          undoToken: ok.undoToken,
+          equipment: equipment as EquipmentRow,
+          action: action as "checkout" | "return",
+          scanLogId: typeof body.scanLogId === "string" ? body.scanLogId : "",
+          undoToken: typeof body.undoToken === "string" ? body.undoToken : "",
         };
       }
 
@@ -166,14 +184,16 @@ export const api = {
      * `canUndoScan`). Returns the BARE updated row (not wrapped in `{equipment}`).
      */
     revert: (equipmentId: string, undoToken: string) =>
-      requestJson<EquipmentRow>(`/api/equipment/${equipmentId}/revert`, {
+      // Encode the id: NFC/route-derived ids can contain `/`, `?`, `#`, or dot
+      // segments that would otherwise reshape the request path (CWE-29).
+      requestJson<EquipmentRow>(`/api/equipment/${encodeURIComponent(equipmentId)}/revert`, {
         method: "POST",
         body: JSON.stringify({ undoToken }),
       }),
 
     /** Legacy UUID-only toggle (POST /:id/toggle). NOT used in the hero path. */
     quickToggle: (equipmentId: string) =>
-      requestJson<QuickScanToggleResult>(`/api/equipment/${equipmentId}/toggle`, {
+      requestJson<QuickScanToggleResult>(`/api/equipment/${encodeURIComponent(equipmentId)}/toggle`, {
         method: "POST",
         body: JSON.stringify({ isPluggedIn: true }),
       }),
