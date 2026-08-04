@@ -32,6 +32,9 @@ export function getDefaultRealtimePort(): RealtimePort {
     resolveUrl: resolveApiUrl,
     resolveToken: resolveBearerToken,
     isValidToken: isValidJwt,
+    // Bearer over cleartext http:// is refused in production (CWE-319); permitted
+    // only in dev so on-device Expo (http://<LAN-IP>:3001) keeps working.
+    allowInsecureAuth: __DEV__,
     debug: __DEV__,
   });
   return singleton;
@@ -39,5 +42,6 @@ export function getDefaultRealtimePort(): RealtimePort {
 
 /** Test-only: reset the production singleton between suites. */
 export function __resetDefaultRealtimePortForTests(): void {
+  singleton?.close();
   singleton = null;
 }

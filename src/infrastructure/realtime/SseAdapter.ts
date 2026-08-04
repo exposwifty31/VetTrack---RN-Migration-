@@ -50,12 +50,38 @@ export interface SseAdapterDeps {
   resolveToken: () => Promise<string | null>;
   /** isValidJwt from @/lib/auth-fetch. */
   isValidToken: (token: string | null) => boolean;
+  /**
+   * Permit attaching the Bearer token to a non-https:// stream URL. Defaults to
+   * false (secure): a cleartext http:// stream is refused so the token is never
+   * transmitted in the clear (CWE-319). Production wires this false; dev sets it
+   * true so on-device Expo over http://<LAN-IP> still connects.
+   */
+  allowInsecureAuth?: boolean;
   /** Override for tests; defaults to the frozen SSE stream path. */
   streamPath?: string;
   debug?: boolean;
 }
 
 const DEFAULT_STREAM_PATH = "/api/realtime/stream";
+
+const VALID_RESET_REASONS: readonly RealtimeResetReason[] = [
+  "last_event_pruned",
+  "last_event_unknown",
+];
+
+function isHttpsUrl(url: string): boolean {
+  return /^https:\/\//i.test(url);
+}
+
+/** True only for a genuine RealtimeEnvelope object shape (rejects null/array/primitive). */
+function isEnvelopeShape(value: unknown): value is RealtimeEnvelope {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as { type?: unknown }).type === "string"
+  );
+}
 
 function toNumericCursor(value: unknown): number | undefined {
   return typeof value === "number" &&
@@ -126,13 +152,20 @@ export class SseAdapter implements RealtimePort {
           this.setState("error");
           return;
         }
+        const url = this.deps.resolveUrl(this.deps.streamPath ?? DEFAULT_STREAM_PATH);
+        // Never send the Bearer token over cleartext http:// (CWE-319). Refuse the
+        // connect before EventSource ever sees the Authorization header. Dev opts
+        // out via allowInsecureAuth so on-device Expo (http://<LAN-IP>) still works.
+        if (!isHttpsUrl(url) && !this.deps.allowInsecureAuth) {
+          this.setState("error");
+          return;
+        }
         const headers: Record<string, string> = {
           Authorization: `Bearer ${token}`,
         };
         if (this.cursor > 0) {
           headers["Last-Event-ID"] = String(this.cursor);
         }
-        const url = this.deps.resolveUrl(this.deps.streamPath ?? DEFAULT_STREAM_PATH);
         const es = this.deps.factory(url, {
           headers,
           method: "GET",
@@ -170,12 +203,16 @@ export class SseAdapter implements RealtimePort {
 
   private onMessage(event: SseIncoming): void {
     if (!event.data) return;
-    let envelope: RealtimeEnvelope;
+    let parsed: unknown;
     try {
-      envelope = JSON.parse(event.data) as RealtimeEnvelope;
+      parsed = JSON.parse(event.data);
     } catch {
       return; // malformed frame — drop defensively, never throw on the transport
     }
+    // JSON.parse accepts bare null/number/string/array — validate the envelope
+    // shape before any property access so a non-object frame can't throw or emit.
+    if (!isEnvelopeShape(parsed)) return;
+    const envelope = parsed;
 
     if (envelope.type === "KEEPALIVE") {
       const payload = (envelope.payload ?? {}) as Partial<RealtimeKeepalive>;
@@ -193,8 +230,14 @@ export class SseAdapter implements RealtimePort {
     }
 
     if (envelope.type === "RESET_STATE") {
-      const reason = ((envelope.payload as { reason?: string } | undefined)?.reason ??
-        "last_event_unknown") as RealtimeResetReason;
+      // Validate the server-provided reason against the known set at runtime —
+      // never let an arbitrary string escape as a RealtimeResetReason.
+      const rawReason = (envelope.payload as { reason?: unknown } | undefined)?.reason;
+      const reason: RealtimeResetReason = VALID_RESET_REASONS.includes(
+        rawReason as RealtimeResetReason,
+      )
+        ? (rawReason as RealtimeResetReason)
+        : "last_event_unknown";
       this.cursor = 0; // pruned/unknown resume point — force full snapshot downstream
       this.emit({ kind: "reset", reason });
       return;

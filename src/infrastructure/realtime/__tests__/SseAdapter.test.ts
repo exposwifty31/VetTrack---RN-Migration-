@@ -39,7 +39,10 @@ class FakeEventSource implements SseLike {
   }
 }
 
-function makeAdapter(token: string | null = "a.b.c") {
+function makeAdapter(
+  token: string | null = "a.b.c",
+  overrides: { resolveUrl?: (p: string) => string; allowInsecureAuth?: boolean } = {},
+) {
   const instances: FakeEventSource[] = [];
   const factory: SseFactory = (url, options) => {
     const es = new FakeEventSource(url, options);
@@ -48,9 +51,10 @@ function makeAdapter(token: string | null = "a.b.c") {
   };
   const adapter = new SseAdapter({
     factory,
-    resolveUrl: (p) => `http://x${p}`,
+    resolveUrl: overrides.resolveUrl ?? ((p) => `https://x${p}`),
     resolveToken: async () => token,
     isValidToken: (t) => !!t && t.split(".").length === 3,
+    allowInsecureAuth: overrides.allowInsecureAuth,
   });
   return { adapter, instances };
 }
@@ -166,5 +170,53 @@ describe("SseAdapter", () => {
     expect(instances).toHaveLength(0);
     expect(adapter.getState()).toBe("error");
     expect(events).toContainEqual({ kind: "state", state: "error" });
+  });
+
+  it("refuses to attach the Bearer over cleartext http:// (CWE-319)", async () => {
+    const { adapter, instances } = makeAdapter("a.b.c", {
+      resolveUrl: (p) => `http://insecure${p}`,
+    });
+    adapter.open();
+    await flush();
+    expect(instances).toHaveLength(0); // token never reached EventSource
+    expect(adapter.getState()).toBe("error");
+  });
+
+  it("permits http:// only when allowInsecureAuth is set (dev on-device)", async () => {
+    const { adapter, instances } = makeAdapter("a.b.c", {
+      resolveUrl: (p) => `http://192.168.1.5:3001${p}`,
+      allowInsecureAuth: true,
+    });
+    adapter.open();
+    await flush();
+    expect(instances).toHaveLength(1);
+    expect(instances[0].options.headers.Authorization).toBe("Bearer a.b.c");
+  });
+
+  it("drops valid-JSON frames that are not envelope objects (null/array/primitive)", async () => {
+    const { adapter, instances } = makeAdapter();
+    const events: RealtimeEvent[] = [];
+    adapter.subscribe((e) => events.push(e));
+    adapter.open();
+    await flush();
+    const before = events.length;
+    for (const data of ["null", "42", '"str"', "[1,2,3]", "{}"]) {
+      instances[0].fire("message", { type: "message", data });
+    }
+    expect(events.length).toBe(before); // nothing emitted, nothing thrown
+    expect(adapter.getCursor()).toBe(0);
+  });
+
+  it("maps an unknown RESET_STATE reason to last_event_unknown", async () => {
+    const { adapter, instances } = makeAdapter();
+    const events: RealtimeEvent[] = [];
+    adapter.subscribe((e) => events.push(e));
+    adapter.open();
+    await flush();
+    instances[0].fire(
+      "message",
+      msg({ type: "RESET_STATE", payload: { reason: "bogus_reason" }, timestamp: "t" }),
+    );
+    expect(events).toContainEqual({ kind: "reset", reason: "last_event_unknown" });
   });
 });

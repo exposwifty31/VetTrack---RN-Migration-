@@ -10,8 +10,29 @@ type ClerkTokenGetter = (() => Promise<string | null>) | null;
 
 let clerkTokenGetter: ClerkTokenGetter = null;
 
+type AuthReadyListener = () => void;
+const authReadyListeners = new Set<AuthReadyListener>();
+
+/**
+ * Subscribe to "auth became ready" transitions — fired when a non-null Clerk token
+ * getter is installed (i.e. sign-in wired the seam). Lets Clerk-free consumers
+ * (e.g. RealtimeBridge) re-open a stream that opened before a valid token existed,
+ * without an app background→foreground transition. Returns an unsubscribe fn.
+ */
+export function subscribeAuthReady(listener: AuthReadyListener): () => void {
+  authReadyListeners.add(listener);
+  return () => {
+    authReadyListeners.delete(listener);
+  };
+}
+
+function notifyAuthReady(): void {
+  for (const listener of authReadyListeners) listener();
+}
+
 export function setClerkTokenGetter(getter: ClerkTokenGetter): void {
   clerkTokenGetter = getter;
+  if (getter) notifyAuthReady();
 }
 
 export function getClerkTokenGetter(): ClerkTokenGetter {

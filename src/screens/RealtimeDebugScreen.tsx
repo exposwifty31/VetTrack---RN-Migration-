@@ -45,6 +45,10 @@ export function RealtimeDebugScreen(_props: RootStackScreenProps<"RealtimeDebug"
           break;
       }
     });
+    // Reconcile the snapshot AFTER subscribing so a state/cursor change that fired
+    // between the initial useState reads and this effect isn't missed.
+    setState(port.getState());
+    setCursor(port.getCursor());
     return unsubscribe;
   }, [port]);
 
