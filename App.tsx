@@ -1,11 +1,13 @@
 import "./src/global.css";
 
+import type { ReactNode } from "react";
 import { ClerkProvider } from "@clerk/clerk-expo";
 import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { NavigationContainer } from "@react-navigation/native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
 import { I18nextProvider } from "react-i18next";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Uniwind } from "uniwind";
 
@@ -43,13 +45,19 @@ export default function App() {
     </I18nextProvider>
   );
 
+  // GestureHandlerRootView must be the OUTERMOST element (G2 delight stack —
+  // Gesture Handler no-ops silently without it).
+  const withRoot = (node: ReactNode) => (
+    <GestureHandlerRootView style={{ flex: 1 }}>{node}</GestureHandlerRootView>
+  );
+
   if (!publishableKey) {
-    return tree;
+    return withRoot(tree);
   }
 
-  return (
+  return withRoot(
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       {tree}
-    </ClerkProvider>
+    </ClerkProvider>,
   );
 }
