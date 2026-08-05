@@ -1,6 +1,6 @@
 # G2 Pre-Registration — Hero-Flow Go/No-Go
 
-> **This document is the lock.** Once committed, the commit SHA freezes every threshold, device, tool, and decision rule below. No value may change after the lock SHA is recorded in §8 — a miss is a miss. Amending, force-pushing, or re-committing to move a number voids the gate.
+> **This document is the lock.** Once committed, the commit SHA freezes every threshold, device, tool, and decision rule below. No value may change after the lock SHA is recorded in the merge PR (§8) — a miss is a miss. Amending, force-pushing, or re-committing to move a number voids the gate.
 >
 > **Revision 2026-08-06 (pre-lock):** adapted to the owner's real constraints — stated as final facts in-session — before any lock SHA was ever recorded (§8 of the original template was never filled, so no lock existed to void). Two changes from the template: (1) the gate device is the owner's **Google Pixel** — the only Android device available — replacing the hypothetical low-end device; (2) the ≥5-staff blind preference arm is **not feasible** (no staff panel available) and is replaced by objective floors + the owner's explicit side-by-side judgment (§5).
 
