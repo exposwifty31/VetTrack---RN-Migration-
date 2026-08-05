@@ -26,11 +26,10 @@ export function extractEquipmentId(raw: string): string | null {
     // noncanonical paths (`/anything/equipment/<id>`) so an attacker-written tag
     // cannot smuggle an arbitrary id into the custody-confirmation flow.
     if (url.origin !== UNIVERSAL_LINK_ORIGIN) return null;
-    const parts = url.pathname.split("/").filter((p) => p.length > 0);
-    if (parts.length === 2 && parts[0] === "equipment" && parts[1]) {
-      return parts[1];
-    }
-    return null;
+    // Match the pathname EXACTLY as `/equipment/<id>` — a split()+filter() drops the
+    // trailing empty segment and would silently accept `/equipment/eq1/`.
+    const match = /^\/equipment\/([^/]+)$/.exec(url.pathname);
+    return match?.[1] ?? null;
   } catch {
     // Not a URL → the documented bare-id pilot syntax (e.g. `eq1`).
     if (!trimmed.includes(" ") && trimmed.length > 0) return trimmed;

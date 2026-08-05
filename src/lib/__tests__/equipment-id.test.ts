@@ -32,6 +32,10 @@ describe("extractEquipmentId", () => {
     expect(extractEquipmentId(`${UNIVERSAL_LINK_ORIGIN}/equipment/eq1/extra`)).toBeNull();
   });
 
+  it("rejects a trailing slash after the id", () => {
+    expect(extractEquipmentId(`${UNIVERSAL_LINK_ORIGIN}/equipment/eq1/`)).toBeNull();
+  });
+
   it("accepts a bare pilot id (non-URL fallback)", () => {
     expect(extractEquipmentId("eq1")).toBe("eq1");
   });

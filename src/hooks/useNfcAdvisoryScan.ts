@@ -14,26 +14,33 @@ import NfcManager, { Ndef, NfcTech, type NdefRecord } from "react-native-nfc-man
 
 import { extractEquipmentId } from "@/lib/equipment-id";
 
-/** Try to decode a URL record and pull an equipment id out of it. */
-function idFromRecord(record: NdefRecord): string | null {
-  const payload = record?.payload;
-  if (!payload || payload.length === 0) return null;
+/**
+ * Decode ONLY record 0 (the well-known URI record — the canonical equipment
+ * sticker; see docs/g2-ntag-ndef-spec.md). We deliberately do NOT scan later
+ * records: a hostile tag could append a second URL record to smuggle a different
+ * id past record 0. Returns the decoded id AND the raw decoded URL/payload, so a
+ * non-canonical tag can still fall back to a text search instead of a dead end.
+ */
+function decodeRecord0(records: NdefRecord[]): { id: string | null; payload: string | null } {
+  const payload = records[0]?.payload;
+  if (!payload || payload.length === 0) return { id: null, payload: null };
   try {
     const url = Ndef.uri.decodePayload(new Uint8Array(payload));
-    return extractEquipmentId(url);
+    return { id: extractEquipmentId(url), payload: url };
   } catch {
-    return null;
+    return { id: null, payload: null };
   }
 }
 
 /**
- * A read either yields an id, completes with no id on the tag, or the reader
- * session itself rejected (cancel / tag lost / hardware). The three are distinct
- * so the caller can surface `scan.readFailed` vs `scan.noId`.
+ * A read either yields an id, completes with no canonical id (but may carry a raw
+ * payload for a search fallback), or the reader session itself rejected (cancel /
+ * tag lost / hardware). The three are distinct so the caller can surface
+ * `scan.readFailed` vs `scan.noId` and try `equipment.list({ q: payload })`.
  */
 export type NfcScanResult =
   | { status: "ok"; equipmentId: string }
-  | { status: "no_id" }
+  | { status: "no_id"; payload: string | null }
   | { status: "read_failed" };
 
 export type NfcAdvisoryScan = {
@@ -70,11 +77,9 @@ export function useNfcAdvisoryScan(): NfcAdvisoryScan {
       await NfcManager.requestTechnology(NfcTech.Ndef);
       const tag = await NfcManager.getTag();
       const records: NdefRecord[] = tag?.ndefMessage ?? [];
-      for (const record of records) {
-        const id = idFromRecord(record);
-        if (id) return { status: "ok", equipmentId: id };
-      }
-      return { status: "no_id" };
+      const { id, payload } = decodeRecord0(records);
+      if (id) return { status: "ok", equipmentId: id };
+      return { status: "no_id", payload };
     } catch {
       // requestTechnology()/getTag() reject on user cancel, tag lost, or a
       // hardware error — surface these as a read failure, not a "no id" tag.

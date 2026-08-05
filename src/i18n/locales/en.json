@@ -66,7 +66,7 @@
     "onlineRequired": "You must be online to scan.",
     "conflict": "This item's state changed. Try again.",
     "notFound": "Equipment not found.",
-    "failed": "Checkout failed. Try again."
+    "failed": "That didn't go through. Try again."
   },
   "signIn": {
     "title": "Sign in",

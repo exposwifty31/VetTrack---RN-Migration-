@@ -34,7 +34,7 @@ All frame/tap/TTI floors are evaluated on the **Android gate (primary)** device.
 | O2 | Frames over budget during the same interaction | **< 1% of sampled frames** | same rAF sampler; count(frameΔ > budget) / total |
 | O3 | tap→response (perceived) | **< 100 ms** | react-native-performance mark `scan_tap` → `scan_visual_ack` (optimistic UI commit) |
 | O4 | Cold TTI | **< 2 s** | react-native-performance `nativeLaunchStart` → `screenInteractive`, **cold starts ONLY** (exclude warm/hot/prewarm) |
-| O5 | Hero task-time | **≤ Capacitor** across the same ≥5 staff | wall-clock scan→checkout per participant, both apps |
+| O5 | Hero task-time (paired) | **median of paired (RN − Capacitor) task-time ≤ 0** across the same ≥6 staff | wall-clock scan→checkout per participant on both apps; one paired difference per participant (see §6 for missing-data handling) |
 
 > O1/O2 are **not** performance-mark measurable. They come from a requestAnimationFrame delta sampler (JS thread) PLUS a Reanimated `useFrameCallback` UI-thread source; report both threads separately.
 > O3 measures PERCEIVED responsiveness at the optimistic commit. The separate `scan_server_confirmed` mark (network round-trip) is recorded for diagnostics but is NOT the O3 floor.
@@ -43,14 +43,15 @@ All frame/tap/TTI floors are evaluated on the **Android gate (primary)** device.
 
 | # | Metric | Threshold | Method |
 |---|---|---|---|
-| S1 | Blind preference | **≥70% of ≥5 staff prefer RN AND articulate a concrete reason** | counterbalanced unlabeled A/B (blind-preference kit); "concrete" = a named speed/tap/feel difference, not "looks nicer" |
+| S1 | Blind preference | **≥70% of ≥6 staff prefer RN AND articulate a concrete reason** | counterbalanced unlabeled A/B (blind-preference kit); "concrete" = a named speed/tap/feel difference, not "looks nicer". Only runs where the facilitator was blinded to implementation identity (blind-kit §2) count toward S1 |
 
 ## 6. Measurement harness
 
 - Install the locked dependency set with **`npm ci`** (drives `package-lock.json`, which already resolves `react-native-performance` 6.0.0 and the full delight stack exactly). Do **not** run `npm install` / `npx expo install` for the measurement build — an unpinned resolve could drift a dependency version out from under the lock and invalidate the numbers. Three distinct mechanisms: (a) cold-TTI marks O4; (b) tap marks O3; (c) rAF frame sampler + Reanimated `useFrameCallback` + `withTiming` completion callback for O1/O2.
 - Capture ≥5 cold runs per metric per app; report median and p95. Discard warm/prewarm starts.
 - Results CSV schema: `app,device,run,metric,value_ms,frames_total,frames_over_budget,participant_id,order`.
-- Numbers are captured from a `--no-dev --minify` / release build on the §2 gate device only. Simulator + dev-mode samples are wiring smoke, never the verdict.
+- **Verdict numbers require a native release ARTIFACT** — `npx expo run:android --variant release` (or an EAS release build) on the §2 gate device. `--no-dev --minify` on a JS bundle is a **smoke check only**, not a verdict source; simulator + dev-mode samples never count.
+- **O5 pairing / missing data:** each participant contributes exactly one `(RN − Capacitor)` difference. If a participant lacks a valid paired time on either app (error, retry loop, incomplete run), that participant is **excluded from O5** (not imputed) and the exclusion is recorded; the ≥6 minimum must still be met by *complete* pairs.
 
 ## 7. Verdict rule (binding)
 

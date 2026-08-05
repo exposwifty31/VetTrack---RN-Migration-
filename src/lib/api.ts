@@ -114,13 +114,27 @@ export const api = {
         // mutation callback. `readJsonSafe` also honors the non-throwing contract
         // if `res.json()` rejects. Degrade to `blocked_precondition` on a bad shape.
         const body = await readJsonSafe(res);
-        const equipment = body.equipment;
+        const equipment = body.equipment as Partial<EquipmentRow> | undefined;
         const action = body.action;
-        const validShape =
+        const scanLogId = body.scanLogId;
+        const undoToken = body.undoToken;
+        // Validate the COMPLETE success contract — a partial row would poison the
+        // cache via onSuccess, and an empty undoToken would be posted to /revert.
+        const isRow =
           !!equipment &&
           typeof equipment === "object" &&
-          typeof (equipment as EquipmentRow).id === "string" &&
-          (action === "checkout" || action === "return");
+          typeof equipment.id === "string" &&
+          typeof equipment.name === "string" &&
+          typeof equipment.status === "string" &&
+          typeof equipment.custodyState === "string" &&
+          typeof equipment.version === "number";
+        const validShape =
+          isRow &&
+          (action === "checkout" || action === "return") &&
+          typeof scanLogId === "string" &&
+          scanLogId.length > 0 &&
+          typeof undoToken === "string" &&
+          undoToken.length > 0;
         if (!validShape) {
           return { kind: "blocked_precondition", code: "MALFORMED_SCAN_RESPONSE" };
         }
@@ -128,8 +142,8 @@ export const api = {
           kind: "ok",
           equipment: equipment as EquipmentRow,
           action: action as "checkout" | "return",
-          scanLogId: typeof body.scanLogId === "string" ? body.scanLogId : "",
-          undoToken: typeof body.undoToken === "string" ? body.undoToken : "",
+          scanLogId: scanLogId as string,
+          undoToken: undoToken as string,
         };
       }
 

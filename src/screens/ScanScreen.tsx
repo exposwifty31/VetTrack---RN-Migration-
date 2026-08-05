@@ -23,6 +23,12 @@ export function ScanScreen({ navigation }: RootStackScreenProps<"Scan">) {
       navigation.navigate("ScanConfirm", { equipmentId: result.equipmentId });
       return;
     }
+    // Advisory fallback: a tag with a payload but no canonical id → hand it to the
+    // list as a search so a human can pick the item (never auto-committed — ADR-006).
+    if (result.status === "no_id" && result.payload) {
+      navigation.navigate("EquipmentList", { initialQuery: result.payload });
+      return;
+    }
     setNote(result.status === "read_failed" ? t("scan.readFailed") : t("scan.noId"));
   };
 

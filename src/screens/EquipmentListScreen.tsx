@@ -85,12 +85,14 @@ const EquipmentRow = memo(function EquipmentRow({
   );
 });
 
-function EquipmentListBody({ navigation }: RootStackScreenProps<"EquipmentList">) {
+function EquipmentListBody({ navigation, route }: RootStackScreenProps<"EquipmentList">) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   useEquipmentRealtimeSync();
 
-  const [query, setQuery] = useState("");
+  // Seed the search from an initialQuery param — the NFC advisory fallback: a
+  // non-canonical tag (no extractable id) lands here pre-filtered by its payload.
+  const [query, setQuery] = useState(route.params?.initialQuery ?? "");
   // useDeferredValue keeps typing responsive while the filtered query re-runs.
   const deferredQuery = useDeferredValue(query);
   const params: EquipmentListParams = deferredQuery ? { q: deferredQuery } : {};

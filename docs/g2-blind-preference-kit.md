@@ -1,6 +1,6 @@
 # G2 Blind-Preference Kit
 
-Runs the S1 subjective floor: **≥70% of ≥5 staff prefer RN with a concrete reason.** On-site, human-subject, cannot be automated.
+Runs the S1 subjective floor: **≥70% of ≥6 staff prefer RN with a concrete reason.** (≥6 — an even minimum so RN-first/Capacitor-first counterbalancing splits evenly.) On-site, human-subject, cannot be automated.
 
 ## 1. Setup — identical chassis
 
@@ -10,7 +10,7 @@ Runs the S1 subjective floor: **≥70% of ≥5 staff prefer RN with a concrete r
 
 ## 2. Counterbalancing and blinding
 
-- ≥5 participants. Assign order by alternation: odd participants **RN first**, even participants **Capacitor first**. This cancels first-exposure/order effects.
+- **≥6 participants (even).** Assign order by alternation: odd participants **RN first**, even participants **Capacitor first**. An even count keeps the two orders balanced. This cancels first-exposure/order effects.
 - Record the order per participant on the capture sheet (`order` field).
 - Label the two apps to the facilitator only as **App A** / **App B**, remapped per participant. **Remapping reduces label/order bias in how the apps are named — it does NOT blind the facilitator**, who can still tell RN from Capacitor by the device/build in hand.
 - **To actually blind the facilitator to implementation identity:** a **second person** holds the private A/B→app mapping and sets up each round (covers branding, launches the correct app, hands the device over), so the facilitator reading the prompt cannot tell which build is which. If only one facilitator is available, treat implementation identity as **unblinded** and record it as a known bias limitation in the §6 verdict — do not report the result as facilitator-blind.
@@ -57,4 +57,4 @@ Facilitator notes (redact client/patient identifiers): _________________________
 
 ## 6. Scoring
 
-`S1 pass = (# participants preferring RN with a concrete reason) / (total participants) ≥ 0.70`, total ≥ 5. Record the fraction; carry to the pre-registration verdict (§7 of `docs/g2-preregistration.md`). If the facilitator was not blinded to implementation identity (§2), note it alongside the fraction.
+`S1 pass = (# participants preferring RN with a concrete reason) / (total scored participants) ≥ 0.70`, total ≥ 6. **Only facilitator-blinded runs (§2) are scored;** unblinded runs are excluded from both the numerator and the denominator (and recorded as excluded). Record the fraction; carry to the pre-registration verdict (§7 of `docs/g2-preregistration.md`).

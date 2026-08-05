@@ -99,17 +99,23 @@ describe("useScanToggle", () => {
 
   it("rolls the flip back when the server returns a 409 conflict", async () => {
     const { queryClient, view } = await setup();
-    mockAuthFetch.mockResolvedValue(
+    // Defer the 409 so the optimistic flip is observable BEFORE the rollback —
+    // an immediate resolve makes the checked_out state too transient to catch,
+    // and "available" is also the initial value, so we must prove the flip first.
+    let resolveFetch: (r: Response) => void = () => {};
+    mockAuthFetch.mockReturnValue(new Promise<Response>((resolve) => (resolveFetch = resolve)));
+
+    view.result.current.mutate("eq1");
+    await waitFor(() => expect(cachedCustody(queryClient)).toBe("checked_out"));
+
+    resolveFetch(
       fakeResponse(409, {
         code: "CONFLICT",
         reason: "EQUIPMENT_ALREADY_CHECKED_OUT",
         checkedOutByEmail: "other@clinic.test",
       }),
     );
-
-    view.result.current.mutate("eq1");
-    await waitFor(() => expect(view.result.current.isPending).toBe(false));
-    expect(cachedCustody(queryClient)).toBe("available");
+    await waitFor(() => expect(cachedCustody(queryClient)).toBe("available"));
   });
 
   it("reconciles the authoritative list row (version/status/holder) on success", async () => {
@@ -131,10 +137,14 @@ describe("useScanToggle", () => {
     );
 
     view.result.current.mutate("eq1");
-    await waitFor(() => expect(view.result.current.isPending).toBe(false));
-
+    // Wait on the reconciled value itself (version 2 only appears after success),
+    // not isPending — which is initially false and would race the mutation.
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData<EquipmentListPage>(equipmentKeys.list())?.items[0]?.version,
+      ).toBe(2),
+    );
     const row = queryClient.getQueryData<EquipmentListPage>(equipmentKeys.list())?.items[0];
-    expect(row?.version).toBe(2);
     expect(row?.status).toBe("in_use");
     expect(row?.checkedOutByEmail).toBe("me@clinic.test");
   });
