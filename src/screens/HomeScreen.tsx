@@ -2,7 +2,6 @@ import { Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { contractsBridgeSmoke } from "@/lib/contracts-bridge";
-import { DelightSpike } from "./DelightSpike";
 import type { RootStackScreenProps } from "../navigation/types";
 
 /**
@@ -22,14 +21,30 @@ export function HomeScreen({ navigation }: RootStackScreenProps<"Home">) {
         })}
       </Text>
 
-      <DelightSpike />
-
       <Pressable
         className="items-center rounded-xl bg-primary py-3.5 active:opacity-80"
+        onPress={() => navigation.navigate("EquipmentList")}
+        accessibilityRole="button"
+      >
+        <Text className="text-[15px] font-semibold text-primary-foreground">
+          {t("home.equipment")}
+        </Text>
+      </Pressable>
+
+      <Pressable
+        className="items-center rounded-xl border border-border py-3.5 active:opacity-80"
+        onPress={() => navigation.navigate("Scan")}
+        accessibilityRole="button"
+      >
+        <Text className="text-[15px] font-semibold text-foreground">{t("home.scan")}</Text>
+      </Pressable>
+
+      <Pressable
+        className="items-center rounded-xl border border-border py-3.5 active:opacity-80"
         onPress={() => navigation.navigate("SignIn")}
         accessibilityRole="button"
       >
-        <Text className="text-[15px] font-semibold text-primary-foreground">{t("home.signIn")}</Text>
+        <Text className="text-[15px] font-semibold text-foreground">{t("home.signIn")}</Text>
       </Pressable>
 
       <Pressable
@@ -70,7 +85,7 @@ export function HomeScreen({ navigation }: RootStackScreenProps<"Home">) {
         accessibilityRole="button"
       >
         <Text className="text-[15px] font-semibold text-foreground">
-          Open realtime debug (Slice 5)
+          {t("home.realtimeDebug")}
         </Text>
       </Pressable>
     </View>
