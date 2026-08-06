@@ -1,22 +1,27 @@
 # G2 Pre-Registration — Hero-Flow Go/No-Go
 
-> **This document is the lock.** Once committed, the commit SHA freezes every threshold, device, tool, and sample size below. No value may change after the lock SHA is recorded in §8 — a miss is a miss. Amending, force-pushing, or re-committing to move a number voids the gate.
+> **This document is the lock.** Once committed, the commit SHA freezes every threshold, device, tool, and decision rule below. No value may change after the lock SHA is recorded in the merge PR (§8) — a miss is a miss. Amending, force-pushing, or re-committing to move a number voids the gate.
+>
+> **Revision 2026-08-06 (pre-lock):** adapted to the owner's real constraints — stated as final facts in-session — before any lock SHA was ever recorded (§8 of the original template was never filled, so no lock existed to void). Two changes from the template: (1) the gate device is the owner's **Google Pixel** — the only Android device available — replacing the hypothetical low-end device; (2) the ≥5-staff blind preference arm is **not feasible** (no staff panel available) and is replaced by objective floors + the owner's explicit side-by-side judgment (§5).
 
 ## 1. What G2 decides
 
-A real scan→checkout hero flow, built on the full delight stack (Reanimated 4.5.1 + worklets 0.10.1 + Gesture Handler ~2.32.x + FlashList 2.0.2), must **beat the current Capacitor app** on locked objective floors on a named budget device AND win a blind ≥70% staff preference. Miss either and the migration **STOPS — we polish Capacitor instead.**
+A real scan→checkout hero flow, built on the full delight stack (Reanimated 4.5.1 + worklets 0.10.1 + Gesture Handler 2.32.0 + FlashList 2.0.2), must **beat the current Capacitor app** — pass every locked objective floor on the owner's Pixel (O5 is match-or-beat; the strict wins live in O1–O4) — AND win the owner's explicit side-by-side preference. Miss either and the migration **STOPS — we polish Capacitor instead.**
 
-## 2. Named devices (owner fills before lock — record exact values)
+> **Honesty note (locked in, eyes open):** the original design called for a *low-end* Android device because that is where frame budgets break. A Pixel is a mid-to-high-tier device, so the objective floors are **easier to pass** than the template intended. This is accepted deliberately — we measure on the hardware that actually exists — and it means a PASS here says "RN beats Capacitor on good hardware", not "RN survives weak hardware". If a low-end device ever becomes available, O1/O2 may be *re-run* on it as extra evidence, but the verdict of record is the Pixel's.
+
+## 2. Named devices (record exact values at measurement setup, BEFORE the first measured run)
 
 | Role | Device | Refresh rate | SoC | RAM | OS build |
 |---|---|---|---|---|---|
-| Android gate (primary, low-end) | `<e.g. Samsung Galaxy A16>` | `<Hz>` | `<SoC>` | `<GB>` | `<build>` |
-| Android secondary (no-regression) | `<optional, e.g. Moto G Play 2024>` | `<Hz>` | | | |
-| iOS floor | `<e.g. iPhone SE 3rd gen>` | `<Hz>` | | | |
+| Android gate (primary — verdict device) | Google Pixel (owner's device) — exact model recorded in the results file | recorded in results file | recorded in results file | recorded in results file | recorded in results file |
+| iOS floor (secondary, non-veto) | physical iPhone if available; otherwise omitted | recorded in results file | | | |
 
-All frame/tap/TTI floors are evaluated on the **Android gate (primary)** device. iOS is a secondary confirmation, not a veto.
+**This table deliberately contains no editable placeholders.** The device identity values (model via `adb shell getprop ro.product.model`, refresh via `adb shell dumpsys display`, SoC/RAM/OS build) live ONLY in the immutable measurement record — the header block of `docs/g2-results.csv` — written once at measurement setup and never amended. This document locks the *rule*; the results file records the *values*.
 
-## 3. Refresh budget → frame floor (parameterized)
+All frame/tap/TTI floors are evaluated on the **Android gate (primary)** device. Recording the exact model/refresh/OS values is a **mandatory setup step before the first measured run**, and they are recorded in the **results file (`docs/g2-results.csv` header block)** — NOT by editing this document (any post-lock edit to this file voids the gate). Measurements taken before the device record exists do not count.
+
+## 3. Refresh budget → frame floor (parameterized — the RULE is locked, the row is picked by the measured refresh rate)
 
 | Refresh | Per-frame budget |
 |---|---|
@@ -24,7 +29,7 @@ All frame/tap/TTI floors are evaluated on the **Android gate (primary)** device.
 | 90 Hz | 11.11 ms |
 | 120 Hz | 8.33 ms |
 
-**Locked gate-device budget = `<pick the row matching §2 primary>` ms.**
+**Locked rule: gate-device budget = 1000 / (measured refresh rate in Hz) ms**, using the §2 recorded value. If the Pixel runs an adaptive refresh rate, measure with the display forced to its **highest** rate (strictest budget) and record the forced value.
 
 ## 4. Objective floors (ALL must pass on the named gate device)
 
@@ -34,32 +39,36 @@ All frame/tap/TTI floors are evaluated on the **Android gate (primary)** device.
 | O2 | Frames over budget during the same interaction | **< 1% of sampled frames** | same rAF sampler; count(frameΔ > budget) / total |
 | O3 | tap→response (perceived) | **< 100 ms** | react-native-performance mark `scan_tap` → `scan_visual_ack` (optimistic UI commit) |
 | O4 | Cold TTI | **< 2 s** | react-native-performance `nativeLaunchStart` → `screenInteractive`, **cold starts ONLY** (exclude warm/hot/prewarm) |
-| O5 | Hero task-time (paired) | **median of paired (RN − Capacitor) task-time ≤ 0** across the same ≥6 staff | wall-clock scan→checkout per participant on both apps; one paired difference per participant (see §6 for missing-data handling) |
+| O5 | Hero task-time (paired, owner-run) | **median of paired (RN − Capacitor) task-time ≤ 0 (match-or-beat; a tie passes)** across ≥5 complete paired runs by the owner | wall-clock scan→checkout per run on both apps, alternating app order (RN-first on odd runs, Capacitor-first on even) to cancel practice effects; one paired difference per run. **Order-balance rule: the complete pairs used for the median must include ≥2 pairs in each order; if failed-pair filtering breaks the balance, run additional pairs until it is restored** (see §6 for failed-run handling) |
 
-> O1/O2 are **not** performance-mark measurable. They come from a requestAnimationFrame delta sampler (JS thread) PLUS a Reanimated `useFrameCallback` UI-thread source; report both threads separately.
+> O1/O2 are **not** performance-mark measurable. They come from a requestAnimationFrame delta sampler (JS thread) PLUS a Reanimated `useFrameCallback` UI-thread source; report both threads separately. **Binding pass rule: O1 and O2 must pass on BOTH samplers independently** — either sampler failing fails the floor. Each CSV row records its sampler in `frame_source` (`js` | `ui`). **Minimum sample rule: a run whose sampler produced fewer than 100 frames over the measured interaction (including zero — e.g. `requestAnimationFrame` unavailable) is invalid** — recorded as `outcome=failed, failure_reason=insufficient_samples` and it cannot count toward O1/O2. **Aggregation rule (binding): O1/O2 require ≥5 VALID runs per app per sampler — an invalid run is replaced by an additional run, it does not shrink the set. The O1 p95 and the O2 over-budget ratio are computed over the POOLED frames of all valid runs (per app, per sampler), not averaged per-run.**
 > O3 measures PERCEIVED responsiveness at the optimistic commit. The separate `scan_server_confirmed` mark (network round-trip) is recorded for diagnostics but is NOT the O3 floor.
 
-## 5. Subjective floor
+## 5. Subjective floor (replaces the staff blind test — see revision note)
 
 | # | Metric | Threshold | Method |
 |---|---|---|---|
-| S1 | Blind preference | **≥70% of ≥6 staff prefer RN AND articulate a concrete reason** | counterbalanced unlabeled A/B (blind-preference kit); "concrete" = a named speed/tap/feel difference, not "looks nicer". Only runs where the facilitator was blinded to implementation identity (blind-kit §2) count toward S1 |
+| S1 | Owner side-by-side judgment | **Owner runs the same hero flow on both apps back-to-back on the Pixel and issues an explicit written verdict: "RN" or "Capacitor", with at least one concrete reason** (a named speed/tap/feel difference, not "looks nicer") | Verdict + reason recorded verbatim in the results file. The owner is not blinded (infeasible with n=1 who also knows the codebase); this is acknowledged as weaker evidence than the original blind design and is compensated by the objective floors carrying the primary weight |
 
 ## 6. Measurement harness
 
 - Install the locked dependency set with **`npm ci`** (drives `package-lock.json`, which already resolves `react-native-performance` 6.0.0 and the full delight stack exactly). Do **not** run `npm install` / `npx expo install` for the measurement build — an unpinned resolve could drift a dependency version out from under the lock and invalidate the numbers. Three distinct mechanisms: (a) cold-TTI marks O4; (b) tap marks O3; (c) rAF frame sampler + Reanimated `useFrameCallback` + `withTiming` completion callback for O1/O2.
 - Capture ≥5 cold runs per metric per app; report median and p95. Discard warm/prewarm starts.
-- Results CSV schema: `app,device,run,metric,value_ms,frames_total,frames_over_budget,participant_id,order`.
+- Results CSV schema: `app,device,run,metric,value_ms,frames_total,frames_over_budget,frame_source,participant_id,order,outcome,failure_reason,raw_sha256` (`participant_id` = `owner` for every row under this revision; `frame_source` = `js`/`ui` for O1/O2 rows, empty otherwise; `outcome` = `ok`/`failed`).
+- **Reproducibility contracts (binding):**
+  - **O1/O2:** every valid frame-sampler run archives its raw frame-delta array as JSON under `docs/g2-raw/<app>-run<NN>-<frame_source>.json` (immutable once written); the file's SHA-256 goes in that row's `raw_sha256`. The pooled p95 and over-budget ratio must be recomputable from the archived arrays alone.
+  - **O5:** `run` is the pair key — the RN row and the Capacitor row of one paired attempt carry the same `run` value; the paired difference is `value_ms(RN,run=k) − value_ms(Capacitor,run=k)`.
+  - **S1:** the owner's verdict is recorded verbatim in the results-file footer block (`# s1_verdict: RN|Capacitor` + `# s1_reason: <verbatim concrete reason>` + `# s1_date:`), written once.
 - **Verdict numbers require a native release ARTIFACT** — `npx expo run:android --variant release` (or an EAS release build) on the §2 gate device. `--no-dev --minify` on a JS bundle is a **smoke check only**, not a verdict source; simulator + dev-mode samples never count.
-- **O5 pairing / missing data:** each participant contributes exactly one `(RN − Capacitor)` difference. If a participant lacks a valid paired time on either app (error, retry loop, incomplete run), that participant is **excluded from O5** (not imputed) and the exclusion is recorded; the ≥6 minimum must still be met by *complete* pairs.
+- **O5 pairing / failed runs — no silent exclusions:** every *started* run is recorded with `outcome` + `failure_reason`; nothing is discarded. The median is computed over complete pairs and the ≥5 minimum must be met by complete pairs, **but failures are not neutral**: any **RN-side failure** (error, retry loop, incomplete flow) in any started pair **fails O5 outright** — an app that cannot reliably finish its hero flow cannot pass by cherry-picking its good runs. A Capacitor-side failure with an RN success is recorded and noted in the verdict (evidence for RN), with that pair excluded from the median only.
 
 ## 7. Verdict rule (binding)
 
-**PASS requires ALL objective floors (O1–O5) met on the named gate device AND ≥70% blind preference (S1) AND hero task-time ≤ Capacitor (O5).** Miss any objective floor OR <70% blind preference → **STOP the migration and polish Capacitor.** The gate does not pass on management enthusiasm.
+**PASS requires ALL objective floors (O1–O5) met on the owner's Pixel AND an explicit owner verdict of "RN" with a concrete reason (S1).** Miss any objective floor OR an owner verdict of "Capacitor" → **STOP the migration and polish Capacitor.** The gate does not pass on enthusiasm — the written verdict and the CSV are the record.
 
 ## 8. Lock
 
-- Pre-registration lock SHA: `<filled by owner at commit>`
-- Date locked: `<YYYY-MM-DD>`
-- Stack under test (frozen): reanimated 4.5.1 · worklets 0.10.1 · gesture-handler ~2.32.x · flash-list 2.0.2 · Expo SDK 57 / RN 0.86.2 / New Arch / Hermes · react-native-performance 6.0.0.
-- Owner sign-off: `<name>`
+- Pre-registration lock SHA: the SHA of the commit that lands this revision on `main` (recorded in the merge PR; any later edit to this file voids the gate).
+- Date locked: the date of the merge commit that lands this revision on `main` (same authoritative record as the lock SHA — the merge PR).
+- Stack under test (frozen, exact resolved versions from `package-lock.json`): reanimated 4.5.1 · worklets 0.10.1 · gesture-handler 2.32.0 · flash-list 2.0.2 · Expo SDK 57 / RN 0.86.2 / New Arch / Hermes · react-native-performance 6.0.0.
+- Owner sign-off: approved in-session 2026-08-06 (device = Pixel, staff panel infeasible → owner judgment; commit explicitly requested by owner).

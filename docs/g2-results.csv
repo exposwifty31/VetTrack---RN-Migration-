@@ -1,0 +1,15 @@
+# === G2 measurement record (immutable once written at setup — see docs/g2-preregistration.md §2) ===
+# device_model:        <written once at setup via: adb shell getprop ro.product.model>
+# device_refresh_hz:   <written once at setup via: adb shell dumpsys display (forced to highest rate)>
+# device_soc:          <written once at setup>
+# device_ram_gb:       <written once at setup>
+# device_os_build:     <written once at setup>
+# setup_date:          <written once at setup>
+# === rows below: one row per metric sample, schema per pre-registration §6 ===
+# === O5 pairing: `run` is the pair key across the RN row and the Capacitor row of one attempt ===
+# === O1/O2: raw frame-delta JSON archived at docs/g2-raw/<app>-run<NN>-<frame_source>.json; its SHA-256 in raw_sha256 ===
+app,device,run,metric,value_ms,frames_total,frames_over_budget,frame_source,participant_id,order,outcome,failure_reason,raw_sha256
+# === footer (written once at verdict): ===
+# s1_verdict: <RN|Capacitor — written once at verdict>
+# s1_reason:  <verbatim concrete reason — written once at verdict>
+# s1_date:    <written once at verdict>
