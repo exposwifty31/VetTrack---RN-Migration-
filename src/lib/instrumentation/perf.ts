@@ -169,18 +169,22 @@ export function startFrameSampler(budgetMs: number): FrameSamplerHandle {
   let framesTotal = 0;
   let framesOverBudget = 0;
   const deltasMs: number[] = [];
-  let last = performanceNow();
+  // null until the FIRST rAF callback fires: the sampler-start→first-callback
+  // interval is NOT an inter-frame delta and must not skew p95/over-budget.
+  let last: number | null = null;
   let rafId: number | null = null;
   let running = true;
 
   const tick = () => {
     if (!running || !raf) return;
     const now = performanceNow();
-    const delta = now - last;
+    if (last != null) {
+      const delta = now - last;
+      framesTotal += 1;
+      if (delta > budgetMs) framesOverBudget += 1;
+      deltasMs.push(delta);
+    }
     last = now;
-    framesTotal += 1;
-    if (delta > budgetMs) framesOverBudget += 1;
-    deltasMs.push(delta);
     rafId = raf(tick);
   };
 
