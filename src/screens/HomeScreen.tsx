@@ -88,6 +88,14 @@ export function HomeScreen({ navigation }: RootStackScreenProps<"Home">) {
           {t("home.realtimeDebug")}
         </Text>
       </Pressable>
+
+      <Pressable
+        className="items-center rounded-xl border border-border py-3.5 active:opacity-80"
+        onPress={() => navigation.navigate("G2Measure")}
+        accessibilityRole="button"
+      >
+        <Text className="text-[15px] font-semibold text-foreground">{t("home.g2Measure")}</Text>
+      </Pressable>
     </View>
   );
 }

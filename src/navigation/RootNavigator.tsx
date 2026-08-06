@@ -5,6 +5,7 @@ import { BootstrapGate } from "../app/BootstrapGate";
 import { ApiSmokeScreen } from "../screens/ApiSmokeScreen";
 import { CheckoutConfirm } from "../screens/CheckoutConfirm";
 import { EquipmentListScreen } from "../screens/EquipmentListScreen";
+import { G2MeasureScreen } from "../screens/G2MeasureScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { I18nDebugScreen } from "../screens/I18nDebugScreen";
 import { NfcSpikeScreen } from "../screens/NfcSpikeScreen";
@@ -66,6 +67,7 @@ export function RootNavigator() {
       <Stack.Screen name="StorageDebug" component={StorageDebugScreen} options={{ title: t("nav.storageDebug") }} />
       <Stack.Screen name="RealtimeDebug" component={RealtimeDebugScreen} options={{ title: t("nav.realtimeDebug") }} />
       <Stack.Screen name="I18nDebug" component={I18nDebugScreen} options={{ title: t("nav.i18nDebug") }} />
+      <Stack.Screen name="G2Measure" component={G2MeasureScreen} options={{ title: t("nav.g2Measure") }} />
     </Stack.Navigator>
   );
 }

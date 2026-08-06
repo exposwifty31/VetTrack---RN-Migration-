@@ -19,7 +19,8 @@
     "realtimeDebug": "זמן אמת",
     "i18nDebug": "שפה ו-RTL",
     "equipment": "ציוד",
-    "scan": "סריקה"
+    "scan": "סריקה",
+    "g2Measure": "מדידת G2"
   },
   "home": {
     "title": "VetTrack",
@@ -31,7 +32,8 @@
     "i18nDebug": "שפה ו-RTL (שלב 6)",
     "equipment": "רשימת ציוד",
     "scan": "סריקת תווית",
-    "realtimeDebug": "פתח דיבאג זמן אמת (שלב 5)"
+    "realtimeDebug": "פתח דיבאג זמן אמת (שלב 5)",
+    "g2Measure": "מדידת G2 (שער)"
   },
   "bootstrap": {
     "reauth": "פג תוקף החיבור. התחבר שוב כדי להמשיך.",
@@ -113,5 +115,20 @@
     "reloadNotPending": "הכיוון תואם לשפה.",
     "toggle": "החלף עברית / אנגלית",
     "sample": "דוגמה: {{save}} · {{cancel}} · {{loading}}"
+  },
+  "g2": {
+    "title": "מדידת G2",
+    "subtitle": "ריצה {{run}} — גלול את רשימת הציוד, פתח אישור, ואז ייצא",
+    "budget": "תקציב פריים",
+    "budgetMissing": "EXPO_PUBLIC_FRAME_BUDGET_MS לא מוגדר — נדרש build מדידה (1000 / קצב הרענון). לא מנחשים 60Hz.",
+    "tti": "TTI קר (O4)",
+    "tapAck": "הקשה → אישור חזותי (O3)",
+    "tapServer": "הקשה → אישור שרת (אבחון)",
+    "framesTitle": "פריימים — thread ‏{{source}}",
+    "framesLine": "סה\"כ {{total}} · מעל תקציב {{over}} · ‏p95 ‏{{p95}} ‏ms",
+    "noSample": "אין דגימה עדיין — גלול את הרשימה / פתח אישור קודם",
+    "refresh": "רענן נתונים",
+    "nextRun": "איפוס דגימות → ריצה הבאה",
+    "export": "ייצוא JSON של הריצה"
   }
 }

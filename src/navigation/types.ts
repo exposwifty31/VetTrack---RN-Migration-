@@ -9,6 +9,7 @@ export type RootStackParamList = {
   StorageDebug: undefined;
   RealtimeDebug: undefined;
   I18nDebug: undefined;
+  G2Measure: undefined;
   EquipmentList: { initialQuery?: string } | undefined;
   Scan: undefined;
   ScanConfirm: { equipmentId: string; prefill?: { name?: string; status?: string } };
