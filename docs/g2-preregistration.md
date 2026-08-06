@@ -14,8 +14,10 @@ A real scan→checkout hero flow, built on the full delight stack (Reanimated 4.
 
 | Role | Device | Refresh rate | SoC | RAM | OS build |
 |---|---|---|---|---|---|
-| Android gate (primary — verdict device) | Google Pixel (owner's device) — exact model: `<record via adb shell getprop ro.product.model>` | `<record via adb shell dumpsys display>` | `<record>` | `<record>` | `<record>` |
-| iOS floor (secondary, non-veto) | physical iPhone if available; otherwise omitted | `<Hz>` | | | |
+| Android gate (primary — verdict device) | Google Pixel (owner's device) — exact model recorded in the results file | recorded in results file | recorded in results file | recorded in results file | recorded in results file |
+| iOS floor (secondary, non-veto) | physical iPhone if available; otherwise omitted | recorded in results file | | | |
+
+**This table deliberately contains no editable placeholders.** The device identity values (model via `adb shell getprop ro.product.model`, refresh via `adb shell dumpsys display`, SoC/RAM/OS build) live ONLY in the immutable measurement record — the header block of `docs/g2-results.csv` — written once at measurement setup and never amended. This document locks the *rule*; the results file records the *values*.
 
 All frame/tap/TTI floors are evaluated on the **Android gate (primary)** device. Recording the exact model/refresh/OS values is a **mandatory setup step before the first measured run**, and they are recorded in the **results file (`docs/g2-results.csv` header block)** — NOT by editing this document (any post-lock edit to this file voids the gate). Measurements taken before the device record exists do not count.
 
@@ -37,9 +39,9 @@ All frame/tap/TTI floors are evaluated on the **Android gate (primary)** device.
 | O2 | Frames over budget during the same interaction | **< 1% of sampled frames** | same rAF sampler; count(frameΔ > budget) / total |
 | O3 | tap→response (perceived) | **< 100 ms** | react-native-performance mark `scan_tap` → `scan_visual_ack` (optimistic UI commit) |
 | O4 | Cold TTI | **< 2 s** | react-native-performance `nativeLaunchStart` → `screenInteractive`, **cold starts ONLY** (exclude warm/hot/prewarm) |
-| O5 | Hero task-time (paired, owner-run) | **median of paired (RN − Capacitor) task-time ≤ 0 (match-or-beat; a tie passes)** across ≥5 complete paired runs by the owner | wall-clock scan→checkout per run on both apps, alternating app order (RN-first on odd runs, Capacitor-first on even) to cancel practice effects; one paired difference per run (see §6 for failed-run handling) |
+| O5 | Hero task-time (paired, owner-run) | **median of paired (RN − Capacitor) task-time ≤ 0 (match-or-beat; a tie passes)** across ≥5 complete paired runs by the owner | wall-clock scan→checkout per run on both apps, alternating app order (RN-first on odd runs, Capacitor-first on even) to cancel practice effects; one paired difference per run. **Order-balance rule: the complete pairs used for the median must include ≥2 pairs in each order; if failed-pair filtering breaks the balance, run additional pairs until it is restored** (see §6 for failed-run handling) |
 
-> O1/O2 are **not** performance-mark measurable. They come from a requestAnimationFrame delta sampler (JS thread) PLUS a Reanimated `useFrameCallback` UI-thread source; report both threads separately. **Binding pass rule: O1 and O2 must pass on BOTH samplers independently** — either sampler failing fails the floor. Each CSV row records its sampler in `frame_source` (`js` | `ui`).
+> O1/O2 are **not** performance-mark measurable. They come from a requestAnimationFrame delta sampler (JS thread) PLUS a Reanimated `useFrameCallback` UI-thread source; report both threads separately. **Binding pass rule: O1 and O2 must pass on BOTH samplers independently** — either sampler failing fails the floor. Each CSV row records its sampler in `frame_source` (`js` | `ui`). **Minimum sample rule: a run whose sampler produced fewer than 100 frames over the measured interaction (including zero — e.g. `requestAnimationFrame` unavailable) is invalid** — recorded as `outcome=failed, failure_reason=insufficient_samples` and it cannot count toward O1/O2.
 > O3 measures PERCEIVED responsiveness at the optimistic commit. The separate `scan_server_confirmed` mark (network round-trip) is recorded for diagnostics but is NOT the O3 floor.
 
 ## 5. Subjective floor (replaces the staff blind test — see revision note)
