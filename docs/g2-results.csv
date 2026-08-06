@@ -6,4 +6,10 @@
 # device_os_build:     <written once at setup>
 # setup_date:          <written once at setup>
 # === rows below: one row per metric sample, schema per pre-registration §6 ===
-app,device,run,metric,value_ms,frames_total,frames_over_budget,frame_source,participant_id,order,outcome,failure_reason
+# === O5 pairing: `run` is the pair key across the RN row and the Capacitor row of one attempt ===
+# === O1/O2: raw frame-delta JSON archived at docs/g2-raw/<app>-run<NN>-<frame_source>.json; its SHA-256 in raw_sha256 ===
+app,device,run,metric,value_ms,frames_total,frames_over_budget,frame_source,participant_id,order,outcome,failure_reason,raw_sha256
+# === footer (written once at verdict): ===
+# s1_verdict: <RN|Capacitor — written once at verdict>
+# s1_reason:  <verbatim concrete reason — written once at verdict>
+# s1_date:    <written once at verdict>
