@@ -3,6 +3,8 @@
  * first-callback interval is NOT an inter-frame delta and must be excluded
  * (CodeRabbit PR #17). Uses a manual rAF queue + a mocked monotonic clock.
  */
+import { startFrameSampler } from "@/lib/instrumentation/perf";
+
 let mockNow = 0;
 
 jest.mock("react-native-performance", () => ({
@@ -15,8 +17,6 @@ jest.mock("react-native-performance", () => ({
     getEntriesByName: jest.fn(() => []),
   },
 }));
-
-import { startFrameSampler } from "@/lib/instrumentation/perf";
 
 type RafCallback = (time: number) => void;
 let rafQueue: RafCallback[] = [];
