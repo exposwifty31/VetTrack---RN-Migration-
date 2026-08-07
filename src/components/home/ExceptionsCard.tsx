@@ -10,6 +10,8 @@ import { useUniwind } from "uniwind";
 
 import { EXCEPTION_STALE_DAYS, type ExceptionItem } from "@/lib/home-readiness";
 
+import { FORWARD_CHEVRON } from "./glyphs";
+
 const MAX_ROWS = 3;
 
 export function ExceptionsCard({
@@ -17,12 +19,12 @@ export function ExceptionsCard({
   items,
   onHeaderPress,
   onItemPress,
-}: {
+}: Readonly<{
   count: number;
   items: ExceptionItem[];
   onHeaderPress: () => void;
   onItemPress: (item: ExceptionItem) => void;
-}) {
+}>) {
   const { t } = useTranslation();
   const { theme } = useUniwind();
   const light = theme === "light";
@@ -53,7 +55,7 @@ export function ExceptionsCard({
             </Text>
           </View>
           <View className="flex-1" />
-          <Text className="font-rubik text-[17px] text-text-tertiary">‹</Text>
+          <Text className="font-rubik text-[17px] text-text-tertiary">{FORWARD_CHEVRON}</Text>
         </Pressable>
 
         {items.slice(0, MAX_ROWS).map((item) => (
@@ -83,7 +85,7 @@ export function ExceptionsCard({
                 {t("aurora.exceptionReason", { days: EXCEPTION_STALE_DAYS })}
               </Text>
             </View>
-            <Text className="font-rubik text-[15px] text-text-tertiary">‹</Text>
+            <Text className="font-rubik text-[15px] text-text-tertiary">{FORWARD_CHEVRON}</Text>
           </Pressable>
         ))}
       </View>

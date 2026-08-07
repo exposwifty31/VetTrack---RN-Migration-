@@ -16,11 +16,11 @@ function MetricColumn({
   value,
   label,
   colorClass,
-}: {
+}: Readonly<{
   value: number | null;
   label: string;
   colorClass: string;
-}) {
+}>) {
   return (
     <View className="flex-1 items-center">
       <Text
@@ -34,23 +34,17 @@ function MetricColumn({
   );
 }
 
-export function ReadinessCard({ readiness }: { readiness: Readiness | null }) {
+export function ReadinessCard({ readiness }: Readonly<{ readiness: Readiness | null }>) {
   const { t } = useTranslation();
   const { theme } = useUniwind();
   const light = theme === "light";
 
+  const notReadyProblemClass = light ? "text-[#B91C1C]" : "text-danger";
   const notReadyColor =
-    readiness != null && readiness.notReady > 0
-      ? light
-        ? "text-[#B91C1C]"
-        : "text-danger"
-      : "text-foreground";
+    readiness != null && readiness.notReady > 0 ? notReadyProblemClass : "text-foreground";
+  const checkedOutProblemClass = light ? "text-[#92400E]" : "text-warning";
   const checkedOutColor =
-    readiness != null && readiness.checkedOut > 0
-      ? light
-        ? "text-[#92400E]"
-        : "text-warning"
-      : "text-foreground";
+    readiness != null && readiness.checkedOut > 0 ? checkedOutProblemClass : "text-foreground";
 
   return (
     <View className="px-[22px] pt-2.5">

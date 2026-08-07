@@ -18,7 +18,7 @@ import { VT_MARK_XML } from "./vt-mark-xml";
 /** Visual bar height (44pt row + vertical padding) for scroll-under offsets. */
 export const TOP_BAR_HEIGHT = 52;
 
-type GlassTopBarProps = {
+type GlassTopBarProps = Readonly<{
   topInset: number;
   /** Avatar initial (from the signed-in identity). Hidden letter when unknown. */
   initial?: string;
@@ -29,7 +29,7 @@ type GlassTopBarProps = {
   unreadCount?: number;
   onSearchPress: () => void;
   onSettingsPress: () => void;
-};
+}>;
 
 export function GlassTopBar({
   topInset,

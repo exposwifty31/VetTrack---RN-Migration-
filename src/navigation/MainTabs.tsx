@@ -75,7 +75,12 @@ function AuroraTabBar({ state, navigation }: BottomTabBarProps) {
         } else {
           color = focused ? violet : inactiveColor;
         }
-        const labelColor = isEmergency ? dangerColor : focused ? violet : inactiveColor;
+        let labelColor: string;
+        if (isEmergency) {
+          labelColor = dangerColor;
+        } else {
+          labelColor = focused ? violet : inactiveColor;
+        }
 
         const pillStyle = focused
           ? { backgroundColor: isEmergency ? dangerSolid : violetPillBg }
@@ -118,12 +123,13 @@ function AuroraTabBar({ state, navigation }: BottomTabBarProps) {
   );
 }
 
+// Module scope: an inline lambda would define a new tab-bar component identity
+// on every MainTabs render.
+const renderAuroraTabBar = (props: BottomTabBarProps) => <AuroraTabBar {...props} />;
+
 export function MainTabs() {
   return (
-    <Tab.Navigator
-      screenOptions={{ headerShown: false }}
-      tabBar={(props) => <AuroraTabBar {...props} />}
-    >
+    <Tab.Navigator screenOptions={{ headerShown: false }} tabBar={renderAuroraTabBar}>
       <Tab.Screen name="Today" component={HomeScreen} />
       <Tab.Screen name="EquipmentTab" component={EquipmentTabScreen} />
       <Tab.Screen name="Emergency" component={EmergencyScreen} />

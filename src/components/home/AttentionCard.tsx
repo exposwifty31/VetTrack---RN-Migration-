@@ -6,17 +6,17 @@
  * never a fabricated all-clear. Rows are LIST ROWS: no scale animation
  * (motion doctrine), static pressed style only.
  */
-import { I18nManager, Pressable, Text, View } from "react-native";
+import type { TFunction } from "i18next";
+import type { ReactNode } from "react";
+import { Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useUniwind } from "uniwind";
 
 import type { AttentionItem } from "@/lib/home-readiness";
 
-const MAX_ROWS = 4;
+import { FORWARD_CHEVRON } from "./glyphs";
 
-// Forward-pointing chevron: layout direction is fixed at boot (rtl-bootstrap),
-// so a module-level constant is safe.
-const FORWARD_CHEVRON = I18nManager.isRTL ? "‹" : "›";
+const MAX_ROWS = 4;
 
 function formatDueTime(dueAtMs: number, locale: string): string {
   try {
@@ -30,40 +30,49 @@ function formatDueTime(dueAtMs: number, locale: string): string {
   }
 }
 
+type RowVisuals = { iconBg: string; statusColor: string };
+
+function rowVisuals(overdue: boolean, light: boolean): RowVisuals {
+  if (overdue) {
+    if (light) return { iconBg: "rgba(185,28,28,0.10)", statusColor: "#B91C1C" };
+    return { iconBg: "rgba(248,113,113,0.14)", statusColor: "#F87171" };
+  }
+  if (light) return { iconBg: "rgba(180,83,9,0.10)", statusColor: "#92400E" };
+  return { iconBg: "rgba(251,191,36,0.12)", statusColor: "#FBBF24" };
+}
+
+function buildMetaParts(
+  item: AttentionItem,
+  overdue: boolean,
+  t: TFunction,
+  locale: string,
+): string[] {
+  if (!overdue) return [t("aurora.maintenanceLine")];
+  const parts = [t("aurora.overdueLine")];
+  if (item.holder) parts.push(`⁦${item.holder}⁩`);
+  if (item.dueAtMs != null) {
+    const time = formatDueTime(item.dueAtMs, locale);
+    if (time) parts.push(t("aurora.overdueDue", { time: `⁦${time}⁩` }));
+  }
+  return parts;
+}
+
 function AttentionRow({
   item,
   first,
   onPress,
-}: {
+}: Readonly<{
   item: AttentionItem;
   first: boolean;
   onPress: (item: AttentionItem) => void;
-}) {
+}>) {
   const { t, i18n } = useTranslation();
   const { theme } = useUniwind();
   const light = theme === "light";
 
   const overdue = item.severity === "overdue";
-  const iconBg = overdue
-    ? light
-      ? "rgba(185,28,28,0.10)"
-      : "rgba(248,113,113,0.14)"
-    : light
-      ? "rgba(180,83,9,0.10)"
-      : "rgba(251,191,36,0.12)";
-  const statusColor = overdue ? (light ? "#B91C1C" : "#F87171") : light ? "#92400E" : "#FBBF24";
-
-  const parts: string[] = [];
-  if (overdue) {
-    parts.push(t("aurora.overdueLine"));
-    if (item.holder) parts.push(`⁦${item.holder}⁩`);
-    if (item.dueAtMs != null) {
-      const time = formatDueTime(item.dueAtMs, i18n.language);
-      if (time) parts.push(t("aurora.overdueDue", { time: `⁦${time}⁩` }));
-    }
-  } else {
-    parts.push(t("aurora.maintenanceLine"));
-  }
+  const { iconBg, statusColor } = rowVisuals(overdue, light);
+  const parts = buildMetaParts(item, overdue, t, i18n.language);
 
   return (
     <Pressable
@@ -98,26 +107,61 @@ function AttentionRow({
   );
 }
 
+function cardBorderClass(items: readonly AttentionItem[] | null): string {
+  if (items == null) return "border-border";
+  if (items.length === 0) {
+    return "border-[rgba(74,222,128,0.20)] light:border-[rgba(21,128,61,0.22)]";
+  }
+  return "border-[rgba(248,113,113,0.25)] light:border-[rgba(185,28,28,0.25)]";
+}
+
 export function AttentionCard({
   items,
   loadFailed = false,
   onItemPress,
-}: {
+}: Readonly<{
   items: AttentionItem[] | null;
   /** Fetch failed — render an honest load-error line, never a fake all-clear. */
   loadFailed?: boolean;
   onItemPress: (item: AttentionItem) => void;
-}) {
+}>) {
   const { t } = useTranslation();
   const { theme } = useUniwind();
   const light = theme === "light";
 
-  const borderClass =
-    items == null
-      ? "border-border"
-      : items.length === 0
-        ? "border-[rgba(74,222,128,0.20)] light:border-[rgba(21,128,61,0.22)]"
-        : "border-[rgba(248,113,113,0.25)] light:border-[rgba(185,28,28,0.25)]";
+  const borderClass = cardBorderClass(items);
+
+  let body: ReactNode;
+  if (items == null) {
+    body = (
+      <Text className="px-5 pb-4 pt-2 text-center font-rubik text-[11.5px] text-muted">
+        {loadFailed ? t("equipment.loadError") : t("common.loading")}
+      </Text>
+    );
+  } else if (items.length === 0) {
+    body = (
+      <View className="items-center gap-1.5 px-5 pb-3.5 pt-2.5">
+        <View className="h-[38px] w-[38px] items-center justify-center rounded-full border-[1.5px] border-[rgba(74,222,128,0.35)] bg-[rgba(74,222,128,0.08)] light:border-[rgba(21,128,61,0.30)] light:bg-[rgba(21,128,61,0.08)]">
+          <View
+            className="h-[7px] w-[13px] border-b-[2.5px] border-l-[2.5px] border-success"
+            style={{ transform: [{ rotate: "-45deg" }], marginTop: -3 }}
+          />
+        </View>
+        <Text className="font-rubik-semibold text-[14px] text-foreground">
+          {t("aurora.allClearTitle")}
+        </Text>
+        <Text className="font-rubik text-[11.5px] text-muted">{t("aurora.allClearSubtitle")}</Text>
+      </View>
+    );
+  } else {
+    body = (
+      <View className="pb-1">
+        {items.slice(0, MAX_ROWS).map((item, i) => (
+          <AttentionRow key={item.id} item={item} first={i === 0} onPress={onItemPress} />
+        ))}
+      </View>
+    );
+  }
 
   return (
     <View className="px-[22px] pt-2.5">
@@ -129,30 +173,7 @@ export function AttentionCard({
           {t("aurora.attentionTitle")}
         </Text>
 
-        {items == null ? (
-          <Text className="px-5 pb-4 pt-2 text-center font-rubik text-[11.5px] text-muted">
-            {loadFailed ? t("equipment.loadError") : t("common.loading")}
-          </Text>
-        ) : items.length === 0 ? (
-          <View className="items-center gap-1.5 px-5 pb-3.5 pt-2.5">
-            <View className="h-[38px] w-[38px] items-center justify-center rounded-full border-[1.5px] border-[rgba(74,222,128,0.35)] bg-[rgba(74,222,128,0.08)] light:border-[rgba(21,128,61,0.30)] light:bg-[rgba(21,128,61,0.08)]">
-              <View
-                className="h-[7px] w-[13px] border-b-[2.5px] border-l-[2.5px] border-success"
-                style={{ transform: [{ rotate: "-45deg" }], marginTop: -3 }}
-              />
-            </View>
-            <Text className="font-rubik-semibold text-[14px] text-foreground">
-              {t("aurora.allClearTitle")}
-            </Text>
-            <Text className="font-rubik text-[11.5px] text-muted">{t("aurora.allClearSubtitle")}</Text>
-          </View>
-        ) : (
-          <View className="pb-1">
-            {items.slice(0, MAX_ROWS).map((item, i) => (
-              <AttentionRow key={item.id} item={item} first={i === 0} onPress={onItemPress} />
-            ))}
-          </View>
-        )}
+        {body}
       </View>
     </View>
   );

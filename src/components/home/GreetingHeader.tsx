@@ -13,7 +13,7 @@ function greetingKey(
   return "aurora.greetingEvening";
 }
 
-export function GreetingHeader({ name }: { name?: string }) {
+export function GreetingHeader({ name }: Readonly<{ name?: string }>) {
   const { t, i18n } = useTranslation();
   const now = new Date();
 

@@ -3,16 +3,14 @@
  * Double-bezel violet gradient card; the only fully saturated element on the
  * screen. Identical in both themes. Press = the signature PressableScale feel.
  */
-import { I18nManager, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { PressableScale } from "@/components/PressableScale";
 
-// Forward-pointing arrow (README §3: "← arrow (RTL forward)"). Layout direction
-// is fixed at boot (rtl-bootstrap), so a module-level constant is safe.
-const FORWARD_ARROW = I18nManager.isRTL ? "←" : "→";
+import { FORWARD_ARROW } from "./glyphs";
 
-export function ScanHero({ onPress }: { onPress: () => void }) {
+export function ScanHero({ onPress }: Readonly<{ onPress: () => void }>) {
   const { t } = useTranslation();
   return (
     <View className="px-[22px] pt-3">

@@ -25,11 +25,13 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const MIN_HIT_TARGET_PT = 44;
 
-type PressableScaleProps = Omit<PressableProps, "style"> & {
-  className?: string;
-  /** Plain style only (no function form) — it is merged with the scale transform. */
-  style?: StyleProp<ViewStyle>;
-};
+type PressableScaleProps = Readonly<
+  Omit<PressableProps, "style"> & {
+    className?: string;
+    /** Plain style only (no function form) — it is merged with the scale transform. */
+    style?: StyleProp<ViewStyle>;
+  }
+>;
 
 export function PressableScale({
   onPressIn,
@@ -55,7 +57,7 @@ export function PressableScale({
       const padY = Math.max(0, (MIN_HIT_TARGET_PT - height) / 2);
       setAutoHitSlop((prev) => {
         if (padX === 0 && padY === 0) return prev === undefined ? prev : undefined;
-        if (prev && prev.left === padX && prev.top === padY) return prev;
+        if (prev?.left === padX && prev?.top === padY) return prev;
         return { top: padY, bottom: padY, left: padX, right: padX };
       });
       onLayout?.(e);

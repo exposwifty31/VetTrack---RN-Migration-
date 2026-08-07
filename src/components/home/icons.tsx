@@ -7,7 +7,9 @@
 import { View } from "react-native";
 import Svg, { Circle, Line, Path } from "react-native-svg";
 
-type IconProps = { color: string; size?: number };
+type IconProps = Readonly<{ color: string; size?: number }>;
+
+type GlyphProps = Readonly<{ color: string }>;
 
 export function SearchIcon({ color, size = 20 }: IconProps) {
   return (
@@ -48,7 +50,7 @@ export function SlidersIcon({ color, size = 20 }: IconProps) {
 
 /* Tab glyphs — plain-View geometry lifted 1:1 from the hand-off tab bar. */
 
-export function TodayGlyph({ color }: { color: string }) {
+export function TodayGlyph({ color }: GlyphProps) {
   return (
     <View style={{ width: 15, height: 14, borderWidth: 2, borderColor: color, borderRadius: 4 }}>
       <View style={{ position: "absolute", top: 2, left: 1, right: 1, height: 2, backgroundColor: color }} />
@@ -56,7 +58,7 @@ export function TodayGlyph({ color }: { color: string }) {
   );
 }
 
-export function EquipmentGlyph({ color }: { color: string }) {
+export function EquipmentGlyph({ color }: GlyphProps) {
   return (
     <View style={{ gap: 3, alignItems: "center", justifyContent: "center" }}>
       <View style={{ width: 16, height: 2.5, borderRadius: 2, backgroundColor: color }} />
@@ -67,7 +69,7 @@ export function EquipmentGlyph({ color }: { color: string }) {
 }
 
 /** Emergency plus — danger family: static, never glassed, never animated. */
-export function EmergencyGlyph({ color }: { color: string }) {
+export function EmergencyGlyph({ color }: GlyphProps) {
   return (
     <View style={{ width: 16, height: 16, alignItems: "center", justifyContent: "center" }}>
       <View style={{ width: 16, height: 4.5, borderRadius: 2, backgroundColor: color }} />
@@ -76,7 +78,7 @@ export function EmergencyGlyph({ color }: { color: string }) {
   );
 }
 
-export function MenuGlyph({ color }: { color: string }) {
+export function MenuGlyph({ color }: GlyphProps) {
   return (
     <View style={{ flexDirection: "row", gap: 3.5, alignItems: "center" }}>
       <View style={{ width: 4.5, height: 4.5, borderRadius: 999, backgroundColor: color }} />

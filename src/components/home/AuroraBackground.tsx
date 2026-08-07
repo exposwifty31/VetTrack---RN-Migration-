@@ -9,7 +9,7 @@ import { StyleSheet, useWindowDimensions, View } from "react-native";
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from "react-native-svg";
 import { useUniwind } from "uniwind";
 
-type GlowProps = {
+type GlowProps = Readonly<{
   id: string;
   color: string;
   opacity: number;
@@ -17,7 +17,7 @@ type GlowProps = {
   height: number;
   centerX: number;
   centerY: number;
-};
+}>;
 
 function Glow({ id, color, opacity, width, height, centerX, centerY }: GlowProps) {
   return (
