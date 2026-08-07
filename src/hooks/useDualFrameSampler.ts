@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useFrameCallback, useSharedValue } from "react-native-reanimated";
+import { runOnUI, useFrameCallback, useSharedValue } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 import {
   getFrameBudgetMs,
@@ -18,19 +19,28 @@ import {
  * JSON needs) but no frame is counted over-budget — the measurement screen
  * fails loud on a missing budget before any verdict export.
  */
+
+/** Publish the UI-thread sample on the RN runtime (called via scheduleOnRN). */
+function publishUiSample(deltasMs: number[], budgetMs: number): void {
+  publishFrameSample("ui", {
+    framesTotal: deltasMs.length,
+    framesOverBudget: deltasMs.filter((d) => d > budgetMs).length,
+    deltasMs,
+  });
+}
+
 export function useDualFrameSampler() {
   const budgetMs = getFrameBudgetMs() ?? Number.POSITIVE_INFINITY;
 
-  const uiFramesTotal = useSharedValue(0);
-  const uiFramesOverBudget = useSharedValue(0);
+  // The delta array is the single source of truth — counters are derived from
+  // it at publish time (separate per-frame counters raced the array reads and
+  // produced the G2.5 run-04 counter/array mismatch).
   const uiDeltas = useSharedValue<number[]>([]);
 
   const frameCallback = useFrameCallback((frame) => {
     "worklet";
     const delta = frame.timeSincePreviousFrame;
     if (delta != null) {
-      uiFramesTotal.value += 1;
-      if (delta > budgetMs) uiFramesOverBudget.value += 1;
       uiDeltas.modify((arr) => {
         "worklet";
         arr.push(delta);
@@ -48,12 +58,10 @@ export function useDualFrameSampler() {
 
   const start = useCallback(() => {
     if (jsHandle.current) return; // already sampling — idempotent
-    uiFramesTotal.value = 0;
-    uiFramesOverBudget.value = 0;
     uiDeltas.value = [];
     jsHandle.current = startFrameSampler(budgetMs);
     frameCallbackRef.current.setActive(true);
-  }, [budgetMs, uiFramesTotal, uiFramesOverBudget, uiDeltas]);
+  }, [budgetMs, uiDeltas]);
 
   const stop = useCallback(() => {
     const handle = jsHandle.current;
@@ -61,16 +69,15 @@ export function useDualFrameSampler() {
     jsHandle.current = null;
     frameCallbackRef.current.setActive(false);
     publishFrameSample("js", handle.stop());
-    // Snapshot the delta array ONCE and derive both counters from it: the
-    // separate shared-value reads are not atomic against a still-settling
-    // UI-thread frame (observed as a one-frame counter/array mismatch in the
-    // G2.5 run-04 archive). The array is the reproducibility ground truth.
-    const deltasMs = [...uiDeltas.value];
-    publishFrameSample("ui", {
-      framesTotal: deltasMs.length,
-      framesOverBudget: deltasMs.filter((d) => d > budgetMs).length,
-      deltasMs,
-    });
+    // Snapshot ON the UI runtime: its queue is serial, so this block runs after
+    // the deactivation and after any still-pending frame callback — no trailing
+    // frame can land after the capture. The sample is then published back on
+    // the RN runtime in stop order.
+    runOnUI(() => {
+      "worklet";
+      const deltasMs = uiDeltas.value.slice();
+      scheduleOnRN(publishUiSample, deltasMs, budgetMs);
+    })();
   }, [budgetMs, uiDeltas]);
 
   // Never leave the UI frame callback running after unmount.
