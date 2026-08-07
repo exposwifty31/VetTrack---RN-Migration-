@@ -50,3 +50,28 @@ at `stop()` (fix in this PR).
 - Equipment-list + checkout-sheet Aurora passes: **landed** (PR #21, merged to main
   `bb842d7`, 2026-08-07). Still open: one combined three-screen no-regression run
   on the device covering the restyled list scroll + sheet.
+
+
+## Combined three-screen run — CLOSED (2026-08-07, evening)
+
+Final G2.5 exit item executed: the combined protocol (Home navigation → 
+equipment-list scroll → checkout-sheet enter, per run) on the restyled
+surfaces of main post-PR #21 (stale meta tier + glass T2 sheet included),
+release arm64 build, 90 Hz forced, production backend, signed-in session.
+
+**Pooled UI thread: n=1962 · p95 11.07 ms (floor 11.11) · 1 dropped
+(≥22.22 ms) = 0.051% (floor <1%) — PASS. No regression vs the
+11.08/11.09 ms record.**
+
+| file | ui frames (array) | drops ≥22.22ms | sha256 |
+|---|---|---|---|
+| combined-run01.json | 418 | 0 | `4b6e353e483c1e59c67a3b78200a60017e31062ae438496e69a67219c6f4f18c` |
+| combined-run02.json | 429 | 1 | `9ecc24ad2aa09bb55d42221ddccd9173f60c55f6bf41d9bc8994c8d2f9b592dd` |
+| combined-run03.json | 434 | 0 | `530c4ead317594fa7044a82657157a3b3650c475594ebe93c8a6734a7d48e67f` |
+| combined-run04.json | 351 | 0 | `0d28d0d2c7a5b77f4fe0d2e67c057aaa332eaed2d49009695727c87bc7e03430` |
+| combined-run05.json | 330 | 0 | `8f2058d233e9e7551048ef077443b6de4bc9acb4718a64060aa0a526b68eacc8` |
+
+Counters derived from the archived `deltasMs` arrays (arrays are
+authoritative, per the reproducibility contract). With this run the
+"Remaining exit-bar items" list above is fully closed except the
+light-theme seam (theme still pinned dark — tracked as a G3-era item).
