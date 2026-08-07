@@ -22,7 +22,7 @@ export function SignInScreen(props: RootStackScreenProps<"SignIn">) {
         <Pressable
           className="items-center rounded-xl border border-border py-3.5 active:opacity-80"
           accessibilityRole="button"
-          onPress={() => props.navigation.navigate("Home")}
+          onPress={() => props.navigation.navigate("Main")}
         >
           <Text className="text-[15px] font-semibold text-foreground">{t("common.back")}</Text>
         </Pressable>
@@ -51,7 +51,7 @@ function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
         <Pressable
           className="items-center rounded-xl bg-primary py-3.5 active:opacity-80"
           accessibilityRole="button"
-          onPress={() => navigation.navigate("Home")}
+          onPress={() => navigation.navigate("Main")}
         >
           <Text className="text-[15px] font-semibold text-primary-foreground">{t("signIn.goHome")}</Text>
         </Pressable>

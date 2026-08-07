@@ -1,13 +1,13 @@
 import "./src/global.css";
 
 import type { ReactNode } from "react";
-import {
-  Rubik_400Regular,
-  Rubik_500Medium,
-  Rubik_600SemiBold,
-  Rubik_700Bold,
-  useFonts,
-} from "@expo-google-fonts/rubik";
+// Per-weight subpath imports — the package root re-exports every weight and
+// would drag all 14 Rubik ttfs (~3MB) into the bundle; we ship exactly four.
+import { Rubik_400Regular } from "@expo-google-fonts/rubik/400Regular";
+import { Rubik_500Medium } from "@expo-google-fonts/rubik/500Medium";
+import { Rubik_600SemiBold } from "@expo-google-fonts/rubik/600SemiBold";
+import { Rubik_700Bold } from "@expo-google-fonts/rubik/700Bold";
+import { useFonts } from "expo-font";
 import { ClerkProvider } from "@clerk/clerk-expo";
 import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { NavigationContainer } from "@react-navigation/native";
