@@ -137,6 +137,19 @@ describe("isoDayDate + addIsoDays", () => {
     expect(addIsoDays("2026/08/07", 1)).toBeNull();
   });
 
+  it("rejects calendar-invalid days instead of letting Date roll them over", () => {
+    expect(isoDayDate("2026-02-31")).toBeNull();
+    expect(isoDayDate("2026-04-31")).toBeNull();
+    expect(isoDayDate("2026-13-01")).toBeNull();
+    expect(isoDayDate("2026-00-10")).toBeNull();
+    expect(isoDayDate("2026-01-00")).toBeNull();
+    expect(isoDayDate("2026-01-32")).toBeNull();
+    expect(addIsoDays("2026-02-31", 1)).toBeNull();
+    // Leap-year boundary stays valid.
+    expect(isoDayDate("2028-02-29")).not.toBeNull();
+    expect(isoDayDate("2026-02-29")).toBeNull();
+  });
+
   it("adds and subtracts days across month and year boundaries", () => {
     expect(addIsoDays("2026-08-07", 1)).toBe("2026-08-08");
     expect(addIsoDays("2026-08-01", -1)).toBe("2026-07-31");

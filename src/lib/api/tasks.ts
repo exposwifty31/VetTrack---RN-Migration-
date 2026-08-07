@@ -78,10 +78,22 @@ export function isOffShiftError(error: unknown): boolean {
   );
 }
 
+/** Query retry policy: default-retry parity (retry: 1) minus pointless 4xx retries. */
+export function retryUnlessClientError(failureCount: number, error: unknown): boolean {
+  if (error instanceof TasksApiError && error.status < 500) return false;
+  return failureCount < 1;
+}
+
 async function requestTasksJson<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await authFetch(path, init);
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    // Normalize before reading fields: a JSON `null` (or non-object) body must
+    // still surface a coded TasksApiError, never a TypeError.
+    const payload: unknown = await res.json().catch(() => ({}));
+    const body =
+      payload !== null && typeof payload === "object"
+        ? (payload as Record<string, unknown>)
+        : {};
     const code =
       typeof body.code === "string"
         ? body.code

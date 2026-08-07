@@ -47,11 +47,11 @@ export type Task = {
   scheduledAt?: string | null;
   completedAt?: string | null;
   status: string;
-  priority?: string;
+  priority?: string | null;
   taskType?: string | null;
   notes?: string | null;
   appointmentType?: string | null;
   createdBy?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };

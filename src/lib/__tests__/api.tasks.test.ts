@@ -152,6 +152,16 @@ describe("lifecycle mutations", () => {
     mockAuthFetch.mockResolvedValue(makeResponse(502, "not-json-shaped"));
     await expect(tasksApi.start("task-1")).rejects.toMatchObject({ code: "HTTP_502" });
   });
+
+  it("survives a JSON null error body (still a coded TasksApiError, never a TypeError)", async () => {
+    mockAuthFetch.mockResolvedValue(makeResponse(403, null));
+
+    await expect(tasksApi.start("task-1")).rejects.toMatchObject({
+      status: 403,
+      code: "HTTP_403",
+      name: "TasksApiError",
+    });
+  });
 });
 
 describe("isOffShiftError", () => {

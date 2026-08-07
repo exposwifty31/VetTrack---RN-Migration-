@@ -15,6 +15,9 @@ import {
 } from "@/lib/task-permissions";
 import type { Task } from "@/types/tasks";
 
+/** The two list scopes the screen offers. `mine` = the server's clinic-today scope. */
+export type TaskSegment = "all" | "mine";
+
 export const START_ELIGIBLE_STATUSES = ["scheduled", "assigned", "arrived", "approved"] as const;
 
 export function canStartFromStatus(status: string): boolean {

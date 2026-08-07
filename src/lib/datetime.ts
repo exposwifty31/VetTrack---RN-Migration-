@@ -88,13 +88,22 @@ export function isoDayString(value: DateTimeInput): string | null {
 
 /**
  * A `YYYY-MM-DD` string as a local-noon Date — noon anchors day arithmetic and
- * label formatting away from DST edges. Malformed strings return null.
+ * label formatting away from DST edges. Malformed AND calendar-invalid strings
+ * return null: the round-trip check rejects Date's silent rollover (a
+ * "2026-02-31" would otherwise become March 3).
  */
 export function isoDayDate(day: string): Date | null {
   const match = ISO_DAY_RE.exec(day);
   if (!match) return null;
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
-  return Number.isNaN(date.getTime()) ? null : date;
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const dayOfMonth = Number(match[3]);
+  const date = new Date(year, monthIndex, dayOfMonth, 12);
+  return date.getFullYear() === year &&
+    date.getMonth() === monthIndex &&
+    date.getDate() === dayOfMonth
+    ? date
+    : null;
 }
 
 /** Day arithmetic on the `YYYY-MM-DD` shape (delta may be negative). */
