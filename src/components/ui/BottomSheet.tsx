@@ -69,7 +69,14 @@ export function BottomSheet({ onDismiss, children }: BottomSheetProps) {
   }));
 
   // Drag-down to dismiss. Vertical gesture → no RTL mirroring needed.
+  // Downward-only activation: without offsets an unrestricted Pan activates on
+  // ANY movement and cancels active presses in children (buttons inside the
+  // sheet). Activate only after 12px downward; fail on upward + horizontal so
+  // taps and future horizontal gestures pass through untouched.
   const panGesture = Gesture.Pan()
+    .activeOffsetY(12)
+    .failOffsetY(-12)
+    .failOffsetX([-16, 16])
     .onUpdate((e) => {
       "worklet";
       if (e.translationY > 0) translateY.value = e.translationY;

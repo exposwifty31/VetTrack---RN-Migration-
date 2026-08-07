@@ -15,12 +15,9 @@ type SectionCardProps = Readonly<{
   className?: string;
 }>;
 
+const BASE_CLASSES = "rounded-md border border-border bg-surface p-4";
+
 export function SectionCard({ children, className }: SectionCardProps) {
-  return (
-    <View
-      className={`rounded-md border border-border bg-surface p-4${className ? ` ${className}` : ""}`}
-    >
-      {children}
-    </View>
-  );
+  const resolvedClassName = className ? `${BASE_CLASSES} ${className}` : BASE_CLASSES;
+  return <View className={resolvedClassName}>{children}</View>;
 }
