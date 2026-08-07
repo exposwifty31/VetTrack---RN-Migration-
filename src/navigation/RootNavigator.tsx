@@ -48,12 +48,12 @@ function GatedScanConfirm(props: RootStackScreenProps<"ScanConfirm">) {
 }
 
 // G3 placeholders gated the same way — identity must resolve before any G3
-// surface renders. The placeholder screens are prop-free (zero data fetching),
-// so the wrappers take no screen props yet; later slices thread them through.
-function GatedEquipmentDetail() {
+// surface renders. Placeholder screens are prop-free (zero data fetching);
+// each slice threads its screen props through when it lands (Slice 2 below).
+function GatedEquipmentDetail(props: RootStackScreenProps<"EquipmentDetail">) {
   return (
     <BootstrapGate>
-      <EquipmentDetailScreen />
+      <EquipmentDetailScreen {...props} />
     </BootstrapGate>
   );
 }
