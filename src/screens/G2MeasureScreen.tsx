@@ -64,12 +64,13 @@ export function G2MeasureScreen(_props: RootStackScreenProps<"G2Measure">) {
     // Deterministic capture channel for cable-driven measurement runs: the
     // payload also goes to the native log (adb logcat), so the raw arrays can
     // be archived without driving the share sheet. logcat truncates lines at
-    // ~4KB, so the JSON is chunked with reassembly markers.
+    // ~4KB, so the JSON is chunked; every chunk carries the G2_EXPORT marker
+    // (the collector's contract) plus i/total reassembly metadata.
     const serialized = JSON.stringify(payload);
     const CHUNK = 3000;
     const total = Math.ceil(serialized.length / CHUNK);
     for (let i = 0; i < total; i += 1) {
-      console.log(`G2CHUNK ${run} ${i + 1}/${total} ${serialized.slice(i * CHUNK, (i + 1) * CHUNK)}`);
+      console.log(`G2_EXPORT ${run} ${i + 1}/${total} ${serialized.slice(i * CHUNK, (i + 1) * CHUNK)}`);
     }
     try {
       await Share.share({ message: JSON.stringify(payload) });

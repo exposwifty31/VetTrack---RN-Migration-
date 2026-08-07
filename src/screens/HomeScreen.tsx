@@ -19,8 +19,9 @@ export function HomeScreen({ navigation }: RootStackScreenProps<"Home">) {
 
   useEffect(() => {
     if (!markedHomeInteractive) {
-      markedHomeInteractive = true;
-      mark(MARK.screenInteractive);
+      // Latch ONLY on a successful mark — a swallowed performance.mark failure
+      // must leave the latch open so a later mount can still record O4's end mark.
+      markedHomeInteractive = mark(MARK.screenInteractive);
     }
   }, []);
 

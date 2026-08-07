@@ -27,12 +27,18 @@ export const MARK = {
 
 export type MarkName = (typeof MARK)[keyof typeof MARK];
 
-/** Emit a performance mark. No-op if the module is unavailable. */
-export function mark(name: string): void {
+/**
+ * Emit a performance mark. No-op if the module is unavailable.
+ * Returns whether the mark was actually recorded so latching callers
+ * (e.g. the O4 Home-interactive latch) never latch on a swallowed failure.
+ */
+export function mark(name: string): boolean {
   try {
     performance.mark(name);
+    return true;
   } catch {
     // marks are best-effort instrumentation
+    return false;
   }
 }
 

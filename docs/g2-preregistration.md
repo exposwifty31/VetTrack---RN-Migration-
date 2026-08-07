@@ -29,7 +29,9 @@ migration **STOPS — we polish Capacitor instead.**
 - Gate device: **Google Pixel 7** (panther, serial 32101FDH20035A) · Tensor G2 · 8 GB ·
   Android 16 (CP1A.260405.005) — recorded once in the `docs/g2-results.csv` header block.
 - Display forced to its highest rate: **90 Hz** (`min_refresh_rate 90`), verified via
-  `dumpsys display` (`renderFrameRate 90.0`). Vsync period = **11.11 ms**.
+  `dumpsys display` (`renderFrameRate 90.0`). Frame budget = **11.11 ms** — 1000/90
+  quantized to the exact value baked as `EXPO_PUBLIC_FRAME_BUDGET_MS=11.11`; the dropped-frame
+  threshold below is derived from it (2 × 11.11 = 22.22 ms), so sampler, env, and doc share one value.
 - Debug overlays OFF during measured runs (pointer location, refresh-rate overlay, show-touches).
 - Backend: production (`https://vettrack.uk`), same account and data for both apps.
 - Builds: RN = `assembleRelease` arm64 with `npm ci` lockfile discipline; Capacitor = the
@@ -60,9 +62,13 @@ verbatim in the results-file footer.
 - Instrumentation: `src/lib/instrumentation/perf.ts` + `useDualFrameSampler` +
   `G2MeasureScreen` (this PR). Budget baked via `EXPO_PUBLIC_FRAME_BUDGET_MS=11.11`;
   a missing budget fails loud.
-- Every run's raw frame-delta arrays are archived as `docs/g2-raw/<tag>.json` with SHA-256
-  recorded in `docs/g2-results.csv` (`raw_sha256`). All floors must be recomputable from the
-  raw arrays alone.
+- Every run's export JSON is archived as `docs/g2-raw/<tag>.json` with SHA-256 recorded in
+  `docs/g2-results.csv` (`raw_sha256`). **O1/O2 must be recomputable from the archived raw
+  frame-delta arrays alone**; O3/O4 are mark-derived scalars archived in the same export
+  JSONs; O5 is owner wall-clock recorded directly in the CSV.
+- **The archive filename is the authoritative run id.** The in-payload `run` field is a
+  session-local counter that resets on app relaunch (plus `exportedAt` for disambiguation);
+  analysis keys runs by filename, never by the payload counter.
 - Runs with <100 frames on a sampler are invalid (`insufficient_samples`) and are replaced.
 - CSV schema and O5 pairing rules as in v1 (schema row in `docs/g2-results.csv`).
 
