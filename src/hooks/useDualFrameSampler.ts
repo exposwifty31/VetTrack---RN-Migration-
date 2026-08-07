@@ -61,12 +61,17 @@ export function useDualFrameSampler() {
     jsHandle.current = null;
     frameCallbackRef.current.setActive(false);
     publishFrameSample("js", handle.stop());
+    // Snapshot the delta array ONCE and derive both counters from it: the
+    // separate shared-value reads are not atomic against a still-settling
+    // UI-thread frame (observed as a one-frame counter/array mismatch in the
+    // G2.5 run-04 archive). The array is the reproducibility ground truth.
+    const deltasMs = [...uiDeltas.value];
     publishFrameSample("ui", {
-      framesTotal: uiFramesTotal.value,
-      framesOverBudget: uiFramesOverBudget.value,
-      deltasMs: [...uiDeltas.value],
+      framesTotal: deltasMs.length,
+      framesOverBudget: deltasMs.filter((d) => d > budgetMs).length,
+      deltasMs,
     });
-  }, [uiFramesTotal, uiFramesOverBudget, uiDeltas]);
+  }, [budgetMs, uiDeltas]);
 
   // Never leave the UI frame callback running after unmount.
   useEffect(() => stop, [stop]);
