@@ -8,7 +8,14 @@
     "close": "Close",
     "language": "Language",
     "hebrew": "עברית",
-    "english": "English"
+    "english": "English",
+    "retry": "Try again",
+    "empty": "Nothing to show",
+    "errorGeneric": "Something went wrong. Try again.",
+    "offline": "No network connection",
+    "confirm": "Confirm",
+    "offShift": "Off shift",
+    "comingSoon": "Coming soon"
   },
   "nav": {
     "home": "Home",
@@ -20,7 +27,17 @@
     "i18nDebug": "i18n & RTL",
     "equipment": "Equipment",
     "scan": "Scan",
-    "g2Measure": "G2 measure"
+    "g2Measure": "G2 measure",
+    "equipmentDetail": "Equipment details",
+    "tasks": "Tasks",
+    "myEquipment": "My equipment",
+    "alerts": "Alerts",
+    "rooms": "Rooms",
+    "roomDetail": "Room details",
+    "shiftChat": "Shift chat",
+    "handoff": "Handoff",
+    "inventory": "Inventory",
+    "autopilotQueue": "Autopilot queue"
   },
   "home": {
     "title": "VetTrack",
