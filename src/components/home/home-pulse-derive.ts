@@ -124,14 +124,17 @@ const MINUTES_PER_DAY = 1440;
 
 /**
  * Shift a HH:MM clock time by `deltaMinutes`, wrapping across midnight — the
- * adjustment picker's stepper math. Malformed input returns it unchanged so a
- * stepper press can never corrupt the field.
+ * adjustment picker's stepper math. Malformed OR out-of-range input (hours
+ * >23, minutes >59 — e.g. "12:99") returns unchanged so a stepper press can
+ * never corrupt the field, and never silently normalizes an invalid time.
  */
 export function shiftClockTime(time: string, deltaMinutes: number): string {
   const match = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
   if (!match) return time;
-  const total = Number(match[1]) * 60 + Number(match[2]);
-  if (total >= MINUTES_PER_DAY) return time;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return time;
+  const total = hours * 60 + minutes;
   const next = (((total + deltaMinutes) % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY;
   const h = String(Math.floor(next / 60)).padStart(2, "0");
   const m = String(next % 60).padStart(2, "0");

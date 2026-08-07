@@ -172,12 +172,12 @@ function SheetContent({ initialKind, shiftStart, shiftEnd, onClose }: SheetConte
         {/* LTR row: stepper order (-1h -15m time +15m +1h) must not mirror. */}
         <View className="flex-row items-center justify-center gap-2" style={{ direction: "ltr" }}>
           <StepButton
-            label="-1h"
+            label={t("shiftAdjustments.stepDownHour")}
             a11yLabel={t("shiftAdjustments.stepDownHourA11y")}
             onPress={() => setTime((current) => shiftClockTime(current, -60))}
           />
           <StepButton
-            label="-15m"
+            label={t("shiftAdjustments.stepDown")}
             a11yLabel={t("shiftAdjustments.stepDownA11y")}
             onPress={() => setTime((current) => shiftClockTime(current, -15))}
           />
@@ -190,12 +190,12 @@ function SheetContent({ initialKind, shiftStart, shiftEnd, onClose }: SheetConte
             </Text>
           </View>
           <StepButton
-            label="+15m"
+            label={t("shiftAdjustments.stepUp")}
             a11yLabel={t("shiftAdjustments.stepUpA11y")}
             onPress={() => setTime((current) => shiftClockTime(current, 15))}
           />
           <StepButton
-            label="+1h"
+            label={t("shiftAdjustments.stepUpHour")}
             a11yLabel={t("shiftAdjustments.stepUpHourA11y")}
             onPress={() => setTime((current) => shiftClockTime(current, 60))}
           />

@@ -1,10 +1,14 @@
 /**
  * G2.5 Aurora home — operational dashboard (README.md, "בית מתוקן · חלופה A"),
- * uplifted to G3 Slice 5 daily-pulse parity. Vertical order: glass top bar
- * (floating, content scrolls under it) → greeting → scan hero → shift hero
- * (pulse + adjustments) → tasks/nudges chips → readiness → attention →
- * exceptions → recent activity. Dark default + light parity; RTL-first with
- * LTR isolates for names/numbers.
+ * uplifted to G3 Slice 5 daily-pulse parity. The screen scroller is a
+ * top-level FlashList (rn-best-practices: the cursor-paged activity feed is
+ * unbounded, so its rows are virtualized/recycled — never `map`-mounted in a
+ * ScrollView): all fixed dashboard content rides `ListHeaderComponent`, the
+ * feed's load-more rides the footer. Vertical order: glass top bar (floating,
+ * content scrolls under it) → greeting → scan hero → shift hero (pulse +
+ * adjustments) → tasks/nudges chips → readiness → attention → exceptions →
+ * recent activity. Dark default + light parity; RTL-first with LTR isolates
+ * for names/numbers.
  *
  * Data honesty: readiness metrics still derive client-side from
  * `api.equipment.list()` (`src/lib/home-readiness.ts`, untouched); the pulse
@@ -20,12 +24,18 @@
  * budget).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { View } from "react-native";
+import type { ListRenderItem } from "@shopify/flash-list";
+import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useIdentity } from "@/app/useIdentity";
-import { ActivityFeedCard } from "@/components/home/ActivityFeedCard";
+import {
+  ActivityLoadMoreFooter,
+  ActivityRow,
+  ActivitySectionHeader,
+} from "@/components/home/ActivityFeed";
 import { AuroraBackground } from "@/components/home/AuroraBackground";
 import { AttentionCard } from "@/components/home/AttentionCard";
 import { ExceptionsCard } from "@/components/home/ExceptionsCard";
@@ -45,7 +55,7 @@ import { ShiftHeroCard } from "@/components/home/ShiftHeroCard";
 import { useEquipmentRealtimeSync } from "@/hooks/useEquipmentRealtimeSync";
 import { api, equipmentKeys } from "@/lib/api";
 import { retryUnlessClientError } from "@/lib/api/coded-error";
-import { homeApi, homeKeys, type ActivityPage } from "@/lib/api/home";
+import { homeApi, homeKeys, type ActivityItem, type ActivityPage } from "@/lib/api/home";
 import { nudgeKeys, nudgesApi } from "@/lib/api/nudges";
 import {
   shiftAdjustmentKeys,
@@ -186,73 +196,97 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
     ? flattenActivityPages(activityQuery.data.pages)
     : null;
 
+  const onActivityPress = useCallback(
+    (item: ActivityItem) =>
+      navigation.navigate("EquipmentDetail", { equipmentId: item.equipmentId }),
+    [navigation],
+  );
+
+  // Stable renderItem so FlashList recycling stays cheap (rn-best-practices).
+  const renderActivityRow = useCallback<ListRenderItem<ActivityItem>>(
+    ({ item }) => <ActivityRow item={item} onPress={onActivityPress} />,
+    [onActivityPress],
+  );
+
   const displayName =
     identity.data?.name?.trim().split(/\s+/)[0] ||
     identity.data?.email?.split("@")[0] ||
     undefined;
   const initial = displayName ? displayName[0].toUpperCase() : undefined;
 
+  // All fixed dashboard content rides the list header (single scroller: the
+  // FlashList below owns scrolling; only activity rows are list items).
+  const listHeader = (
+    <View>
+      <GreetingHeader name={displayName} />
+      <ScanHero onPress={() => navigation.navigate("Scan")} />
+      <ShiftHeroCard
+        state={heroState}
+        streak={dashboard?.streak ?? null}
+        scansToday={dashboard?.scansToday ?? null}
+        tasksDone={dashboard?.tasksCompletedToday ?? null}
+        pendingAdjustment={pendingAdjustment}
+        cancelInFlight={cancelAdjustment.isPending}
+        loadFailed={dashboardQuery.isError}
+        onRetry={() => void dashboardQuery.refetch()}
+        onRequestAdjustment={setSheetKind}
+        onCancelAdjustment={(id) => cancelAdjustment.mutate(id)}
+      />
+      <HomeChipsRow
+        tasksCounts={tasksDashboardQuery.data?.counts ?? null}
+        nudgesCount={nudgesQuery.data?.length ?? null}
+        onTasksPress={() => navigation.navigate("Tasks")}
+      />
+      <ReadinessCard readiness={readiness} />
+      <AttentionCard
+        items={attentionItems}
+        loadFailed={fleetQuery.isError}
+        onHeaderPress={() => navigation.navigate("Alerts")}
+        onItemPress={(item) =>
+          navigation.navigate("EquipmentList", { initialQuery: item.equipmentName })
+        }
+      />
+      {exceptions.length > 0 ? (
+        <ExceptionsCard
+          count={exceptions.length}
+          items={exceptions}
+          onHeaderPress={() => navigation.navigate("EquipmentList")}
+          onItemPress={(item) =>
+            navigation.navigate("EquipmentList", { initialQuery: item.name })
+          }
+        />
+      ) : null}
+      <ActivitySectionHeader
+        items={activityItems}
+        loadFailed={activityQuery.isError}
+        onRetry={() => void activityQuery.refetch()}
+      />
+    </View>
+  );
+
   return (
     <View className="flex-1 bg-background">
       <AuroraBackground />
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{
-          paddingTop: insets.top + TOP_BAR_HEIGHT + 8,
-          paddingBottom: 24,
-        }}
-        showsVerticalScrollIndicator={false}
-      >
-        <GreetingHeader name={displayName} />
-        <ScanHero onPress={() => navigation.navigate("Scan")} />
-        <ShiftHeroCard
-          state={heroState}
-          streak={dashboard?.streak ?? null}
-          scansToday={dashboard?.scansToday ?? null}
-          tasksDone={dashboard?.tasksCompletedToday ?? null}
-          pendingAdjustment={pendingAdjustment}
-          cancelInFlight={cancelAdjustment.isPending}
-          loadFailed={dashboardQuery.isError}
-          onRetry={() => void dashboardQuery.refetch()}
-          onRequestAdjustment={setSheetKind}
-          onCancelAdjustment={(id) => cancelAdjustment.mutate(id)}
-        />
-        <HomeChipsRow
-          tasksCounts={tasksDashboardQuery.data?.counts ?? null}
-          nudgesCount={nudgesQuery.data?.length ?? null}
-          onTasksPress={() => navigation.navigate("Tasks")}
-        />
-        <ReadinessCard readiness={readiness} />
-        <AttentionCard
-          items={attentionItems}
-          loadFailed={fleetQuery.isError}
-          onHeaderPress={() => navigation.navigate("Alerts")}
-          onItemPress={(item) =>
-            navigation.navigate("EquipmentList", { initialQuery: item.equipmentName })
+      <View className="flex-1">
+        <FlashList
+          data={activityItems ?? []}
+          renderItem={renderActivityRow}
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={listHeader}
+          ListFooterComponent={
+            <ActivityLoadMoreFooter
+              hasMore={activityQuery.hasNextPage}
+              loadingMore={activityQuery.isFetchingNextPage}
+              onLoadMore={() => void activityQuery.fetchNextPage()}
+            />
           }
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingTop: insets.top + TOP_BAR_HEIGHT + 8,
+            paddingBottom: 24,
+          }}
         />
-        {exceptions.length > 0 ? (
-          <ExceptionsCard
-            count={exceptions.length}
-            items={exceptions}
-            onHeaderPress={() => navigation.navigate("EquipmentList")}
-            onItemPress={(item) =>
-              navigation.navigate("EquipmentList", { initialQuery: item.name })
-            }
-          />
-        ) : null}
-        <ActivityFeedCard
-          items={activityItems}
-          loadFailed={activityQuery.isError}
-          hasMore={activityQuery.hasNextPage}
-          loadingMore={activityQuery.isFetchingNextPage}
-          onLoadMore={() => void activityQuery.fetchNextPage()}
-          onRetry={() => void activityQuery.refetch()}
-          onItemPress={(item) =>
-            navigation.navigate("EquipmentDetail", { equipmentId: item.equipmentId })
-          }
-        />
-      </ScrollView>
+      </View>
       <GlassTopBar
         topInset={insets.top}
         initial={initial}

@@ -122,6 +122,20 @@ describe("shiftClockTime", () => {
     expect(shiftClockTime("later", 15)).toBe("later");
     expect(shiftClockTime("25:00", 15)).toBe("25:00");
   });
+
+  it("rejects out-of-range components instead of normalizing them", () => {
+    // "12:99" must NOT become "13:39" (silent normalization of invalid input).
+    expect(shiftClockTime("12:99", 0)).toBe("12:99");
+    expect(shiftClockTime("12:60", 15)).toBe("12:60");
+    expect(shiftClockTime("24:00", 15)).toBe("24:00");
+    expect(shiftClockTime("99:15", -15)).toBe("99:15");
+  });
+
+  it("accepts the exact boundary values", () => {
+    expect(shiftClockTime("23:59", 1)).toBe("00:00");
+    expect(shiftClockTime("00:00", -1)).toBe("23:59");
+    expect(shiftClockTime("0:59", 1)).toBe("01:00");
+  });
 });
 
 describe("adjustmentErrorKey", () => {
