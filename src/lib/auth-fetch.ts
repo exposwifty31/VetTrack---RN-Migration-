@@ -5,6 +5,7 @@
 
 import { resolveApiUrl } from "@/lib/api-origin";
 import { getCurrentUserId, getStoredBearerToken } from "@/lib/auth-store";
+import { emergencyOfflineErrorFromFailedDispatch } from "@/lib/emergency-block";
 
 type ClerkTokenGetter = (() => Promise<string | null>) | null;
 
@@ -102,6 +103,26 @@ export async function resolveBearerToken(): Promise<string | null> {
   return resolveToken();
 }
 
+/**
+ * Network dispatch with the frozen no-offline-emergency-queueing doctrine: a
+ * network-level rejection on a Code Blue mutation becomes a loud
+ * `EmergencyOfflineError` (never queued, never retried); every other failure
+ * — and every successful response — passes through 100% unchanged.
+ */
+async function dispatchFetch(
+  resolvedUrl: string,
+  path: string,
+  init: RequestInit,
+): Promise<Response> {
+  try {
+    return await fetch(resolvedUrl, init);
+  } catch (err) {
+    const blocked = emergencyOfflineErrorFromFailedDispatch(err, path, init.method ?? "GET");
+    if (blocked) throw blocked;
+    throw err;
+  }
+}
+
 export class AuthFetchError extends Error {
   readonly status?: number;
 
@@ -137,12 +158,12 @@ export async function authFetch(path: string, options: RequestInit = {}): Promis
       headers.set("Content-Type", "application/json");
     }
 
-    const res = await fetch(resolvedUrl, { ...options, headers });
+    const res = await dispatchFetch(resolvedUrl, path, { ...options, headers });
     if (res.status === 401) {
       throw new AuthFetchError("UNAUTHORIZED", 401);
     }
     return res;
   }
 
-  return fetch(resolvedUrl, options);
+  return dispatchFetch(resolvedUrl, path, options);
 }
