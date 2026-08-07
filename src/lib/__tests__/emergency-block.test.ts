@@ -79,6 +79,13 @@ describe("isNetworkFailure", () => {
     expect(isNetworkFailure(new TypeError("Cannot read properties of undefined"))).toBe(false);
   });
 
+  it("does NOT match messages that merely CONTAIN a known phrase (patterns are anchored)", () => {
+    expect(isNetworkFailure(new TypeError("Failed to fetch request configuration"))).toBe(false);
+    expect(isNetworkFailure(new Error("The fetch failed due to bad config"))).toBe(false);
+    expect(isNetworkFailure(new Error("retry: Network request failed twice"))).toBe(false);
+    expect(isNetworkFailure(new Error("NetworkError code 42"))).toBe(false);
+  });
+
   it("does NOT treat caller-initiated aborts or app errors as offline", () => {
     const abort = new Error("Aborted");
     abort.name = "AbortError";

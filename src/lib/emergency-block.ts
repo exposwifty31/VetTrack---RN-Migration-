@@ -79,18 +79,20 @@ function recordEmergencyBlock(entry: EmergencyBlockBufferEntry): void {
 }
 
 /**
- * Known network-level fetch rejection messages, matched narrowly so a
- * programming error that also throws TypeError (e.g. "Invalid URL") is never
- * masked as an offline block:
+ * Known network-level fetch rejection messages, anchored to the COMPLETE
+ * message each engine emits so neither a programming error that also throws
+ * TypeError (e.g. "Invalid URL") nor an app error that merely contains a
+ * known phrase (e.g. "Failed to fetch request configuration") is ever masked
+ * as an offline block:
  *   - "Network request failed" — RN / whatwg-fetch
  *   - "Failed to fetch"        — Chromium
  *   - "Load failed"            — WebKit / Safari
  *   - "fetch failed"           — undici (Node / jest env)
- *   - "NetworkError"           — Firefox
+ *   - "NetworkError when attempting to fetch resource." — Firefox
  * Caller aborts are cancellations, not offline — never converted to a block.
  */
 const NETWORK_FAILURE_MESSAGE =
-  /network request failed|failed to fetch|load failed|fetch failed|networkerror/i;
+  /^(?:network request failed|failed to fetch|load failed|fetch failed|networkerror when attempting to fetch resource\.)$/i;
 
 export function isNetworkFailure(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
