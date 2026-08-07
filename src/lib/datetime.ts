@@ -13,12 +13,14 @@ export function resolveIntlLocale(language: string = i18n.language): string {
   return language === "he" || language.startsWith("he-") ? "he-IL" : "en-GB";
 }
 
-type FormatKind = "date" | "time" | "dateTime";
+type FormatKind = "date" | "time" | "dateTime" | "dayLabel";
 
 const FORMAT_OPTIONS: Record<FormatKind, Intl.DateTimeFormatOptions> = {
   date: { dateStyle: "medium" },
   time: { timeStyle: "short" },
   dateTime: { dateStyle: "medium", timeStyle: "short" },
+  // Day-nav header shape (Tasks day view): "יום ה׳, 7 באוג׳" / "Thu, 7 Aug".
+  dayLabel: { weekday: "short", day: "numeric", month: "short" },
 };
 
 const formatterCache = new Map<string, Intl.DateTimeFormat>();
@@ -60,6 +62,56 @@ export function formatTime(value: DateTimeInput, language?: string): string | nu
 export function formatDateTime(value: DateTimeInput, language?: string): string | null {
   const ms = toEpochMs(value);
   return ms == null ? null : getFormatter("dateTime", language).format(ms);
+}
+
+export function formatDayLabel(value: DateTimeInput, language?: string): string | null {
+  const ms = toEpochMs(value);
+  return ms == null ? null : getFormatter("dayLabel", language).format(ms);
+}
+
+const ISO_DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * LOCAL calendar day as `YYYY-MM-DD` — the `?day=` param shape the server's
+ * appointments listing expects. The server resolves the window in the CLINIC
+ * timezone; the device-local day is the correct client input for on-site staff
+ * (and the same assumption the web Tasks page makes).
+ */
+export function isoDayString(value: DateTimeInput): string | null {
+  const ms = toEpochMs(value);
+  if (ms == null) return null;
+  const d = new Date(ms);
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * A `YYYY-MM-DD` string as a local-noon Date — noon anchors day arithmetic and
+ * label formatting away from DST edges. Malformed AND calendar-invalid strings
+ * return null: the round-trip check rejects Date's silent rollover (a
+ * "2026-02-31" would otherwise become March 3).
+ */
+export function isoDayDate(day: string): Date | null {
+  const match = ISO_DAY_RE.exec(day);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const dayOfMonth = Number(match[3]);
+  const date = new Date(year, monthIndex, dayOfMonth, 12);
+  return date.getFullYear() === year &&
+    date.getMonth() === monthIndex &&
+    date.getDate() === dayOfMonth
+    ? date
+    : null;
+}
+
+/** Day arithmetic on the `YYYY-MM-DD` shape (delta may be negative). */
+export function addIsoDays(day: string, delta: number): string | null {
+  const base = isoDayDate(day);
+  if (base == null) return null;
+  base.setDate(base.getDate() + delta);
+  return isoDayString(base);
 }
 
 export type RelativeDay =
