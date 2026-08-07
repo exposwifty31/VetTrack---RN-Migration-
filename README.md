@@ -24,9 +24,10 @@ G0 (Capacitor safety net) is nearly done; store submissions are intentionally on
 
 | Gate | State |
 |---|---|
-| **G1 — Foundation** | **done** — slices 0–7 merged to `main` (incl. 5 SSE + 6 i18n/RTL); CI (typecheck + test) green. One open item: slice 8 NFC real-tag (hardware-blocked). Next: **G2** |
-| G2 — Hero flow (delight) | not started |
-| G3 — Daily-driver parity | not started |
+| **G1 — Foundation** | **done** — slices 0–7 merged to `main` (incl. 5 SSE + 6 i18n/RTL); CI (typecheck + test) green. One open item: slice 8 NFC real-tag (hardware-blocked) |
+| **G2 — Hero flow (delight)** | **PASSED 2026-08-07** — pre-registration v2 lock `63c36b3` (PR #17): O1 pooled UI p95 11.09ms · O2 0/2886 dropped · O3 0.2–1.4ms · O4 cold-to-Home median 260ms · S1 owner verdict "RN"; O5 waived (declared deviation). Record: `docs/g2-preregistration.md` + `docs/g2-results.csv` + `docs/g2-raw/` |
+| **G2.5 — Design language** | **not started** — owner-mandated (2026-08-07): design matters as much as functionality; no G3 screen ships before the language exists as tokens/primitives. Scope + exit bar: `DESIGN-LANGUAGE.md` |
+| G3 — Daily-driver parity | not started (gated on G2.5) |
 | G4 — Code Blue + full offline | not started |
 | G5 — RN to stores | not started |
 
