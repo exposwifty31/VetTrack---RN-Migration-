@@ -107,3 +107,130 @@ export type EquipmentListResult =
   | { status: 304 };
 
 export type OutboxHead = { maxPublishedId: number };
+
+/** Server `EQUIPMENT_STATUS_VALUES` (equipment.ts:61) — the /:id/scan status enum. */
+export type EquipmentStatusValue =
+  | "ok"
+  | "issue"
+  | "maintenance"
+  | "sterilized"
+  | "overdue"
+  | "inactive"
+  | "critical"
+  | "needs_attention";
+
+/**
+ * GET /api/equipment/:id — the detail read (get-equipment-by-id.ts select).
+ * Joined names (folderName/roomName/lastVerifiedByName) come from the handler's
+ * leftJoins; `custodyState`/`readinessState`/`usageState` from the operational
+ * select. The endpoint returns NO `version` column — do not model one here.
+ * Everything beyond the identity trio is optional so an older server shape
+ * degrades to honest empty renders instead of crashing sections.
+ */
+export type EquipmentDetail = {
+  id: string;
+  name: string;
+  status: string;
+  serialNumber?: string | null;
+  model?: string | null;
+  manufacturer?: string | null;
+  purchaseDate?: string | null;
+  expiryDate?: string | null;
+  location?: string | null;
+  folderId?: string | null;
+  folderName?: string | null;
+  roomId?: string | null;
+  roomName?: string | null;
+  nfcTagId?: string | null;
+  lastVerifiedAt?: string | null;
+  lastVerifiedByName?: string | null;
+  lastSeen?: string | null;
+  lastStatus?: string | null;
+  lastMaintenanceDate?: string | null;
+  lastSterilizationDate?: string | null;
+  maintenanceIntervalDays?: number | null;
+  imageUrl?: string | null;
+  checkedOutById?: string | null;
+  checkedOutByEmail?: string | null;
+  checkedOutAt?: string | null;
+  checkedOutLocation?: string | null;
+  expectedReturnMinutes?: number | null;
+  createdAt?: string | null;
+  usuallyFoundHere?: string | null;
+  searchAlias?: string | null;
+  staffNote?: string | null;
+  custodyState?: string;
+  readinessState?: string | null;
+  usageState?: string | null;
+};
+
+/** One scan-log row (GET /:id/logs). staffName/staffRole appear on admin reads only. */
+export type EquipmentLogItem = {
+  id: string;
+  equipmentId: string;
+  userId?: string | null;
+  userEmail?: string | null;
+  status: string;
+  note?: string | null;
+  photoUrl?: string | null;
+  timestamp: string;
+  staffName?: string | null;
+  staffRole?: string | null;
+};
+
+/** GET /:id/logs — page envelope (default limit 50, max 200). */
+export type EquipmentLogsPage = {
+  items: EquipmentLogItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+
+/** One transfer row (GET /:id/transfers — bare array, newest first). */
+export type EquipmentTransferItem = {
+  id: string;
+  equipmentId?: string | null;
+  fromFolderName?: string | null;
+  toFolderName?: string | null;
+  userId?: string | null;
+  note?: string | null;
+  timestamp: string;
+};
+
+/** GET /api/equipment/:equipmentId/deployability (equipment-operational-state.ts:162). */
+export type EquipmentDeployability = {
+  equipmentId: string;
+  custodyState: string;
+  readinessState: string;
+  usageState: string;
+  fullDeployable: boolean;
+  bundleGate: {
+    ok: boolean;
+    reason?: string;
+    failedConditions?: string[];
+    staleConditions?: string[];
+    unknownConditions?: string[];
+  };
+  asOfMs: number;
+};
+
+/** POST /:id/checkout 200 — `{equipment, undoToken}` (undoToken empty on emergency path). */
+export type EquipmentCheckoutResponse = {
+  equipment: EquipmentRow;
+  undoToken: string;
+};
+
+/** POST /:id/return 200 — returnRecord null when the item was already returned. */
+export type EquipmentReturnResponse = {
+  equipment: EquipmentRow;
+  undoToken: string;
+  returnRecord: unknown | null;
+};
+
+/** POST /:id/scan 200 — the status-report path (report-issue uses status "issue"). */
+export type EquipmentStatusReportResponse = {
+  equipment: EquipmentRow;
+  scanLog: EquipmentLogItem | null;
+  undoToken: string;
+};
