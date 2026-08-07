@@ -29,6 +29,18 @@ export type RootStackParamList = {
   EquipmentList: { initialQuery?: string } | undefined;
   Scan: undefined;
   ScanConfirm: { equipmentId: string; prefill?: { name?: string; status?: string } };
+  // G3 routes — pre-registered in Slice 1 (collision avoidance: later slices
+  // build the screens without touching this shared param list again).
+  EquipmentDetail: { equipmentId: string };
+  Tasks: undefined;
+  MyEquipment: undefined;
+  Alerts: undefined;
+  Rooms: undefined;
+  RoomDetail: { roomId: string };
+  ShiftChat: undefined;
+  Handoff: undefined;
+  Inventory: undefined;
+  AutopilotQueue: undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<
