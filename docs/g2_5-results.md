@@ -14,7 +14,8 @@ raw arrays archived with SHA-256).
 | Dropped frames (≥2×vsync, ≥22.22 ms) | 0 (0.000%) | **0 (0.000%)** | < 1% | **PASS** |
 
 With the Aurora restyle in place — including its single glass blur layer on the
-top app bar — the measured floors are unchanged from the pre-Aurora baseline.
+top app bar — the measured values remain within the 11.11 ms floor and show no
+regression against the recorded baseline (11.08 ms vs 11.09 ms; 0 drops in both).
 (No glass-off control run was taken, so no causal per-layer cost claim is made;
 the claim is strictly no-regression against the recorded baseline.)
 
