@@ -95,9 +95,12 @@ function AttentionRow({
 
 export function AttentionCard({
   items,
+  loadFailed = false,
   onItemPress,
 }: {
   items: AttentionItem[] | null;
+  /** Fetch failed — render an honest load-error line, never a fake all-clear. */
+  loadFailed?: boolean;
   onItemPress: (item: AttentionItem) => void;
 }) {
   const { t } = useTranslation();
@@ -123,7 +126,7 @@ export function AttentionCard({
 
         {items == null ? (
           <Text className="px-5 pb-4 pt-2 text-center font-rubik text-[11.5px] text-muted">
-            {t("common.loading")}
+            {loadFailed ? t("equipment.loadError") : t("common.loading")}
           </Text>
         ) : items.length === 0 ? (
           <View className="items-center gap-1.5 px-5 pb-3.5 pt-2.5">

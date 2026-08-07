@@ -102,6 +102,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
         <ReadinessCard readiness={readiness} />
         <AttentionCard
           items={attentionItems}
+          loadFailed={fleetQuery.isError}
           onItemPress={(item) =>
             navigation.navigate("EquipmentList", { initialQuery: item.equipmentName })
           }
