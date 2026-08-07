@@ -48,6 +48,21 @@ export function SlidersIcon({ color, size = 20 }: IconProps) {
   );
 }
 
+/** Shift-chat launcher (G3 Slice 5) — speech bubble in the same 20×20 grammar. */
+export function ChatIcon({ color, size = 20 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <Path
+        d="M10 3.6c-3.8 0-6.4 2.4-6.4 5.5 0 1.7.8 3.2 2.1 4.2l-.6 3.1 3.1-1.6c.6.1 1.2.2 1.8.2 3.8 0 6.4-2.4 6.4-5.9 0-3.1-2.6-5.5-6.4-5.5z"
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 /* Tab glyphs — plain-View geometry lifted 1:1 from the hand-off tab bar. */
 
 export function TodayGlyph({ color }: GlyphProps) {

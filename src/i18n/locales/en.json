@@ -50,7 +50,32 @@
     "equipment": "Equipment list",
     "scan": "Scan a tag",
     "realtimeDebug": "Open realtime debug (Slice 5)",
-    "g2Measure": "G2 measurement (gate)"
+    "g2Measure": "G2 measurement (gate)",
+    "shift": {
+      "onShift": "On shift",
+      "until": "Until {{time}}",
+      "nextShift": "Next shift: {{time}}",
+      "noUpcoming": "No upcoming shift on the roster",
+      "streak": "No-overdue streak",
+      "scansToday": "Scans today",
+      "tasksDone": "Tasks completed",
+      "loadError": "Could not load the shift pulse."
+    },
+    "activity": {
+      "title": "Recent activity",
+      "empty": "No activity yet.",
+      "loadMore": "Load more",
+      "loadError": "Could not load activity.",
+      "scan": "Scan",
+      "transfer": "Transfer",
+      "transferRoute": "{{from}} → {{to}}"
+    },
+    "chips": {
+      "tasks": "Tasks today",
+      "tasksOverdue": "{{count}} overdue",
+      "tasksA11y": "Open tasks",
+      "nudges": "Reminders"
+    }
   },
   "aurora": {
     "greetingMorning": "Good morning",
@@ -73,7 +98,9 @@
     "exceptionsTitle": "Exceptions",
     "exceptionReason": "No scan in more than {{days}} days",
     "searchA11y": "Search",
-    "settingsA11y": "Settings"
+    "settingsA11y": "Settings",
+    "chatA11y": "Shift chat",
+    "attentionAllA11y": "All alerts"
   },
   "tabs": {
     "today": "Today",
@@ -352,6 +379,35 @@
       "notAssigned": "This task has no one assigned.",
       "alreadyApplied": "This action was already applied.",
       "offShift": "This action is available only during an active shift."
+    }
+  },
+  "shiftAdjustments": {
+    "request": "Shift adjustment request",
+    "extend": "Extend shift",
+    "leaveEarly": "Leave early",
+    "requestedEnd": "Requested end time",
+    "reason": "Reason",
+    "reasonHint": "At least {{min}} characters",
+    "pending": "Pending request",
+    "cancel": "Cancel request",
+    "submit": "Send request",
+    "stepDownA11y": "15 minutes earlier",
+    "stepUpA11y": "15 minutes later",
+    "stepDownHourA11y": "One hour earlier",
+    "stepUpHourA11y": "One hour later",
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "cancelled": "Cancelled"
+    },
+    "errors": {
+      "notOnShift": "Adjustments can only be requested during a rostered shift.",
+      "duplicatePending": "You already have a pending request for this shift.",
+      "notAnExtension": "An extension must end later than the current shift end.",
+      "notEarlier": "Leaving early must end before the current shift end.",
+      "invalidTime": "Enter a valid time (HH:MM).",
+      "invalidReason": "The reason must be 3-500 characters."
     }
   }
 }
