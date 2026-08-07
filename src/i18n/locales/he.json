@@ -106,6 +106,127 @@
     "seenYesterday": "עודכן אתמול",
     "seenDaysAgo": "עודכן לפני {{days}} ימים"
   },
+  "equipmentDetail": {
+    "loadError": "לא ניתן לטעון את פרטי הציוד.",
+    "status": {
+      "ok": "תקין",
+      "issue": "תקלה",
+      "maintenance": "בתחזוקה",
+      "sterilized": "מעוקר",
+      "overdue": "באיחור",
+      "inactive": "לא פעיל",
+      "critical": "קריטי",
+      "needs_attention": "דורש טיפול"
+    },
+    "identity": {
+      "serial": "מספר סידורי",
+      "model": "דגם",
+      "manufacturer": "יצרן",
+      "lastVerified": "אומת לאחרונה {{when}} על ידי {{name}}",
+      "lastVerifiedNoName": "אומת לאחרונה {{when}}"
+    },
+    "custody": {
+      "title": "משמורת",
+      "available": "זמין",
+      "heldByMe": "מושאל אצלך",
+      "holder": "מושאל אצל {{email}}",
+      "holderUnknown": "בהשאלה",
+      "since": "מאז {{when}}",
+      "expectedReturn": "צפוי לחזור {{when}}",
+      "overdue": "באיחור — היה צפוי לחזור {{when}}"
+    },
+    "actions": {
+      "checkout": "השאלה",
+      "return": "החזרה",
+      "returnCharging": "החזרה + טעינה",
+      "reportIssue": "דיווח תקלה"
+    },
+    "return": {
+      "pluggedInPrompt": "האם הציוד מחובר לטעינה?",
+      "pluggedIn": "מחובר לטעינה",
+      "notPluggedIn": "לא מחובר",
+      "success": "הוחזר",
+      "error": "ההחזרה נכשלה. נסו שוב."
+    },
+    "location": {
+      "title": "מיקום",
+      "room": "חדר",
+      "freeText": "הערת מיקום",
+      "usuallyFoundHere": "נמצא בדרך כלל",
+      "checkedOutTo": "נלקח אל",
+      "unknown": "אין מיקום רשום"
+    },
+    "readiness": {
+      "title": "מוכנות",
+      "deployable": "מוכן לפריסה",
+      "notDeployable": "לא מוכן לפריסה",
+      "custody": "משמורת",
+      "readinessState": "מוכנות",
+      "usage": "שימוש",
+      "gateBlocked": "חסם ערכה: {{reason}}",
+      "failedConditions": "תנאים שנכשלו: {{list}}",
+      "loadError": "לא ניתן לטעון את המוכנות."
+    },
+    "custodyState": {
+      "available": "זמין",
+      "checked_out": "בהשאלה",
+      "untracked": "לא במעקב"
+    },
+    "readinessValue": {
+      "ready": "מוכן",
+      "not_ready": "לא מוכן",
+      "unknown": "לא ידוע"
+    },
+    "usageValue": {
+      "available": "זמין",
+      "in_use": "בשימוש",
+      "staged": "מוכן מראש",
+      "emergency_use": "בשימוש חירום"
+    },
+    "truth": {
+      "title": "תמונת מצב מאומתת",
+      "custodian": "מחזיק",
+      "unknowns": "לא ידוע",
+      "loadError": "לא ניתן לטעון את סיכום הראיות.",
+      "confidence": {
+        "high": "ודאות גבוהה",
+        "medium": "ודאות בינונית",
+        "low": "ודאות נמוכה",
+        "stale": "ראיות לא עדכניות"
+      }
+    },
+    "waitlist": {
+      "title": "רשימת המתנה",
+      "join": "הצטרפות לרשימת ההמתנה",
+      "leave": "יציאה מרשימת ההמתנה",
+      "position": "המיקום שלך: {{position}}",
+      "queueSize": "{{count}} ממתינים",
+      "empty": "אין ממתינים.",
+      "reserved": "שמור עבורך עד {{when}}",
+      "loadError": "לא ניתן לטעון את רשימת ההמתנה.",
+      "actionError": "עדכון רשימת ההמתנה נכשל. נסו שוב."
+    },
+    "history": {
+      "title": "היסטוריה",
+      "empty": "אין סריקות עדיין.",
+      "loadMore": "טעינת עוד",
+      "loadError": "לא ניתן לטעון את ההיסטוריה."
+    },
+    "transfers": {
+      "title": "העברות",
+      "empty": "אין העברות.",
+      "loadError": "לא ניתן לטעון העברות.",
+      "route": "מ־{{from}} אל {{to}}",
+      "routeToOnly": "אל {{to}}"
+    },
+    "report": {
+      "title": "דיווח תקלה",
+      "notePlaceholder": "מה הבעיה? (חובה)",
+      "submit": "שליחת דיווח",
+      "success": "התקלה דווחה",
+      "error": "הדיווח נכשל. נסו שוב."
+    }
+  },
   "scan": {
     "prompt": "התחל סריקה, ואז קרב את התווית לטלפון.",
     "readReady": "מוכן — קרב את התווית.",

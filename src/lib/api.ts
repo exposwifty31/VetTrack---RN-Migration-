@@ -1,12 +1,21 @@
+import type { EquipmentTruthResponse, EquipmentWaitlistSnapshot } from "@vettrack/shared";
 import * as Crypto from "expo-crypto";
 
 import { authFetch } from "@/lib/auth-fetch";
 import { setCurrentUserId } from "@/lib/auth-store";
 import type {
   ConflictResult,
+  EquipmentCheckoutResponse,
+  EquipmentDeployability,
+  EquipmentDetail,
   EquipmentListPage,
   EquipmentListResult,
+  EquipmentLogsPage,
+  EquipmentReturnResponse,
   EquipmentRow,
+  EquipmentStatusReportResponse,
+  EquipmentStatusValue,
+  EquipmentTransferItem,
   MeUser,
   OutboxHead,
   QuickScanToggleResult,
@@ -37,6 +46,14 @@ export const equipmentKeys = {
       : (["equipment", "list"] as const);
   },
   detail: (id: string) => ["equipment", "detail", id] as const,
+  // Detail sub-resources nest under detail(id): equipmentKeys.all invalidation
+  // (the SSE hook + useScanToggle onSettled) covers every one of them, and a
+  // targeted detail(id) invalidation refreshes the whole detail screen.
+  logs: (id: string) => ["equipment", "detail", id, "logs"] as const,
+  transfers: (id: string) => ["equipment", "detail", id, "transfers"] as const,
+  waitlist: (id: string) => ["equipment", "detail", id, "waitlist"] as const,
+  deployability: (id: string) => ["equipment", "detail", id, "deployability"] as const,
+  truth: (id: string) => ["equipment", "detail", id, "truth"] as const,
 };
 
 export type EquipmentListParams = {
@@ -211,5 +228,110 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ isPluggedIn: true }),
       }),
+
+    // ── Slice 2: equipment detail reads ─────────────────────────────────────
+    // Every path id is encodeURIComponent-ed (CWE-29, the `revert` idiom):
+    // NFC/route-derived ids can contain `/`, `?`, `#`, or dot segments.
+
+    /** GET /api/equipment/:id — detail read (joined folder/room/verifier names). */
+    byId: (equipmentId: string) =>
+      requestJson<EquipmentDetail>(`/api/equipment/${encodeURIComponent(equipmentId)}`),
+
+    /** GET /:id/logs — paginated scan history (server clamps limit to ≤200, default 50). */
+    logs: (equipmentId: string, page = 1, limit = 20) =>
+      requestJson<EquipmentLogsPage>(
+        `/api/equipment/${encodeURIComponent(equipmentId)}/logs?page=${page}&limit=${limit}`,
+      ),
+
+    /** GET /:id/transfers — bare array, newest first. */
+    transfers: (equipmentId: string) =>
+      requestJson<EquipmentTransferItem[]>(
+        `/api/equipment/${encodeURIComponent(equipmentId)}/transfers`,
+      ),
+
+    /** GET /api/equipment/:equipmentId/deployability (operational-state router, bare /api mount). */
+    deployability: (equipmentId: string) =>
+      requestJson<EquipmentDeployability>(
+        `/api/equipment/${encodeURIComponent(equipmentId)}/deployability`,
+      ),
+
+    /** GET /:id/truth — Asset Copilot evidence graph (vendored contract type). */
+    truth: (equipmentId: string) =>
+      requestJson<EquipmentTruthResponse>(
+        `/api/equipment/${encodeURIComponent(equipmentId)}/truth`,
+      ),
+
+    // ── Slice 2: waitlist ───────────────────────────────────────────────────
+
+    /** GET /:id/waitlist — snapshot (queueSize, myPosition, entries). student+ floor. */
+    waitlist: (equipmentId: string) =>
+      requestJson<EquipmentWaitlistSnapshot>(
+        `/api/equipment/${encodeURIComponent(equipmentId)}/waitlist`,
+      ),
+
+    /** POST /:id/waitlist — join (201, fresh snapshot; 409 WAITLIST_ALREADY_JOINED). */
+    joinWaitlist: (equipmentId: string) =>
+      requestJson<EquipmentWaitlistSnapshot>(
+        `/api/equipment/${encodeURIComponent(equipmentId)}/waitlist`,
+        { method: "POST" },
+      ),
+
+    /** DELETE /:id/waitlist — leave (fresh snapshot; 404 WAITLIST_NOT_ON_WAITLIST). */
+    leaveWaitlist: (equipmentId: string) =>
+      requestJson<EquipmentWaitlistSnapshot>(
+        `/api/equipment/${encodeURIComponent(equipmentId)}/waitlist`,
+        { method: "DELETE" },
+      ),
+
+    // ── Slice 2: custody mutations (direct endpoints) ───────────────────────
+    // All three carry `equipmentReplayIdempotency` server-side — send the
+    // established scan idiom's `x-request-id` so a replayed request dedupes.
+
+    /** POST /:id/checkout {location?, emergencyReason?} → {equipment, undoToken}. */
+    checkout: (equipmentId: string, body: { location?: string; emergencyReason?: string } = {}) =>
+      requestJson<EquipmentCheckoutResponse>(
+        `/api/equipment/${encodeURIComponent(equipmentId)}/checkout`,
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+          headers: { "x-request-id": Crypto.randomUUID() },
+        },
+      ),
+
+    /**
+     * POST /:id/return {isPluggedIn?, plugInDeadlineMinutes?} — the direct
+     * return path that feeds charge tracking (`isPluggedIn: false` schedules
+     * the charge alert; deadline defaults server-side to 30 min).
+     */
+    returnEquipment: (
+      equipmentId: string,
+      body: { isPluggedIn?: boolean; plugInDeadlineMinutes?: number } = {},
+    ) =>
+      requestJson<EquipmentReturnResponse>(
+        `/api/equipment/${encodeURIComponent(equipmentId)}/return`,
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+          headers: { "x-request-id": Crypto.randomUUID() },
+        },
+      ),
+
+    /**
+     * POST /:id/scan {status, note?, photoUrl?} — the status-report path.
+     * Report-issue = status "issue"; the server 400s (ISSUE_NOTE_REQUIRED)
+     * when the note is empty, so the UI requires it before submitting.
+     */
+    reportStatus: (
+      equipmentId: string,
+      body: { status: EquipmentStatusValue; note?: string; photoUrl?: string },
+    ) =>
+      requestJson<EquipmentStatusReportResponse>(
+        `/api/equipment/${encodeURIComponent(equipmentId)}/scan`,
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+          headers: { "x-request-id": Crypto.randomUUID() },
+        },
+      ),
   },
 };

@@ -106,6 +106,127 @@
     "seenYesterday": "Updated yesterday",
     "seenDaysAgo": "Updated {{days}} days ago"
   },
+  "equipmentDetail": {
+    "loadError": "Could not load equipment details.",
+    "status": {
+      "ok": "OK",
+      "issue": "Issue",
+      "maintenance": "Maintenance",
+      "sterilized": "Sterilized",
+      "overdue": "Overdue",
+      "inactive": "Inactive",
+      "critical": "Critical",
+      "needs_attention": "Needs attention"
+    },
+    "identity": {
+      "serial": "Serial",
+      "model": "Model",
+      "manufacturer": "Manufacturer",
+      "lastVerified": "Last verified {{when}} by {{name}}",
+      "lastVerifiedNoName": "Last verified {{when}}"
+    },
+    "custody": {
+      "title": "Custody",
+      "available": "Available",
+      "heldByMe": "Checked out by you",
+      "holder": "Held by {{email}}",
+      "holderUnknown": "Checked out",
+      "since": "Since {{when}}",
+      "expectedReturn": "Expected back {{when}}",
+      "overdue": "Overdue — was expected back {{when}}"
+    },
+    "actions": {
+      "checkout": "Check out",
+      "return": "Return",
+      "returnCharging": "Return + charging",
+      "reportIssue": "Report issue"
+    },
+    "return": {
+      "pluggedInPrompt": "Is the equipment plugged in to charge?",
+      "pluggedIn": "Plugged in",
+      "notPluggedIn": "Not plugged in",
+      "success": "Returned",
+      "error": "Return failed. Try again."
+    },
+    "location": {
+      "title": "Location",
+      "room": "Room",
+      "freeText": "Location note",
+      "usuallyFoundHere": "Usually found",
+      "checkedOutTo": "Taken to",
+      "unknown": "No location on record"
+    },
+    "readiness": {
+      "title": "Readiness",
+      "deployable": "Ready to deploy",
+      "notDeployable": "Not ready to deploy",
+      "custody": "Custody",
+      "readinessState": "Readiness",
+      "usage": "Usage",
+      "gateBlocked": "Bundle gate: {{reason}}",
+      "failedConditions": "Failed conditions: {{list}}",
+      "loadError": "Could not load readiness."
+    },
+    "custodyState": {
+      "available": "Available",
+      "checked_out": "Checked out",
+      "untracked": "Untracked"
+    },
+    "readinessValue": {
+      "ready": "Ready",
+      "not_ready": "Not ready",
+      "unknown": "Unknown"
+    },
+    "usageValue": {
+      "available": "Available",
+      "in_use": "In use",
+      "staged": "Staged",
+      "emergency_use": "Emergency use"
+    },
+    "truth": {
+      "title": "Verified snapshot",
+      "custodian": "Custodian",
+      "unknowns": "Unknowns",
+      "loadError": "Could not load the evidence summary.",
+      "confidence": {
+        "high": "High confidence",
+        "medium": "Medium confidence",
+        "low": "Low confidence",
+        "stale": "Stale evidence"
+      }
+    },
+    "waitlist": {
+      "title": "Waitlist",
+      "join": "Join waitlist",
+      "leave": "Leave waitlist",
+      "position": "Your position: {{position}}",
+      "queueSize": "{{count}} waiting",
+      "empty": "No one is waiting.",
+      "reserved": "Reserved for you until {{when}}",
+      "loadError": "Could not load the waitlist.",
+      "actionError": "Waitlist update failed. Try again."
+    },
+    "history": {
+      "title": "History",
+      "empty": "No scans yet.",
+      "loadMore": "Load more",
+      "loadError": "Could not load history."
+    },
+    "transfers": {
+      "title": "Transfers",
+      "empty": "No transfers.",
+      "loadError": "Could not load transfers.",
+      "route": "From {{from}} to {{to}}",
+      "routeToOnly": "To {{to}}"
+    },
+    "report": {
+      "title": "Report issue",
+      "notePlaceholder": "What's wrong? (required)",
+      "submit": "Send report",
+      "success": "Issue reported",
+      "error": "Report failed. Try again."
+    }
+  },
   "scan": {
     "prompt": "Launch scan, then hold the tag to the phone.",
     "readReady": "Ready — present the tag.",
