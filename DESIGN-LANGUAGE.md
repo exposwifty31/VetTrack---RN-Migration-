@@ -64,3 +64,7 @@ break the 90fps floors.
   G2.5 references it, never edits it.
 - Gates G3–G5 keep their names and numbers; G2.5 is additive.
 - All work lands through slice-PR discipline (PR → CI green → CodeRabbit → owner merge).
+
+## Process addendum (2026-08-07)
+
+Every remaining G2.5 work item (device verification passes, theme-seam work, any Aurora refinement) falls under the standing five-React-skills mandate: load the applicable subset (`react-native-best-practices` + `react-native-architecture` + `react-native-design` for UI work; `argent-react-native-app-workflow` for device/emulator loops) via the Skill tool before the work, and record a "Skills compliance" note in the PR body.

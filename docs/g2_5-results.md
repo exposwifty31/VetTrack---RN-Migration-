@@ -47,4 +47,6 @@ at `stop()` (fix in this PR).
   not yet exercised — the app currently pins the dark theme (theme toggle is an
   open G2.5 seam).
 - RTL verified on-device (Hebrew-default screenshots, 2026-08-07).
-- Equipment-list + checkout-sheet Aurora passes: in progress on a separate branch.
+- Equipment-list + checkout-sheet Aurora passes: **landed** (PR #21, merged to main
+  `bb842d7`, 2026-08-07). Still open: one combined three-screen no-regression run
+  on the device covering the restyled list scroll + sheet.

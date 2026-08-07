@@ -26,9 +26,9 @@ G0 (Capacitor safety net) is nearly done; store submissions are intentionally on
 |---|---|
 | **G1 — Foundation** | **done** — slices 0–7 merged to `main` (incl. 5 SSE + 6 i18n/RTL); CI (typecheck + test) green. One open item: slice 8 NFC real-tag (hardware-blocked) |
 | **G2 — Hero flow (delight)** | **PASSED 2026-08-07** — pre-registration v2 lock `63c36b3` (PR #17): O1 pooled UI p95 11.09ms · O2 0/2886 dropped · O3 0.2–1.4ms · O4 cold-to-Home median 260ms · S1 owner verdict "RN"; O5 waived (declared deviation). Record: `docs/g2-preregistration.md` + `docs/g2-results.csv` + `docs/g2-raw/` |
-| **G2.5 — Design language** | **not started** — owner-mandated (2026-08-07): design matters as much as functionality; no G3 screen ships before the language exists as tokens/primitives. Scope + exit bar: `DESIGN-LANGUAGE.md` |
-| G3 — Daily-driver parity | not started (gated on G2.5) |
-| G4 — Code Blue + full offline | not started |
+| **G2.5 — Design language** | **implementation complete 2026-08-07** — Aurora shipped across Home + equipment list + checkout sheet (PRs #19/#21); exit bar passed on-device (UI pooled p95 11.08 ms, 0/2849 drops — `docs/g2_5-results.md`, PR #20). Open: combined three-screen device pass + light-theme seam. Scope + exit bar: `DESIGN-LANGUAGE.md` |
+| G3 — Daily-driver parity | **in progress** — plan `docs/G3-PLAN.md` (PR #22); Slice 1 foundations (PR #23) |
+| G4 — Code Blue + full offline | first zero-regret piece in flight: emergency-block classifier in the fetch layer (PR #24); the rest gated per the G3-PLAN §4 readiness memo |
 | G5 — RN to stores | not started |
 
 ## G1 — progress
@@ -37,7 +37,7 @@ All foundation slices are merged to `main`: 0 (baseline), 1 (nav + Zustand), 1b 
 2 (fail-loud MMKV storage port), 3 (Clerk-Expo auth), 4 (API client + TanStack Query),
 5 (SSE, foreground-only), 6 (i18n + RTL), 7 (contracts/shared + Metro `.js`→`.ts` resolver).
 `tsc` is clean and CI (typecheck + test) is green on `main`. The one open G1 item is slice 8
-(NFC real-tag read), blocked on a physical NTAG tag. **Next: G2 — hero flow.**
+(NFC real-tag read), blocked on a physical NTAG tag.
 
 ### NFC de-risk (done — kept here as reference)
 
