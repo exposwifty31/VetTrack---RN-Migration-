@@ -19,7 +19,8 @@
     "realtimeDebug": "Realtime debug",
     "i18nDebug": "i18n & RTL",
     "equipment": "Equipment",
-    "scan": "Scan"
+    "scan": "Scan",
+    "g2Measure": "G2 measure"
   },
   "home": {
     "title": "VetTrack",
@@ -31,7 +32,8 @@
     "i18nDebug": "i18n & RTL (Slice 6)",
     "equipment": "Equipment list",
     "scan": "Scan a tag",
-    "realtimeDebug": "Open realtime debug (Slice 5)"
+    "realtimeDebug": "Open realtime debug (Slice 5)",
+    "g2Measure": "G2 measurement (gate)"
   },
   "bootstrap": {
     "reauth": "Session expired. Sign in again to continue.",
@@ -113,5 +115,20 @@
     "reloadNotPending": "Direction matches locale.",
     "toggle": "Toggle Hebrew / English",
     "sample": "Sample: {{save}} · {{cancel}} · {{loading}}"
+  },
+  "g2": {
+    "title": "G2 measurement",
+    "subtitle": "Run {{run}} — scroll the equipment list, open checkout, then export",
+    "budget": "Frame budget",
+    "budgetMissing": "EXPO_PUBLIC_FRAME_BUDGET_MS is not set — measurement build required (1000 / device Hz). Refusing to guess 60 Hz.",
+    "tti": "Cold TTI (O4)",
+    "tapAck": "Tap → visual ack (O3)",
+    "tapServer": "Tap → server confirmed (diagnostic)",
+    "framesTitle": "Frames — {{source}} thread",
+    "framesLine": "total {{total}} · over budget {{over}} · p95 {{p95}} ms",
+    "noSample": "No sample yet — scroll the list / open checkout first",
+    "refresh": "Refresh readout",
+    "nextRun": "Reset samples → next run",
+    "export": "Export run JSON"
   }
 }

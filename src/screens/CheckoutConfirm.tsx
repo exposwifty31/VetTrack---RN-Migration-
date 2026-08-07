@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import Animated, {
   useAnimatedStyle,
-  useFrameCallback,
   useSharedValue,
   withSpring,
   withTiming,
@@ -13,24 +12,16 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets";
 
 import { useIdentity } from "@/app/useIdentity";
+import { useDualFrameSampler } from "@/hooks/useDualFrameSampler";
 import { useScanToggle } from "@/hooks/useScanToggle";
 import { api, equipmentKeys } from "@/lib/api";
-import {
-  mark,
-  MARK,
-  publishFrameSample,
-  startFrameSampler,
-  type FrameSample,
-} from "@/lib/instrumentation/perf";
+import { mark, MARK } from "@/lib/instrumentation/perf";
 import { canUndoScan } from "@/lib/roles";
 import type { ScanResult } from "@/types/api";
 
 import type { RootStackScreenProps } from "../navigation/types";
 
 const DISMISS_THRESHOLD = 120;
-// 60 Hz frame budget — the UI-thread sampler counts frames over this during the
-// enter animation (reported separately from the JS-thread sampler, never merged).
-const FRAME_BUDGET_MS = 16.67;
 
 type Feedback = { tone: "success" | "error"; message: string } | null;
 
@@ -52,63 +43,25 @@ export function CheckoutConfirm({ route, navigation }: RootStackScreenProps<"Sca
 
   const translateY = useSharedValue(40);
   const opacity = useSharedValue(0);
-  // UI-thread jank accumulators for the animation (separate source from perf.ts's
-  // JS-thread rAF sampler). Run on the UI thread via a worklet; total + over-budget
-  // are both tracked so the published UI sample carries a real frame count.
-  const uiFramesTotal = useSharedValue(0);
-  const uiFramesOverBudget = useSharedValue(0);
-
-  const frameCallback = useFrameCallback((frame) => {
-    "worklet";
-    const delta = frame.timeSincePreviousFrame;
-    if (delta != null) {
-      uiFramesTotal.value += 1;
-      if (delta > FRAME_BUDGET_MS) uiFramesOverBudget.value += 1;
-    }
-  }, true);
-  // Keep a stable handle to the frame callback so the (stable) finalize callback
-  // can stop it without re-running the enter-animation effect.
-  const frameCallbackRef = useRef(frameCallback);
-  useEffect(() => {
-    frameCallbackRef.current = frameCallback;
-  }, [frameCallback]);
+  // Dual-thread frame sampling (O1/O2) over the hero-transition segment — the
+  // JS rAF sampler + UI-thread useFrameCallback, published separately and
+  // concatenated in the sink with the FlashList scroll segment of the same run.
+  const { start: startSamplers, stop: stopSamplers } = useDualFrameSampler();
 
   const dismiss = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
 
-  // JS-thread frame sampler (O1/O2) over the enter animation — reported SEPARATELY
-  // from the UI-thread useFrameCallback accumulator above (never merged). When the
-  // enter animation ends we stop BOTH samplers and publish each to its own sink.
-  const jsFrameSample = useRef<FrameSample | null>(null);
-  const finishSamplers = useCallback(
-    (sampler: ReturnType<typeof startFrameSampler>) => {
-      const js = sampler.stop();
-      jsFrameSample.current = js;
-      publishFrameSample("js", js);
-      // Stop the UI-thread frame callback and publish its sample separately.
-      frameCallbackRef.current.setActive(false);
-      publishFrameSample("ui", {
-        framesTotal: uiFramesTotal.value,
-        framesOverBudget: uiFramesOverBudget.value,
-      });
-    },
-    [uiFramesTotal, uiFramesOverBudget],
-  );
-
   useEffect(() => {
-    const sampler = startFrameSampler(FRAME_BUDGET_MS);
+    startSamplers();
     // withTiming completion callback (worklet) hops to JS to close the sampler window.
     opacity.value = withTiming(1, { duration: 220 }, (finished) => {
       "worklet";
-      if (finished) scheduleOnRN(finishSamplers, sampler);
+      if (finished) scheduleOnRN(stopSamplers);
     });
     translateY.value = withSpring(0, { damping: 18, stiffness: 180 });
-    return () => {
-      jsFrameSample.current = sampler.stop();
-      frameCallbackRef.current.setActive(false);
-    };
-  }, [opacity, translateY, finishSamplers]);
+    return stopSamplers; // early dismiss still closes + publishes the segment
+  }, [opacity, translateY, startSamplers, stopSamplers]);
 
   const sheetStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

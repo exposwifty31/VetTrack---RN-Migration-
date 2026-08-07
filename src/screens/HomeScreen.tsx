@@ -1,8 +1,14 @@
+import { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { contractsBridgeSmoke } from "@/lib/contracts-bridge";
+import { mark, MARK } from "@/lib/instrumentation/perf";
 import type { RootStackScreenProps } from "../navigation/types";
+
+// O4 v2 (pre-registration §3): cold TTI = nativeLaunchStart → FIRST interactive
+// screen, which is Home. Latch once per process so re-visits never re-mark.
+let markedHomeInteractive = false;
 
 /**
  * G1 foundation home. Styled with Uniwind className; copy via i18next (Slice 6).
@@ -10,6 +16,14 @@ import type { RootStackScreenProps } from "../navigation/types";
 export function HomeScreen({ navigation }: RootStackScreenProps<"Home">) {
   const { t } = useTranslation();
   const bridge = contractsBridgeSmoke();
+
+  useEffect(() => {
+    if (!markedHomeInteractive) {
+      // Latch ONLY on a successful mark — a swallowed performance.mark failure
+      // must leave the latch open so a later mount can still record O4's end mark.
+      markedHomeInteractive = mark(MARK.screenInteractive);
+    }
+  }, []);
 
   return (
     <View className="flex-1 gap-3 bg-background px-6 pt-6">
@@ -87,6 +101,14 @@ export function HomeScreen({ navigation }: RootStackScreenProps<"Home">) {
         <Text className="text-[15px] font-semibold text-foreground">
           {t("home.realtimeDebug")}
         </Text>
+      </Pressable>
+
+      <Pressable
+        className="items-center rounded-xl border border-border py-3.5 active:opacity-80"
+        onPress={() => navigation.navigate("G2Measure")}
+        accessibilityRole="button"
+      >
+        <Text className="text-[15px] font-semibold text-foreground">{t("home.g2Measure")}</Text>
       </Pressable>
     </View>
   );

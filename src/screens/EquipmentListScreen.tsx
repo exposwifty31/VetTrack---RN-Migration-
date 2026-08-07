@@ -10,6 +10,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { BootstrapGate } from "@/app/BootstrapGate";
+import { useDualFrameSampler } from "@/hooks/useDualFrameSampler";
 import { useEquipmentRealtimeSync } from "@/hooks/useEquipmentRealtimeSync";
 import { api, equipmentKeys, type EquipmentListParams } from "@/lib/api";
 import { haptics } from "@/lib/haptics";
@@ -143,6 +144,12 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
     [navigation],
   );
 
+  // O1/O2 scroll segment: sample frames (JS rAF + UI useFrameCallback) while the
+  // FlashList scrolls. Drag and momentum are separate sampled segments that
+  // concatenate in the perf sink — start/stop are idempotent, so the drag→momentum
+  // hand-off (end-drag fires before momentum-begin) costs at most one frame gap.
+  const { start: startScrollSampling, stop: stopScrollSampling } = useDualFrameSampler();
+
   const items = listQuery.data?.items ?? [];
 
   return (
@@ -179,6 +186,10 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
           renderItem={({ item }) => <EquipmentRow item={item} onPress={onRowPress} />}
           keyExtractor={(item) => item.id}
           getItemType={(item) => item.status}
+          onScrollBeginDrag={startScrollSampling}
+          onScrollEndDrag={stopScrollSampling}
+          onMomentumScrollBegin={startScrollSampling}
+          onMomentumScrollEnd={stopScrollSampling}
         />
       )}
     </View>

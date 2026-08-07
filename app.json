@@ -8,7 +8,8 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "uk.vettrack.rnmigration"
+      "bundleIdentifier": "uk.vettrack.rnmigration",
+      "appleTeamId": "87F5G378M6"
     },
     "android": {
       "adaptiveIcon": {
