@@ -61,6 +61,10 @@ export function G2MeasureScreen(_props: RootStackScreenProps<"G2Measure">) {
       frames: { js: current.js, ui: current.ui },
       exportedAt: new Date().toISOString(),
     };
+    // Deterministic capture channel for cable-driven measurement runs: the
+    // payload also goes to the native log (adb logcat), so the raw arrays can
+    // be archived without driving the share sheet. Marker is grep-stable.
+    console.log(`G2_EXPORT ${JSON.stringify(payload)}`);
     try {
       await Share.share({ message: JSON.stringify(payload) });
       setError(null);
