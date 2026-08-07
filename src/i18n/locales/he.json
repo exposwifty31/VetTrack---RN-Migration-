@@ -8,7 +8,14 @@
     "close": "סגור",
     "language": "שפה",
     "hebrew": "עברית",
-    "english": "English"
+    "english": "English",
+    "retry": "נסה שוב",
+    "empty": "אין פריטים להצגה",
+    "errorGeneric": "משהו השתבש. נסה שוב.",
+    "offline": "אין חיבור לרשת",
+    "confirm": "אישור",
+    "offShift": "מחוץ למשמרת",
+    "comingSoon": "בקרוב"
   },
   "nav": {
     "home": "בית",
@@ -20,7 +27,17 @@
     "i18nDebug": "שפה ו-RTL",
     "equipment": "ציוד",
     "scan": "סריקה",
-    "g2Measure": "מדידת G2"
+    "g2Measure": "מדידת G2",
+    "equipmentDetail": "פרטי ציוד",
+    "tasks": "משימות",
+    "myEquipment": "הציוד שלי",
+    "alerts": "התראות",
+    "rooms": "חדרים",
+    "roomDetail": "פרטי חדר",
+    "shiftChat": "צ'אט משמרת",
+    "handoff": "העברת משמרת",
+    "inventory": "מלאי",
+    "autopilotQueue": "תור האוטופיילוט"
   },
   "home": {
     "title": "VetTrack",
