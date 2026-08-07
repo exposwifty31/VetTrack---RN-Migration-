@@ -79,11 +79,14 @@ below the 22.22 ms drop threshold (run maxima: 17.16 / 33.20 / 17.20 /
 
 ```sh
 python3 - <<'PY'
-import json, glob
-pool = [d for f in sorted(glob.glob("docs/g2_5-raw/combined-run0*.json"))
-        for d in json.load(open(f))["frames"]["ui"]["deltasMs"]]
+import json
+FILES = [f"docs/g2_5-raw/combined-run{i:02d}.json" for i in range(1, 6)]
+pool = [d for f in FILES for d in json.load(open(f))["frames"]["ui"]["deltasMs"]]
 pool.sort(); n = len(pool)
-print(n, pool[max(0,(95*n+99)//100-1)], sum(1 for d in pool if d >= 22.22))
+p95 = round(pool[max(0, (95 * n + 99) // 100 - 1)], 2)
+drops = sum(1 for d in pool if d >= 22.22)
+assert (n, p95, drops) == (1962, 11.07, 1), (n, p95, drops)
+print("OK", n, p95, drops)
 PY
 ```
 
