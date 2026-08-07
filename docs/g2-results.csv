@@ -1,14 +1,40 @@
 # === G2 measurement record (immutable once written at setup — see docs/g2-preregistration.md §2) ===
-# device_model:        <written once at setup via: adb shell getprop ro.product.model>
-# device_refresh_hz:   <written once at setup via: adb shell dumpsys display (forced to highest rate)>
-# device_soc:          <written once at setup>
-# device_ram_gb:       <written once at setup>
-# device_os_build:     <written once at setup>
-# setup_date:          <written once at setup>
+# device_model:        Pixel 7 (panther, serial 32101FDH20035A)
+# device_refresh_hz:   90 (active render mode 90.0 Hz, highest supported; frame budget = 1000/90 = 11.11 ms)
+# device_soc:          Google Tensor G2 (GS201)
+# device_ram_gb:       8 (MemTotal 7643344 kB)
+# device_os_build:     Android 16, build CP1A.260405.005
+# setup_date:          2026-08-07
 # === rows below: one row per metric sample, schema per pre-registration §6 ===
 # === O5 pairing: `run` is the pair key across the RN row and the Capacitor row of one attempt ===
 # === O1/O2: raw frame-delta JSON archived at docs/g2-raw/<app>-run<NN>-<frame_source>.json; its SHA-256 in raw_sha256 ===
 app,device,run,metric,value_ms,frames_total,frames_over_budget,frame_source,participant_id,order,outcome,failure_reason,raw_sha256
+rn,pixel7,1,o1o2_frames_ui,11.09,575,0,ui,owner,,ok,,1d062c0035ade96144db69490db289043a0b195489a57e40db2fdbe74f338b23
+rn,pixel7,1,o1o2_frames_js,17.61,565,7,js,owner,,ok,,1d062c0035ade96144db69490db289043a0b195489a57e40db2fdbe74f338b23
+rn,pixel7,1,o1o2_frames_ui,11.09,578,0,ui,owner,,ok,,e0ffeb529cdfc4288e138d83923411ddfd921575b2a947c8d41a8012a151b674
+rn,pixel7,1,o1o2_frames_js,14.65,576,6,js,owner,,ok,,e0ffeb529cdfc4288e138d83923411ddfd921575b2a947c8d41a8012a151b674
+rn,pixel7,1,o1o2_frames_ui,11.09,584,0,ui,owner,,ok,,06979be4bff4d0a67618bd82564c43d57042b9d6bb0e6d774d1282b50d5e9611
+rn,pixel7,1,o1o2_frames_js,14.74,580,5,js,owner,,ok,,06979be4bff4d0a67618bd82564c43d57042b9d6bb0e6d774d1282b50d5e9611
+rn,pixel7,1,o1o2_frames_ui,11.09,576,0,ui,owner,,ok,,30051c255cf27413215bf97333badc284087e0262a16093c0a385bb6d56ec468
+rn,pixel7,1,o1o2_frames_js,15.31,573,8,js,owner,,ok,,30051c255cf27413215bf97333badc284087e0262a16093c0a385bb6d56ec468
+rn,pixel7,1,o1o2_frames_ui,11.09,573,0,ui,owner,,ok,,f02e6aa8631f1b6370ac15329af41eb99280891e594279490f1617625946533f
+rn,pixel7,1,o1o2_frames_js,14.98,569,6,js,owner,,ok,,f02e6aa8631f1b6370ac15329af41eb99280891e594279490f1617625946533f
+rn,pixel7,1,o3_tap_visual_ack,0.62,,,,owner,,ok,,2b5477d5936cdaaf03745c717f2f60b590f8b754fb65b46d083ab984a16097ea
+rn,pixel7,2,o3_tap_visual_ack,0.37,,,,owner,,ok,,580a4b91a57cb2cac506e44147488ae7bfcc8ea60280d17f4637ae4a734557a7
+rn,pixel7,3,o3_tap_visual_ack,1.37,,,,owner,,ok,,64f72e2c8fd2a3d38618d9b355b2f8a655e919e56647661c7fd34549e5e92567
+rn,pixel7,4,o3_tap_visual_ack,0.53,,,,owner,,ok,,fbf5654f1828ef5671eef29e84c35bab1fa16b679134de5cc553cb3cac00fdeb
+rn,pixel7,5,o3_tap_visual_ack,0.48,,,,owner,,ok,,ccaf5317397c2b71f7f958aeaa308d8fc1fcdfde68c330baa5657f274002f8ac
+rn,pixel7,6,o3_tap_visual_ack,0.20,,,,owner,,ok,,17ee475d8cfb8b55d29bfd92680d1162969c060e06a8fe840dca88db2000f1e0
+rn,pixel7,1,o4_cold_tti_home,319,,,,owner,,ok,,a2ac2833bdf8c784665f621e8b09822c09cbdcfcb56c60f8345aa6b907d57b4b
+rn,pixel7,2,o4_cold_tti_home,260,,,,owner,,ok,,d7259ff10b4d932b2bddd530ca55979b5c73fb0ffa51be7fe798b7652d8cb37c
+rn,pixel7,3,o4_cold_tti_home,259,,,,owner,,ok,,81cf4a1c1c8dd5295c23d9bcb5fac05ee0a1e949a07dfb3c95f1e5540c25f149
+rn,pixel7,4,o4_cold_tti_home,264,,,,owner,,ok,,7aeb4f738edcefd7c8c8e53ce97c8104d4af56f7605dd643302cc81bfbfe15c1
+rn,pixel7,5,o4_cold_tti_home,253,,,,owner,,ok,,ea2910cfcccbd542b4643d1418a213c1a8b27ca69a60dc26ade5732793f33740
+rn,pixel7,1,o4_diag_cold_to_list_v1_instrument,3622,,,,owner,,ok,diagnostic_includes_automation_overhead,ab01afd25da7965d9d1635a56c11adced0129615813e594497f21ae2640d3149
+rn,pixel7,2,o4_diag_cold_to_list_v1_instrument,3859,,,,owner,,ok,diagnostic_includes_automation_overhead,37eeb806387dfc7162119c549709b14322092c4b16937b8b6ca7918c0cc3b8dd
+rn,pixel7,3,o4_diag_cold_to_list_v1_instrument,3839,,,,owner,,ok,diagnostic_includes_automation_overhead,ac2ab78e14c6c2113a7d832f08e9193d8f1080a2e44709f6ffe56365a11da2f4
+rn,pixel7,4,o4_diag_cold_to_list_v1_instrument,3531,,,,owner,,ok,diagnostic_includes_automation_overhead,75e4f9941196ae717247b57a1c434661ef0c525956b66799f4c5a0c3cef84197
+rn,pixel7,5,o4_diag_cold_to_list_v1_instrument,3783,,,,owner,,ok,diagnostic_includes_automation_overhead,af0e733ec1780f2730ea84049ed807e5c399b4023a9a072f9a3cb321ffcb3393
 # === footer (written once at verdict): ===
 # s1_verdict: <RN|Capacitor — written once at verdict>
 # s1_reason:  <verbatim concrete reason — written once at verdict>
