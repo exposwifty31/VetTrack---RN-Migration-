@@ -65,10 +65,31 @@ describe("taskLifecycleAction — RBAC × ownership × status", () => {
     ).toBe("complete");
   });
 
-  it("vet and senior_technician are RBAC-blocked from the lifecycle (server task.start denial)", () => {
+  it("vet and senior_technician run the lifecycle and bypass ownership (vettrack #171 hierarchical superset)", () => {
     for (const role of ["vet", "senior_technician"]) {
-      expect(taskLifecycleAction({ ...BASE, status: "scheduled", vetId: "me" }, "me", role)).toBeNull();
+      expect(taskLifecycleAction({ ...BASE, status: "scheduled", vetId: "me" }, "me", role)).toBe("start");
+      expect(taskLifecycleAction({ ...BASE, status: "in_progress", vetId: "other" }, "me", role)).toBe(
+        "complete",
+      );
     }
+  });
+
+  it("lead_technician runs the lifecycle on their own tasks only — no ownership bypass", () => {
+    expect(taskLifecycleAction({ ...BASE, status: "scheduled", vetId: "me" }, "me", "lead_technician")).toBe(
+      "start",
+    );
+    expect(
+      taskLifecycleAction({ ...BASE, status: "scheduled", vetId: "other" }, "me", "lead_technician"),
+    ).toBeNull();
+  });
+
+  it("vet_tech mirrors the technician tier — own tasks only", () => {
+    expect(taskLifecycleAction({ ...BASE, status: "in_progress", vetId: "me" }, "me", "vet_tech")).toBe(
+      "complete",
+    );
+    expect(
+      taskLifecycleAction({ ...BASE, status: "in_progress", vetId: "other" }, "me", "vet_tech"),
+    ).toBeNull();
   });
 
   it("students and off-roster roles get nothing", () => {
