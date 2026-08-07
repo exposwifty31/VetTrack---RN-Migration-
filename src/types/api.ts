@@ -164,6 +164,39 @@ export type EquipmentDetail = {
   usageState?: string | null;
 };
 
+/**
+ * One row of GET /api/equipment/my (get-my-equipment.ts select) — the caller's
+ * active checkouts, joined folder/room/verifier names, ordered newest checkout
+ * first. The select returns NO `version` column — do not model one here.
+ * Everything beyond the identity trio is optional so an older server shape
+ * degrades to honest empty renders instead of crashing rows.
+ */
+export type MyEquipmentItem = {
+  id: string;
+  name: string;
+  status: string;
+  serialNumber?: string | null;
+  model?: string | null;
+  manufacturer?: string | null;
+  location?: string | null;
+  folderId?: string | null;
+  folderName?: string | null;
+  roomId?: string | null;
+  roomName?: string | null;
+  nfcTagId?: string | null;
+  lastVerifiedAt?: string | null;
+  lastVerifiedByName?: string | null;
+  lastSeen?: string | null;
+  checkedOutById?: string | null;
+  checkedOutByEmail?: string | null;
+  checkedOutAt?: string | null;
+  checkedOutLocation?: string | null;
+  expectedReturnMinutes?: number | null;
+  custodyState?: string;
+  readinessState?: string | null;
+  usageState?: string | null;
+};
+
 /** One scan-log row (GET /:id/logs). staffName/staffRole appear on admin reads only. */
 export type EquipmentLogItem = {
   id: string;

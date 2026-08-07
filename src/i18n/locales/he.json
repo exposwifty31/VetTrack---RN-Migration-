@@ -79,7 +79,26 @@
     "today": "היום",
     "equipment": "ציוד",
     "emergency": "חירום",
+    "mine": "שלי",
     "menu": "תפריט"
+  },
+  "myEquipment": {
+    "title": "הציוד שלי",
+    "checkedOutCount": "{{count}} מושאלים",
+    "returnHint": "פתח פריט כדי להחזיר אותו",
+    "empty": "אין ציוד בשימוש",
+    "emptyBody": "ציוד שתיקח יופיע כאן.",
+    "debt": {
+      "bannerCheckedOutLong": "{{count}} פריטים מושאלים זמן רב מדי",
+      "bannerVeryStale": "{{count}} פריטים מושאלים מיושנים מאוד — אשר מיקום",
+      "bannerStale": "{{count}} פריטים מושאלים דורשים אימות",
+      "breakdownCheckedOutLong": "{{count}} השאלה ארוכה",
+      "breakdownVeryStale": "{{count}} מיושן מאוד",
+      "breakdownStale": "{{count}} דורש אימות",
+      "badgeCheckedOutLong": "מושאל זמן רב",
+      "badgeVeryStale": "מיושן מאוד",
+      "badgeStale": "דורש אימות"
+    }
   },
   "emergency": {
     "comingSoon": "בקרוב",

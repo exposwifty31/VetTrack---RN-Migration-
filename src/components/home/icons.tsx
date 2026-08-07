@@ -78,6 +78,25 @@ export function EmergencyGlyph({ color }: GlyphProps) {
   );
 }
 
+/** Mine (my equipment) — person silhouette for the custody-scoped 4th tab. */
+export function MineGlyph({ color }: GlyphProps) {
+  return (
+    <View style={{ width: 16, height: 16, alignItems: "center", justifyContent: "flex-end" }}>
+      <View style={{ width: 6.5, height: 6.5, borderRadius: 999, backgroundColor: color }} />
+      <View
+        style={{
+          marginTop: 1.5,
+          width: 13,
+          height: 6.5,
+          borderTopLeftRadius: 999,
+          borderTopRightRadius: 999,
+          backgroundColor: color,
+        }}
+      />
+    </View>
+  );
+}
+
 export function MenuGlyph({ color }: GlyphProps) {
   return (
     <View style={{ flexDirection: "row", gap: 3.5, alignItems: "center" }}>

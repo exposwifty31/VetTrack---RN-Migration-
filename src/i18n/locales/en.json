@@ -79,7 +79,26 @@
     "today": "Today",
     "equipment": "Equipment",
     "emergency": "Emergency",
+    "mine": "Mine",
     "menu": "Menu"
+  },
+  "myEquipment": {
+    "title": "My equipment",
+    "checkedOutCount": "{{count}} checked out",
+    "returnHint": "Open an item to return it",
+    "empty": "No equipment in use",
+    "emptyBody": "Equipment you check out will appear here.",
+    "debt": {
+      "bannerCheckedOutLong": "{{count}} checked-out items held too long",
+      "bannerVeryStale": "{{count}} checked-out items very stale — confirm location",
+      "bannerStale": "{{count}} checked-out items need confirm",
+      "breakdownCheckedOutLong": "{{count}} long checkout",
+      "breakdownVeryStale": "{{count}} very stale",
+      "breakdownStale": "{{count}} stale",
+      "badgeCheckedOutLong": "Checked out long",
+      "badgeVeryStale": "Very stale",
+      "badgeStale": "Needs confirm"
+    }
   },
   "emergency": {
     "comingSoon": "Coming soon",
