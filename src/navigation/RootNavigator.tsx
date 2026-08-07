@@ -66,14 +66,6 @@ function GatedTasks() {
   );
 }
 
-function GatedMyEquipment() {
-  return (
-    <BootstrapGate>
-      <MyEquipmentScreen />
-    </BootstrapGate>
-  );
-}
-
 function GatedAlerts() {
   return (
     <BootstrapGate>
@@ -169,7 +161,10 @@ export function RootNavigator() {
       {/* G3 routes — placeholders until their slices land. */}
       <Stack.Screen name="EquipmentDetail" component={GatedEquipmentDetail} options={{ title: t("nav.equipmentDetail") }} />
       <Stack.Screen name="Tasks" component={GatedTasks} options={{ title: t("nav.tasks") }} />
-      <Stack.Screen name="MyEquipment" component={GatedMyEquipment} options={{ title: t("nav.myEquipment") }} />
+      {/* Slice 4: self-gated (BootstrapGate inside — EquipmentListScreen
+          precedent) so the same component serves this stack route AND the
+          custody-scoped Mine tab; its typed screen props thread directly. */}
+      <Stack.Screen name="MyEquipment" component={MyEquipmentScreen} options={{ title: t("nav.myEquipment") }} />
       <Stack.Screen name="Alerts" component={GatedAlerts} options={{ title: t("nav.alerts") }} />
       <Stack.Screen name="Rooms" component={GatedRooms} options={{ title: t("nav.rooms") }} />
       <Stack.Screen name="RoomDetail" component={GatedRoomDetail} options={{ title: t("nav.roomDetail") }} />

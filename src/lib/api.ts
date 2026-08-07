@@ -17,6 +17,7 @@ import type {
   EquipmentStatusValue,
   EquipmentTransferItem,
   MeUser,
+  MyEquipmentItem,
   OutboxHead,
   QuickScanToggleResult,
   ScanResult,
@@ -45,6 +46,9 @@ export const equipmentKeys = {
       ? (["equipment", "list", params] as const)
       : (["equipment", "list"] as const);
   },
+  // Nests under `all` (["equipment"]) — the SSE hook's global equipment
+  // invalidation and useScanToggle's onSettled cover the personal list too.
+  my: () => ["equipment", "my"] as const,
   detail: (id: string) => ["equipment", "detail", id] as const,
   // Detail sub-resources nest under detail(id): equipmentKeys.all invalidation
   // (the SSE hook + useScanToggle onSettled) covers every one of them, and a
@@ -228,6 +232,15 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ isPluggedIn: true }),
       }),
+
+    // ── Slice 4: personal custody list ──────────────────────────────────────
+
+    /**
+     * GET /api/equipment/my — the caller's active checkouts (bare array,
+     * newest checkout first; folder/room/lastVerifiedBy names joined).
+     * requireAuth floor server-side — every signed-in role may hold equipment.
+     */
+    my: () => requestJson<MyEquipmentItem[]>("/api/equipment/my"),
 
     // ── Slice 2: equipment detail reads ─────────────────────────────────────
     // Every path id is encodeURIComponent-ed (CWE-29, the `revert` idiom):

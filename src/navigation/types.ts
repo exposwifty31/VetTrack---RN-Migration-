@@ -13,6 +13,10 @@ export type MainTabParamList = {
   // instance would ignore new params after its first mount).
   EquipmentTab: undefined;
   Emergency: undefined;
+  // G3 Slice 4 (the sanctioned MainTabs writer): custody-scoped roles (student)
+  // get a Mine tab INSTEAD of Emergency — only one of the two is registered at
+  // a time (see main-tab-set.ts). Web parity: NativeTabBar's custody-only swap.
+  Mine: undefined;
   Menu: undefined;
 };
 
