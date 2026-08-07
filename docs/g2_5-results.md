@@ -72,6 +72,25 @@ release arm64 build, 90 Hz forced, production backend, signed-in session.
 | combined-run05.json | 330 | 0 | `8f2058d233e9e7551048ef077443b6de4bc9acb4718a64060aa0a526b68eacc8` |
 
 Counters derived from the archived `deltasMs` arrays (arrays are
-authoritative, per the reproducibility contract). With this run the
+authoritative, per the reproducibility contract). The single dropped frame
+is a 33.20 ms delta in `combined-run02.json`; every other run's maximum is
+below the 22.22 ms drop threshold (run maxima: 17.16 / 33.20 / 17.20 /
+11.14 / 16.66 ms). Recompute with:
+
+```sh
+python3 - <<'PY'
+import json, glob
+pool = [d for f in sorted(glob.glob("docs/g2_5-raw/combined-run0*.json"))
+        for d in json.load(open(f))["frames"]["ui"]["deltasMs"]]
+pool.sort(); n = len(pool)
+print(n, pool[max(0,(95*n+99)//100-1)], sum(1 for d in pool if d >= 22.22))
+PY
+```
+
+**Record identity:** the FILE NAME is the unique record identifier (the
+sha256 table keys by it). The in-payload `run` field reads `1` in all five
+archives — the on-screen run counter was not advanced between captures —
+and, like the in-payload counters, it is advisory only; the archives are
+kept exactly as captured, never edited. With this run the
 "Remaining exit-bar items" list above is fully closed except the
 light-theme seam (theme still pinned dark — tracked as a G3-era item).
