@@ -35,6 +35,43 @@
     "realtimeDebug": "פתח דיבאג זמן אמת (שלב 5)",
     "g2Measure": "מדידת G2 (שער)"
   },
+  "aurora": {
+    "greetingMorning": "בוקר טוב",
+    "greetingAfternoon": "צהריים טובים",
+    "greetingEvening": "ערב טוב",
+    "scanTitle": "סריקת תווית",
+    "scanSubtitle": "צ'ק־אאוט מהיר · QR / NFC",
+    "readinessTitle": "מוכנות ציוד",
+    "coverageLabel": "כיסוי זמין",
+    "metricReady": "מוכן",
+    "metricNotReady": "לא מוכן",
+    "metricCheckedOut": "מושאלים",
+    "metricInUse": "בשימוש",
+    "attentionTitle": "דורש תשומת לב",
+    "allClearTitle": "הכל תחת שליטה",
+    "allClearSubtitle": "אין איחורים, תחזוקה או התראות פתוחות",
+    "overdueLine": "באיחור החזרה",
+    "overdueDue": "צפוי {{time}}",
+    "maintenanceLine": "בדיקת תחזוקה",
+    "exceptionsTitle": "חריגות",
+    "exceptionReason": "ללא סריקה ביותר מ־{{days}} ימים",
+    "searchA11y": "חיפוש",
+    "settingsA11y": "הגדרות"
+  },
+  "tabs": {
+    "today": "היום",
+    "equipment": "ציוד",
+    "emergency": "חירום",
+    "menu": "תפריט"
+  },
+  "emergency": {
+    "comingSoon": "בקרוב",
+    "subtitle": "יכולות החירום יגיעו בשלב הבא של המעבר. בשעת חירום השתמשו באפליקציה הקיימת."
+  },
+  "menu": {
+    "title": "תפריט",
+    "devSection": "כלי פיתוח ובדיקה"
+  },
   "bootstrap": {
     "reauth": "פג תוקף החיבור. התחבר שוב כדי להמשיך.",
     "retry": "נסה שוב"

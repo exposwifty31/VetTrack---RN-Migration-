@@ -2,41 +2,90 @@
 @import 'uniwind';
 
 /*
- * VetTrack theme — semantic tokens (Uniwind / Tailwind v4 CSS-first).
- * Dark is the product default (clinical dark UI); light is defined for parity
- * per Uniwind rule 9 (every variant must define the same variable set).
+ * VetTrack G2.5 "Aurora" design language — semantic tokens.
+ * Source of truth: docs/design/aurora-home/direction-1c-aurora.md (token table,
+ * AA evidence, glass recipe). Dark is the product default; light defines the
+ * SAME variable set per Uniwind rule 9 (every variant must define every var).
+ *
+ * Fonts: Rubik 400–700 loaded via @expo-google-fonts/rubik in App.tsx.
+ * RN needs one exact font name per family (no fallbacks) — hence one utility
+ * per weight (font-rubik / -medium / -semibold / -bold).
  */
 @theme {
   --font-mono: 'Courier';
+  --font-sans: 'Rubik_400Regular';
+  --font-rubik: 'Rubik_400Regular';
+  --font-rubik-medium: 'Rubik_500Medium';
+  --font-rubik-semibold: 'Rubik_600SemiBold';
+  --font-rubik-bold: 'Rubik_700Bold';
+
+  /* shape (build-time so rounded-sm/md/lg/sheet utilities resolve) */
+  --radius-sm: 14px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --radius-sheet: 36px;
+
+  /* type scale anchors */
+  --text-title: 30px;
+  --text-body: 16px;
+  --text-caption: 13px;
 }
 
 @layer theme {
   :root {
-    @variant light {
-      --color-background: #f8fafc;
-      --color-surface: #ffffff;
-      --color-foreground: #0f172a;
-      --color-muted: #64748b;
-      --color-border: #e2e8f0;
-      --color-primary: #2563eb;
-      --color-primary-foreground: #ffffff;
-      --color-accent: #7c3aed;
-      --color-info: #0284c7;
-      --color-danger: #dc2626;
-      --color-success: #16a34a;
-    }
     @variant dark {
-      --color-background: #0f172a;
-      --color-surface: #020617;
-      --color-foreground: #f8fafc;
-      --color-muted: #94a3b8;
-      --color-border: #1e293b;
-      --color-primary: #2563eb;
-      --color-primary-foreground: #ffffff;
-      --color-accent: #a78bfa;
-      --color-info: #38bdf8;
-      --color-danger: #f87171;
-      --color-success: #4ade80;
+      /* backgrounds & surfaces */
+      --color-background: #0D0B1C; /* + static aurora: radial violet .26–.34 / cyan .14 */
+      --color-surface: #16122E;
+      --color-surface-raised: #1D1840;
+      --color-glass: rgba(167, 139, 250, 0.12);        /* tier 1 · blur 22px, violet-tinted */
+      --color-glass-strong: rgba(167, 139, 250, 0.18); /* tier 2 · blur 30px */
+      /* text */
+      --color-foreground: #F3F1FA;
+      --color-muted: #A6A0C3;
+      --color-text-tertiary: #8B84AD; /* third metadata tier ("עודכן לפני…", timestamps, mono IDs) */
+      /* brand & actions */
+      --color-primary: #7C3AED;
+      --color-primary-foreground: #FFFFFF;
+      --color-accent: #22D3EE;
+      /* statuses */
+      --color-success: #4ADE80;   /* זמין */
+      --color-info: #38BDF8;
+      --color-warning: #FBBF24;   /* מושאל */
+      --color-danger: #F87171;    /* Code Blue family — NEVER glassed */
+      --color-danger-solid: #DC2626;  /* badge / emergency-active fill; white text 4.83:1 */
+      --color-stale: #E879F9;     /* recommended extension — "לא עודכן", distinct from brand violet */
+      /* hairline borders (extension: keeps pre-Aurora screens on-token) */
+      --color-border: rgba(167, 139, 250, 0.14);
+      /* shape */
+      --radius-sm: 14px; --radius-md: 20px; --radius-lg: 28px; --radius-sheet: 36px;
+      /* spacing */
+      --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-8: 32px;
+      /* type */
+      --text-title: 30px; --text-body: 16px; --text-caption: 13px;
+    }
+    @variant light {
+      --color-background: #F7F5FC;
+      --color-surface: #FFFFFF;
+      --color-surface-raised: #FFFFFF; /* elevation via shadow 0 14px 34px rgba(23,19,49,.06) */
+      --color-glass: rgba(255, 255, 255, 0.55);
+      --color-glass-strong: rgba(255, 255, 255, 0.70);
+      --color-foreground: #171331;
+      --color-muted: #5B5680;
+      --color-text-tertiary: #6E6893;
+      --color-primary: #6D28D9;
+      --color-primary-foreground: #FFFFFF;
+      --color-accent: #0891B2;
+      --color-success: #15803D;
+      --color-info: #0369A1;
+      --color-warning: #B45309;
+      --color-danger: #DC2626;
+      --color-danger-solid: #B91C1C;  /* badge / emergency-active fill; white text 6.47:1 */
+      --color-stale: #A21CAF;
+      --color-border: #E9E4F5;
+      --radius-sm: 14px; --radius-md: 20px; --radius-lg: 28px; --radius-sheet: 36px;
+      --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-8: 32px;
+      --text-title: 30px; --text-body: 16px; --text-caption: 13px;
     }
   }
 }

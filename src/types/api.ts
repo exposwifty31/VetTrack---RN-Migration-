@@ -39,7 +39,19 @@ export type EquipmentRow = {
   checkedOutByEmail?: string;
   checkedOutById?: string;
   version: number;
-  lastSeen?: string;
+  lastSeen?: string | null;
+  /**
+   * G2.5 Aurora home — operational fields the list endpoint ALREADY returns
+   * (server `get-equipment-list.ts` selects `equipmentOperationalStateSelect` +
+   * checkout columns). Optional so an older server shape degrades to the honest
+   * empty/all-clear states instead of fabricating metrics.
+   * Known values — readinessState: ready|not_ready|unknown;
+   * usageState: available|in_use|staged|emergency_use.
+   */
+  readinessState?: string | null;
+  usageState?: string | null;
+  checkedOutAt?: string | null;
+  expectedReturnMinutes?: number | null;
 };
 
 /** Legacy toggle result (POST /:id/toggle). Kept for the untouched `quickToggle`. */

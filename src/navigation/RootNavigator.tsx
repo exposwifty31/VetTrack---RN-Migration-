@@ -6,13 +6,13 @@ import { ApiSmokeScreen } from "../screens/ApiSmokeScreen";
 import { CheckoutConfirm } from "../screens/CheckoutConfirm";
 import { EquipmentListScreen } from "../screens/EquipmentListScreen";
 import { G2MeasureScreen } from "../screens/G2MeasureScreen";
-import { HomeScreen } from "../screens/HomeScreen";
 import { I18nDebugScreen } from "../screens/I18nDebugScreen";
 import { NfcSpikeScreen } from "../screens/NfcSpikeScreen";
 import { RealtimeDebugScreen } from "../screens/RealtimeDebugScreen";
 import { ScanScreen } from "../screens/ScanScreen";
 import { SignInScreen } from "../screens/SignInScreen";
 import { StorageDebugScreen } from "../screens/StorageDebugScreen";
+import { MainTabs } from "./MainTabs";
 import type { RootStackParamList, RootStackScreenProps } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -37,19 +37,24 @@ function GatedScanConfirm(props: RootStackScreenProps<"ScanConfirm">) {
   );
 }
 
-/** Native-stack root navigator (screens 4.x + native-stack 7.x, New Arch). */
+/**
+ * Native-stack root navigator (screens 4.x + native-stack 7.x, New Arch).
+ * G2.5 Aurora: `Main` (the tab shell) replaces the old flat Home; every other
+ * flow stays a stack route above the tabs. Chrome colors follow the Aurora
+ * dark tokens (`--color-background` / `--color-foreground`).
+ */
 export function RootNavigator() {
   const { t } = useTranslation();
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: "#0f172a" },
-        headerTintColor: "#f8fafc",
+        headerStyle: { backgroundColor: "#0D0B1C" },
+        headerTintColor: "#F3F1FA",
         headerTitleStyle: { fontWeight: "700" },
-        contentStyle: { backgroundColor: "#0f172a" },
+        contentStyle: { backgroundColor: "#0D0B1C" },
       }}
     >
-      <Stack.Screen name="Home" component={HomeScreen} options={{ title: t("nav.home") }} />
+      <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
       <Stack.Screen
         name="EquipmentList"
         component={EquipmentListScreen}

@@ -1,6 +1,14 @@
 import "./src/global.css";
 
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
+// Per-weight subpath imports — the package root re-exports every weight and
+// would drag all 14 Rubik ttfs (~3MB) into the bundle; we ship exactly four.
+import { Rubik_400Regular } from "@expo-google-fonts/rubik/400Regular";
+import { Rubik_500Medium } from "@expo-google-fonts/rubik/500Medium";
+import { Rubik_600SemiBold } from "@expo-google-fonts/rubik/600SemiBold";
+import { Rubik_700Bold } from "@expo-google-fonts/rubik/700Bold";
+import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
 import { ClerkProvider } from "@clerk/clerk-expo";
 import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { NavigationContainer } from "@react-navigation/native";
@@ -19,6 +27,11 @@ import { RootNavigator } from "./src/navigation/RootNavigator";
 
 Uniwind.setTheme("dark");
 
+// Keep the native splash up while App renders no tree (font resolution below).
+// Must run at module scope, before the first render. Failure is non-fatal —
+// worst case the OS hides the splash on its own schedule.
+void SplashScreen.preventAutoHideAsync().catch(() => {});
+
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
 
 /**
@@ -30,6 +43,22 @@ const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
  * i18next (Slice 6) is initialized on import of ./src/i18n; Hebrew is default.
  */
 export default function App() {
+  // Aurora (G2.5): Rubik is the app family (400–700). Render nothing until the
+  // fonts resolve; on a load ERROR degrade gracefully to system fonts instead
+  // of blanking the app forever.
+  const [fontsLoaded, fontError] = useFonts({
+    Rubik_400Regular,
+    Rubik_500Medium,
+    Rubik_600SemiBold,
+    Rubik_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      void SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded, fontError]);
+
   const tree = (
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
@@ -50,6 +79,10 @@ export default function App() {
   const withRoot = (node: ReactNode) => (
     <GestureHandlerRootView style={{ flex: 1 }}>{node}</GestureHandlerRootView>
   );
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   if (!publishableKey) {
     return withRoot(tree);

@@ -35,6 +35,43 @@
     "realtimeDebug": "Open realtime debug (Slice 5)",
     "g2Measure": "G2 measurement (gate)"
   },
+  "aurora": {
+    "greetingMorning": "Good morning",
+    "greetingAfternoon": "Good afternoon",
+    "greetingEvening": "Good evening",
+    "scanTitle": "Scan a tag",
+    "scanSubtitle": "Quick checkout · QR / NFC",
+    "readinessTitle": "Equipment readiness",
+    "coverageLabel": "Available coverage",
+    "metricReady": "Ready",
+    "metricNotReady": "Not ready",
+    "metricCheckedOut": "Checked out",
+    "metricInUse": "In use",
+    "attentionTitle": "Needs attention",
+    "allClearTitle": "All under control",
+    "allClearSubtitle": "No overdue returns, maintenance, or open alerts",
+    "overdueLine": "Overdue return",
+    "overdueDue": "Due {{time}}",
+    "maintenanceLine": "Maintenance check",
+    "exceptionsTitle": "Exceptions",
+    "exceptionReason": "No scan in more than {{days}} days",
+    "searchA11y": "Search",
+    "settingsA11y": "Settings"
+  },
+  "tabs": {
+    "today": "Today",
+    "equipment": "Equipment",
+    "emergency": "Emergency",
+    "menu": "Menu"
+  },
+  "emergency": {
+    "comingSoon": "Coming soon",
+    "subtitle": "Emergency capabilities arrive in the next migration phase. In an emergency, use the existing app."
+  },
+  "menu": {
+    "title": "Menu",
+    "devSection": "Developer & debug tools"
+  },
   "bootstrap": {
     "reauth": "Session expired. Sign in again to continue.",
     "retry": "Try again"
