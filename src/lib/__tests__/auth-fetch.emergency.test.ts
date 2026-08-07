@@ -23,7 +23,12 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  process.env.EXPO_PUBLIC_API_ORIGIN = prevOrigin;
+  // Assigning undefined would store the string "undefined" — delete instead.
+  if (prevOrigin === undefined) {
+    delete process.env.EXPO_PUBLIC_API_ORIGIN;
+  } else {
+    process.env.EXPO_PUBLIC_API_ORIGIN = prevOrigin;
+  }
   globalThis.fetch = realFetch;
 });
 

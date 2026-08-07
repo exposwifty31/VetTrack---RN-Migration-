@@ -64,9 +64,19 @@ describe("classifyEmergencyEndpoint (manifest-driven)", () => {
 });
 
 describe("isNetworkFailure", () => {
-  it("treats RN and web fetch network rejections as offline", () => {
-    expect(isNetworkFailure(new TypeError("Network request failed"))).toBe(true);
-    expect(isNetworkFailure(new Error("Failed to fetch"))).toBe(true);
+  it("treats every known engine's fetch network rejection as offline", () => {
+    expect(isNetworkFailure(new TypeError("Network request failed"))).toBe(true); // RN
+    expect(isNetworkFailure(new TypeError("Failed to fetch"))).toBe(true); // Chromium
+    expect(isNetworkFailure(new TypeError("Load failed"))).toBe(true); // WebKit
+    expect(isNetworkFailure(new TypeError("fetch failed"))).toBe(true); // undici
+    expect(
+      isNetworkFailure(new TypeError("NetworkError when attempting to fetch resource.")),
+    ).toBe(true); // Firefox
+  });
+
+  it("does NOT treat non-network TypeErrors as offline (programming errors stay loud as themselves)", () => {
+    expect(isNetworkFailure(new TypeError("Invalid URL"))).toBe(false);
+    expect(isNetworkFailure(new TypeError("Cannot read properties of undefined"))).toBe(false);
   });
 
   it("does NOT treat caller-initiated aborts or app errors as offline", () => {
@@ -125,6 +135,17 @@ describe("emergencyOfflineErrorFromFailedDispatch", () => {
     ).toBeNull();
     expect(readEmergencyBlockBuffer()).toHaveLength(0);
   });
+
+  it("does not mask a programming-error TypeError as an offline block", () => {
+    expect(
+      emergencyOfflineErrorFromFailedDispatch(
+        new TypeError("Invalid URL"),
+        "/api/code-blue/sessions",
+        "POST",
+      ),
+    ).toBeNull();
+    expect(readEmergencyBlockBuffer()).toHaveLength(0);
+  });
 });
 
 describe("diagnostic FIFO buffer", () => {
@@ -152,5 +173,13 @@ describe("diagnostic FIFO buffer", () => {
     emergencyOfflineErrorFromFailedDispatch(networkErr, "/api/code-blue/one-tap", "POST");
     expect(before).toHaveLength(1);
     expect(readEmergencyBlockBuffer()).toHaveLength(2);
+  });
+
+  it("returned entries are detached clones — mutating them cannot corrupt the buffer", () => {
+    const networkErr = new TypeError("Network request failed");
+    emergencyOfflineErrorFromFailedDispatch(networkErr, "/api/code-blue/sessions", "POST");
+    const snapshot = readEmergencyBlockBuffer();
+    (snapshot[0] as { path: string }).path = "/tampered";
+    expect(readEmergencyBlockBuffer()[0].path).toBe("/api/code-blue/sessions");
   });
 });

@@ -66,9 +66,12 @@ const BUFFER_MAX = 200;
 // doctrine forbids. Local diagnostics only; NEVER posted to any server.
 let buffer: readonly EmergencyBlockBufferEntry[] = [];
 
-/** Read accessor for a future debug UI. Returns an immutable snapshot. */
+/**
+ * Read accessor for a future debug UI. Returns a detached snapshot (cloned
+ * entries) so callers can never mutate the module-owned buffer.
+ */
 export function readEmergencyBlockBuffer(): readonly EmergencyBlockBufferEntry[] {
-  return buffer;
+  return buffer.map((entry) => ({ ...entry }));
 }
 
 function recordEmergencyBlock(entry: EmergencyBlockBufferEntry): void {
@@ -76,14 +79,23 @@ function recordEmergencyBlock(entry: EmergencyBlockBufferEntry): void {
 }
 
 /**
- * RN's fetch rejects with `TypeError: Network request failed` on connectivity
- * loss; the web target rejects with `TypeError: Failed to fetch`. Caller
- * aborts are cancellations, not offline — never converted to a block.
+ * Known network-level fetch rejection messages, matched narrowly so a
+ * programming error that also throws TypeError (e.g. "Invalid URL") is never
+ * masked as an offline block:
+ *   - "Network request failed" — RN / whatwg-fetch
+ *   - "Failed to fetch"        — Chromium
+ *   - "Load failed"            — WebKit / Safari
+ *   - "fetch failed"           — undici (Node / jest env)
+ *   - "NetworkError"           — Firefox
+ * Caller aborts are cancellations, not offline — never converted to a block.
  */
+const NETWORK_FAILURE_MESSAGE =
+  /network request failed|failed to fetch|load failed|fetch failed|networkerror/i;
+
 export function isNetworkFailure(err: unknown): boolean {
-  if (err instanceof Error && err.name === "AbortError") return false;
-  if (err instanceof TypeError) return true;
-  return err instanceof Error && /Network request failed|Failed to fetch/i.test(err.message);
+  if (!(err instanceof Error)) return false;
+  if (err.name === "AbortError") return false;
+  return NETWORK_FAILURE_MESSAGE.test(err.message);
 }
 
 /**
