@@ -1,25 +1,23 @@
-import { memo, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Text, TextInput, View } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
+import { useUniwind } from "uniwind";
 
 import { BootstrapGate } from "@/app/BootstrapGate";
+import { PressableScale } from "@/components/PressableScale";
+import { EquipmentRow, type RowPressHandler } from "@/components/equipment/EquipmentRow";
+import { AuroraBackground } from "@/components/home/AuroraBackground";
+import { FORWARD_ARROW } from "@/components/home/glyphs";
+import { SearchIcon } from "@/components/home/icons";
 import { useDualFrameSampler } from "@/hooks/useDualFrameSampler";
 import { useEquipmentRealtimeSync } from "@/hooks/useEquipmentRealtimeSync";
 import { api, equipmentKeys, type EquipmentListParams } from "@/lib/api";
-import { haptics } from "@/lib/haptics";
 import { mark, MARK } from "@/lib/instrumentation/perf";
-import type { EquipmentListPage, EquipmentRow as EquipmentRowType } from "@/types/api";
+import type { EquipmentListPage } from "@/types/api";
 
 import type { RootStackScreenProps } from "../navigation/types";
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const EMPTY_PAGE: EquipmentListPage = {
   items: [],
@@ -29,66 +27,11 @@ const EMPTY_PAGE: EquipmentListPage = {
   hasMore: false,
 };
 
-type RowPressHandler = (item: EquipmentRowType) => void;
-
-/** Module-scope, memoized row — a stable renderItem keeps FlashList recycling cheap. */
-const EquipmentRow = memo(function EquipmentRow({
-  item,
-  onPress,
-}: {
-  item: EquipmentRowType;
-  onPress: RowPressHandler;
-}) {
-  const { t } = useTranslation();
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const held = item.custodyState === "checked_out";
-
-  return (
-    <AnimatedPressable
-      style={animatedStyle}
-      className="mb-2 rounded-xl border border-border bg-surface px-4 py-3.5 active:opacity-90"
-      accessibilityRole="button"
-      onPress={() => {
-        haptics.tap();
-        onPress(item);
-      }}
-      onPressIn={() => {
-        scale.value = withSpring(0.97);
-      }}
-      onPressOut={() => {
-        scale.value = withSpring(1);
-      }}
-    >
-      <Text className="text-[16px] font-semibold text-foreground" numberOfLines={1}>
-        {item.name}
-      </Text>
-      {held ? (
-        item.checkedOutByEmail ? (
-          <Text className="mt-0.5 text-[13px] text-muted" numberOfLines={1} style={{ writingDirection: "ltr" }}>
-            {t("equipment.checkedOutBy", { email: item.checkedOutByEmail })}
-          </Text>
-        ) : (
-          <Text className="mt-0.5 text-[13px] text-muted" numberOfLines={1}>
-            {t("equipment.held")}
-          </Text>
-        )
-      ) : (
-        <Text className="mt-0.5 text-[13px] text-info" numberOfLines={1}>
-          {t("equipment.available")}
-        </Text>
-      )}
-    </AnimatedPressable>
-  );
-});
-
 function EquipmentListBody({ navigation, route }: RootStackScreenProps<"EquipmentList">) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { theme } = useUniwind();
+  const light = theme === "light";
   useEquipmentRealtimeSync();
 
   // Seed the search from an initialQuery param — the NFC advisory fallback: a
@@ -153,45 +96,82 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
   const items = listQuery.data?.items ?? [];
 
   return (
-    <View className="flex-1 bg-background px-4 pt-3">
-      <TextInput
-        className="mb-3 rounded-xl border border-border bg-surface px-4 py-3 text-[15px] text-foreground"
-        placeholder={t("equipment.searchPlaceholder")}
-        placeholderTextColor="#64748b"
-        value={query}
-        onChangeText={setQuery}
-        autoCorrect={false}
-        accessibilityLabel={t("equipment.searchPlaceholder")}
-      />
-
-      <Pressable
-        className="mb-3 items-center rounded-xl bg-primary py-3.5 active:opacity-80"
-        accessibilityRole="button"
-        onPress={() => navigation.navigate("Scan")}
-      >
-        <Text className="text-[15px] font-semibold text-primary-foreground">{t("home.scan")}</Text>
-      </Pressable>
-
-      {listQuery.isPending ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator />
+    <View className="flex-1 bg-background">
+      <AuroraBackground />
+      <View className="flex-1 px-[22px] pt-3">
+        {/* Aurora search field — opaque surface, radius-md, muted placeholder, ≥44pt. */}
+        <View className="mb-2.5 min-h-[48px] flex-row items-center gap-2.5 rounded-[20px] border border-border bg-surface px-4">
+          <SearchIcon color={light ? "#5B5680" : "#A6A0C3"} size={18} />
+          <TextInput
+            className="flex-1 py-3 font-rubik text-[16px] text-foreground"
+            placeholder={t("equipment.searchPlaceholder")}
+            placeholderTextColor={light ? "#5B5680" : "#A6A0C3"}
+            value={query}
+            onChangeText={setQuery}
+            autoCorrect={false}
+            accessibilityLabel={t("equipment.searchPlaceholder")}
+          />
         </View>
-      ) : listQuery.isError ? (
-        <Text className="mt-6 text-center text-[15px] text-danger">{t("equipment.loadError")}</Text>
-      ) : items.length === 0 ? (
-        <Text className="mt-6 text-center text-[15px] text-muted">{t("equipment.empty")}</Text>
-      ) : (
-        <FlashList
-          data={items}
-          renderItem={({ item }) => <EquipmentRow item={item} onPress={onRowPress} />}
-          keyExtractor={(item) => item.id}
-          getItemType={(item) => item.status}
-          onScrollBeginDrag={startScrollSampling}
-          onScrollEndDrag={stopScrollSampling}
-          onMomentumScrollBegin={startScrollSampling}
-          onMomentumScrollEnd={stopScrollSampling}
-        />
-      )}
+
+        {/* Scan CTA — compact variant of the home scan hero: same violet gradient
+            + inner highlight, single 52pt row (no double bezel at this size). */}
+        <PressableScale
+          className="mb-3 overflow-hidden rounded-[20px]"
+          accessibilityRole="button"
+          accessibilityLabel={t("home.scan")}
+          onPress={() => navigation.navigate("Scan")}
+        >
+          <View
+            className="min-h-[52px] flex-row items-center gap-3 rounded-[20px] bg-gradient-to-b from-[#7C3AED] to-[#6D28D9] px-4 py-2.5"
+            style={{ boxShadow: "inset 0 1px 1px rgba(255,255,255,0.30)" }}
+          >
+            <View className="h-[30px] w-[30px] items-center justify-center rounded-full bg-[rgba(255,255,255,0.18)]">
+              <View className="h-[15px] w-[15px] items-center justify-center rounded-full border-2 border-white">
+                <View className="h-[5px] w-[5px] rounded-full bg-white" />
+              </View>
+            </View>
+            {/* AA (4.5:1): solid white on #7C3AED = 5.70, on #6D28D9 = 7.10. */}
+            <Text className="flex-1 font-rubik-bold text-[15px] text-white">{t("home.scan")}</Text>
+            <View className="h-7 w-7 items-center justify-center rounded-full bg-[rgba(255,255,255,0.16)]">
+              <Text className="text-[15px] text-white">{FORWARD_ARROW}</Text>
+            </View>
+          </View>
+        </PressableScale>
+
+        {listQuery.isPending ? (
+          <View className="flex-1 items-center justify-center gap-2.5">
+            <ActivityIndicator color={light ? "#6D28D9" : "#A78BFA"} />
+            <Text className="font-rubik text-[13px] text-muted">{t("common.loading")}</Text>
+          </View>
+        ) : listQuery.isError ? (
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-center font-rubik text-[15px] text-danger">
+              {t("equipment.loadError")}
+            </Text>
+          </View>
+        ) : items.length === 0 ? (
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-center font-rubik text-[15px] text-muted">
+              {t("equipment.empty")}
+            </Text>
+          </View>
+        ) : (
+          <FlashList
+            data={items}
+            renderItem={({ item }) => (
+              <EquipmentRow item={item} onPress={onRowPress} sampledAtMs={listQuery.dataUpdatedAt} />
+            )}
+            keyExtractor={(item) => item.id}
+            getItemType={(item) => item.status}
+            onScrollBeginDrag={startScrollSampling}
+            onScrollEndDrag={stopScrollSampling}
+            onMomentumScrollBegin={startScrollSampling}
+            onMomentumScrollEnd={stopScrollSampling}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 16 }}
+          />
+        )}
+      </View>
     </View>
   );
 }

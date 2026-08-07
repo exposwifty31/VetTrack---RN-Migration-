@@ -33,8 +33,13 @@ export type ExceptionItem = {
   name: string;
 };
 
+/**
+ * The ONE stale threshold — shared by the home exceptions derivation and the
+ * equipment-row stale meta tier (owner decision 2026-08-07: same field
+ * `lastSeen`, same 14 days, single constant).
+ */
 export const EXCEPTION_STALE_DAYS = 14;
-const DAY_MS = 86_400_000;
+export const DAY_MS = 86_400_000;
 
 /** usageState values that mean "the unit is being used right now" (server enum). */
 const IN_USE_STATES = new Set(["in_use", "staged", "emergency_use"]);

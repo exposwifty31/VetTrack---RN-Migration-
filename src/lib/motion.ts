@@ -15,7 +15,10 @@
  *
  * NEVER animate:
  *   - Code Blue / emergency surfaces (zero motion, zero glass).
- *   - List rows (FlashList recycling must stay cheap).
+ *   - List-row CONTENT or layout — status/color changes, entrance, reorder
+ *     (FlashList recycling must stay cheap). Press-scale FEEDBACK on rows via
+ *     `PressableScale` is sanctioned (owner decision 2026-08-07) — it is
+ *     transform-only touch feedback, not row-content animation.
  *   - Blur values (re-rasterizes every frame).
  *   - The aurora background glow (painted once, static forever).
  */
