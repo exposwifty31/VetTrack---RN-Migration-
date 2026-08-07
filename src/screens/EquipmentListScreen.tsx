@@ -144,13 +144,17 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
             <Text className="font-rubik text-[13px] text-muted">{t("common.loading")}</Text>
           </View>
         ) : listQuery.isError ? (
-          <Text className="mt-8 text-center font-rubik text-[15px] text-danger">
-            {t("equipment.loadError")}
-          </Text>
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-center font-rubik text-[15px] text-danger">
+              {t("equipment.loadError")}
+            </Text>
+          </View>
         ) : items.length === 0 ? (
-          <Text className="mt-8 text-center font-rubik text-[15px] text-muted">
-            {t("equipment.empty")}
-          </Text>
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-center font-rubik text-[15px] text-muted">
+              {t("equipment.empty")}
+            </Text>
+          </View>
         ) : (
           <FlashList
             data={items}

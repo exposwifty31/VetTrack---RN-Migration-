@@ -31,6 +31,15 @@ const DISMISS_THRESHOLD = 120;
  * Glass T2 blur strength. The spec's recipe is CSS `blur(30px)`; expo-blur
  * `intensity` is not px — the home top bar established 40 ≡ blur 22 (T1), so
  * T2's 30px maps to ~55.
+ *
+ * Android (documented degradation): `blurMethod` stays at its `'none'` default,
+ * which renders the semi-transparent tint only — i.e. the `--color-glass-strong`
+ * overlay without real blur. A true Android blur needs a `BlurTargetView`
+ * WRAPPING the content to be blurred; behind this `transparentModal` that
+ * content is the PREVIOUS navigator screen's subtree, which this screen cannot
+ * wrap — wiring it means hosting a BlurTargetView around the navigator and
+ * threading its ref. Deferred to the Android lane (this migration's G2/G2.5
+ * gate is iOS-sim); the tint-only fallback keeps AA intact.
  */
 const T2_BLUR_INTENSITY = 55;
 
