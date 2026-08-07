@@ -154,7 +154,9 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
         ) : (
           <FlashList
             data={items}
-            renderItem={({ item }) => <EquipmentRow item={item} onPress={onRowPress} />}
+            renderItem={({ item }) => (
+              <EquipmentRow item={item} onPress={onRowPress} sampledAtMs={listQuery.dataUpdatedAt} />
+            )}
             keyExtractor={(item) => item.id}
             getItemType={(item) => item.status}
             onScrollBeginDrag={startScrollSampling}

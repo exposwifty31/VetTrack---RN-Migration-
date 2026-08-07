@@ -83,7 +83,11 @@
     "loadError": "לא ניתן לטעון ציוד.",
     "checkedOutBy": "מושאל על ידי {{email}}",
     "held": "בהשאלה",
-    "available": "זמין"
+    "available": "זמין",
+    "neverSeen": "טרם נסרק",
+    "seenToday": "עודכן היום",
+    "seenYesterday": "עודכן אתמול",
+    "seenDaysAgo": "עודכן לפני {{days}} ימים"
   },
   "scan": {
     "prompt": "התחל סריקה, ואז קרב את התווית לטלפון.",

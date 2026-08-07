@@ -83,7 +83,11 @@
     "loadError": "Could not load equipment.",
     "checkedOutBy": "Checked out by {{email}}",
     "held": "Checked out",
-    "available": "Available"
+    "available": "Available",
+    "neverSeen": "Not scanned yet",
+    "seenToday": "Updated today",
+    "seenYesterday": "Updated yesterday",
+    "seenDaysAgo": "Updated {{days}} days ago"
   },
   "scan": {
     "prompt": "Launch scan, then hold the tag to the phone.",
