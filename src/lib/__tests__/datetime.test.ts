@@ -1,9 +1,13 @@
 import { DAY_MS } from "@/lib/home-readiness";
 
 import {
+  addIsoDays,
   formatDate,
   formatDateTime,
+  formatDayLabel,
   formatTime,
+  isoDayDate,
+  isoDayString,
   relativeDay,
   resolveIntlLocale,
 } from "../datetime";
@@ -99,5 +103,59 @@ describe("relativeDay", () => {
   it("returns null for unparseable input", () => {
     expect(relativeDay(null, now)).toBeNull();
     expect(relativeDay("not-a-date", now)).toBeNull();
+  });
+});
+
+// --- Slice 3 additions: local ISO-day math for the Tasks day view ---
+
+describe("isoDayString", () => {
+  it("emits the LOCAL calendar day as YYYY-MM-DD", () => {
+    // Construct from local fields so the assertion is TZ-independent.
+    const local = new Date(2026, 7, 7, 23, 59, 59);
+    expect(isoDayString(local)).toBe("2026-08-07");
+    expect(isoDayString(new Date(2026, 0, 3, 0, 0, 1))).toBe("2026-01-03");
+  });
+
+  it("returns null for unparseable input", () => {
+    expect(isoDayString("not-a-date")).toBeNull();
+    expect(isoDayString(null)).toBeNull();
+  });
+});
+
+describe("isoDayDate + addIsoDays", () => {
+  it("round-trips a day string through local noon (DST-safe anchor)", () => {
+    const d = isoDayDate("2026-08-07");
+    expect(d?.getFullYear()).toBe(2026);
+    expect(d?.getMonth()).toBe(7);
+    expect(d?.getDate()).toBe(7);
+    expect(d?.getHours()).toBe(12);
+  });
+
+  it("rejects malformed day strings", () => {
+    expect(isoDayDate("2026-8-7")).toBeNull();
+    expect(isoDayDate("yesterday")).toBeNull();
+    expect(addIsoDays("2026/08/07", 1)).toBeNull();
+  });
+
+  it("adds and subtracts days across month and year boundaries", () => {
+    expect(addIsoDays("2026-08-07", 1)).toBe("2026-08-08");
+    expect(addIsoDays("2026-08-01", -1)).toBe("2026-07-31");
+    expect(addIsoDays("2026-12-31", 1)).toBe("2027-01-01");
+    expect(addIsoDays("2026-03-01", -1)).toBe("2026-02-28");
+  });
+});
+
+describe("formatDayLabel", () => {
+  it("renders weekday + day + month through the resolved locale", () => {
+    const d = isoDayDate("2026-08-07");
+    const he = formatDayLabel(d, "he");
+    const en = formatDayLabel(d, "en");
+    expect(he).toBeTruthy();
+    expect(en).toContain("7");
+    expect(en).toMatch(/Aug/);
+  });
+
+  it("returns null for unparseable input", () => {
+    expect(formatDayLabel("nope", "en")).toBeNull();
   });
 });
