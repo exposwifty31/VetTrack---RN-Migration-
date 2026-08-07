@@ -1,6 +1,6 @@
 import "./src/global.css";
 
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 // Per-weight subpath imports — the package root re-exports every weight and
 // would drag all 14 Rubik ttfs (~3MB) into the bundle; we ship exactly four.
 import { Rubik_400Regular } from "@expo-google-fonts/rubik/400Regular";
@@ -8,6 +8,7 @@ import { Rubik_500Medium } from "@expo-google-fonts/rubik/500Medium";
 import { Rubik_600SemiBold } from "@expo-google-fonts/rubik/600SemiBold";
 import { Rubik_700Bold } from "@expo-google-fonts/rubik/700Bold";
 import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
 import { ClerkProvider } from "@clerk/clerk-expo";
 import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { NavigationContainer } from "@react-navigation/native";
@@ -25,6 +26,11 @@ import { queryClient } from "./src/lib/query-client";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 
 Uniwind.setTheme("dark");
+
+// Keep the native splash up while App renders no tree (font resolution below).
+// Must run at module scope, before the first render. Failure is non-fatal —
+// worst case the OS hides the splash on its own schedule.
+void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
 
@@ -46,6 +52,12 @@ export default function App() {
     Rubik_600SemiBold,
     Rubik_700Bold,
   });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      void SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded, fontError]);
 
   const tree = (
     <I18nextProvider i18n={i18n}>

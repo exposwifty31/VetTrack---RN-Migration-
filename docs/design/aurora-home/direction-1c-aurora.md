@@ -95,8 +95,10 @@ Mono IDs (`EQ-104`) use `--font-mono` (ui-monospace stack), tertiary color, LTR.
 
 ## Glass recipe
 
-- **T1** — blur 22px, `rgba(167,139,250,.12)`, hairline `rgba(167,139,250,.20)`:
-  search pill, secondary home card. Max one T1 region per screen.
+- **T1** — blur 22px, `rgba(167,139,250,.12)`, hairline `rgba(167,139,250,.20)`.
+  On Home the ONLY T1 region is the top app bar (iteration 3 blur-budget
+  decision below; earlier drafts placed T1 on a search pill / secondary card —
+  superseded). Max one T1 region per screen.
 - **T2** — blur 30px, `rgba(167,139,250,.18)`: checkout sheet only.
 - Hard cap: 2 glass layers per screen. Emergency screens: zero.
 
@@ -134,14 +136,16 @@ strip may sit on glass, but three-tier equipment rows always sit on opaque
 
 ## Iteration 3 — identity + operational home
 
-**Logo mark.** The original VT app-icon geometry (T crossbar + V bars meeting at
-a point) is kept; gradient remapped indigo → Aurora violet `#A78BFA→#8B5CF6`,
-plus a `#22D3EE` cyan dot at the V apex. The tile is always dark
-(`#1D1840→#0D0B1C`) in both themes.
+**Logo mark — SUPERSEDED.** This iteration explored remapping the mark's
+gradient to Aurora violet `#A78BFA→#8B5CF6` plus a `#22D3EE` cyan dot at the
+V apex. The final identity contract (README §Assets + §1, implemented in
+`DirAurora4.dc.html`) keeps the ORIGINAL `vt-mark.svg` embedded as-is — never
+redrawn, recolored, or reshaped; only glass treatment (bezel, glow, rounded
+corners) around it.
 
-**Wordmark.** `Vet` in `--color-foreground`; `Track` in a violet→cyan gradient —
-dark `#A78BFA→#22D3EE` (7.13 / 10.74 on background), light `#6D28D9→#0E7490`
-(6.57 / 5.03).
+**Wordmark — SUPERSEDED.** This iteration explored `Track` in a violet→cyan
+gradient. Final rules (README §1): `Vet` in `--color-foreground`; `Track`
+**solid** `#A78BFA` (dark) / `#6D28D9` (light).
 
 **Blur-budget decision (home).** Layer 1 = top app bar (glass T1; content
 scrolls under it). Layer 2 is deliberately unspent. The bottom tab bar is

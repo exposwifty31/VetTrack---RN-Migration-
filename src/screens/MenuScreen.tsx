@@ -19,7 +19,12 @@ type MenuLabelKey =
   | "home.i18nDebug"
   | "home.g2Measure";
 
-const MENU_ROUTES: { route: keyof RootStackParamList; labelKey: MenuLabelKey }[] = [
+/** Root-stack routes navigable without params — keeps MENU_ROUTES compile-checked. */
+type ParamFreeRoute = {
+  [K in keyof RootStackParamList]: undefined extends RootStackParamList[K] ? K : never;
+}[keyof RootStackParamList];
+
+const MENU_ROUTES: { route: ParamFreeRoute; labelKey: MenuLabelKey }[] = [
   { route: "SignIn", labelKey: "home.signIn" },
   { route: "ApiSmoke", labelKey: "home.apiSmoke" },
   { route: "NfcSpike", labelKey: "home.nfcSpike" },
@@ -48,7 +53,7 @@ export function MenuScreen({ navigation }: MainTabScreenProps<"Menu">) {
             key={route}
             accessibilityRole="button"
             className="min-h-[48px] justify-center rounded-sm border border-border bg-surface px-4 py-3"
-            onPress={() => navigation.navigate(route as never)}
+            onPress={() => navigation.navigate(route)}
           >
             <Text className="font-rubik-medium text-[15px] text-foreground">{t(labelKey)}</Text>
           </PressableScale>

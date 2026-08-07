@@ -57,11 +57,16 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
     }
   }, []);
 
-  const fleetQuery = useQuery<EquipmentListPage | null>({
+  const fleetQuery = useQuery<EquipmentListPage>({
     queryKey: equipmentKeys.list({ limit: FLEET_PAGE_LIMIT }),
     queryFn: async () => {
       const res = await api.equipment.list({ limit: FLEET_PAGE_LIMIT });
-      return res.status === 200 ? res.data : null;
+      // Throw on non-200 so React Query records the failure and the cards can
+      // render the honest load-error line instead of an endless loading state.
+      if (res.status !== 200) {
+        throw new Error(`equipment.list failed with status ${res.status}`);
+      }
+      return res.data;
     },
   });
 

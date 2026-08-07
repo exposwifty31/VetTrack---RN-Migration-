@@ -54,7 +54,9 @@
     "overdueDue": "Due {{time}}",
     "maintenanceLine": "Maintenance check",
     "exceptionsTitle": "Exceptions",
-    "exceptionReason": "No scan in more than {{days}} days"
+    "exceptionReason": "No scan in more than {{days}} days",
+    "searchA11y": "Search",
+    "settingsA11y": "Settings"
   },
   "tabs": {
     "today": "Today",

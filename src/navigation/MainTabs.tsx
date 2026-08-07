@@ -85,7 +85,7 @@ function AuroraTabBar({ state, navigation }: BottomTabBarProps) {
           <Pressable
             key={route.key}
             accessibilityRole="button"
-            accessibilityState={focused ? { selected: true } : {}}
+            accessibilityState={{ selected: focused }}
             accessibilityLabel={t(visual.labelKey)}
             onPress={() => {
               const event = navigation.emit({

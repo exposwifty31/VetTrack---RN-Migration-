@@ -122,6 +122,25 @@ describe("deriveAttentionItems", () => {
     expect(deriveAttentionItems(items, NOW)).toEqual([]);
   });
 
+  it("rejects negative and non-finite expected-return windows", () => {
+    const checkedOutAt = new Date(NOW - 3 * 60 * 60_000).toISOString(); // 3h ago
+    const items = [
+      row({
+        id: "neg",
+        custodyState: "checked_out",
+        checkedOutAt,
+        expectedReturnMinutes: -60, // would look instantly overdue
+      }),
+      row({
+        id: "nan",
+        custodyState: "checked_out",
+        checkedOutAt,
+        expectedReturnMinutes: Number.NaN, // would produce an invalid dueAtMs
+      }),
+    ];
+    expect(deriveAttentionItems(items, NOW)).toEqual([]);
+  });
+
   it("server-stamped status flags map to their severities, overdue first", () => {
     const items = [
       row({ id: "m", name: "Incubator", status: "maintenance" }),

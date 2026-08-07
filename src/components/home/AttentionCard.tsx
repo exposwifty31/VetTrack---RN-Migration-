@@ -6,7 +6,7 @@
  * never a fabricated all-clear. Rows are LIST ROWS: no scale animation
  * (motion doctrine), static pressed style only.
  */
-import { Pressable, Text, View } from "react-native";
+import { I18nManager, Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useUniwind } from "uniwind";
 
@@ -14,9 +14,14 @@ import type { AttentionItem } from "@/lib/home-readiness";
 
 const MAX_ROWS = 4;
 
+// Forward-pointing chevron: layout direction is fixed at boot (rtl-bootstrap),
+// so a module-level constant is safe.
+const FORWARD_CHEVRON = I18nManager.isRTL ? "‹" : "›";
+
 function formatDueTime(dueAtMs: number, locale: string): string {
   try {
-    return new Intl.DateTimeFormat(locale === "he" ? "he-IL" : "en-GB", {
+    // Prefix match: i18n.language may carry a region subtag (e.g. "he-IL").
+    return new Intl.DateTimeFormat(locale.startsWith("he") ? "he-IL" : "en-GB", {
       hour: "2-digit",
       minute: "2-digit",
     }).format(new Date(dueAtMs));
@@ -88,7 +93,7 @@ function AttentionRow({
           {parts.join(" · ")}
         </Text>
       </View>
-      <Text className="font-rubik text-[15px] text-text-tertiary">‹</Text>
+      <Text className="font-rubik text-[15px] text-text-tertiary">{FORWARD_CHEVRON}</Text>
     </Pressable>
   );
 }

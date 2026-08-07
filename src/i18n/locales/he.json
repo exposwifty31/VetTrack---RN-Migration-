@@ -54,7 +54,9 @@
     "overdueDue": "צפוי {{time}}",
     "maintenanceLine": "בדיקת תחזוקה",
     "exceptionsTitle": "חריגות",
-    "exceptionReason": "ללא סריקה ביותר מ־{{days}} ימים"
+    "exceptionReason": "ללא סריקה ביותר מ־{{days}} ימים",
+    "searchA11y": "חיפוש",
+    "settingsA11y": "הגדרות"
   },
   "tabs": {
     "today": "היום",

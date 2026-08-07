@@ -6,6 +6,7 @@
  */
 import { StyleSheet, Text, View } from "react-native";
 import { BlurView } from "expo-blur";
+import { useTranslation } from "react-i18next";
 import { SvgXml } from "react-native-svg";
 import { useUniwind } from "uniwind";
 
@@ -37,6 +38,7 @@ export function GlassTopBar({
   onSearchPress,
   onSettingsPress,
 }: GlassTopBarProps) {
+  const { t } = useTranslation();
   const { theme } = useUniwind();
   const light = theme === "light";
   const fg = light ? "#171331" : "#F3F1FA";
@@ -84,6 +86,7 @@ export function GlassTopBar({
         <PressableScale
           className="h-11 w-11 items-center justify-center"
           accessibilityRole="button"
+          accessibilityLabel={t("aurora.searchA11y")}
           onPress={onSearchPress}
         >
           <SearchIcon color={fg} />
@@ -94,7 +97,7 @@ export function GlassTopBar({
           <BellIcon color={fg} />
           {unreadCount != null && unreadCount > 0 ? (
             <View
-              className="absolute left-[3px] top-[3px] h-4 min-w-[17px] items-center justify-center rounded-full bg-danger-solid px-1"
+              className="absolute end-[3px] top-[3px] h-4 min-w-[17px] items-center justify-center rounded-full bg-danger-solid px-1"
               style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.35)" }}
             >
               <Text
@@ -110,6 +113,7 @@ export function GlassTopBar({
         <PressableScale
           className="h-11 w-11 items-center justify-center"
           accessibilityRole="button"
+          accessibilityLabel={t("aurora.settingsA11y")}
           onPress={onSettingsPress}
         >
           <SlidersIcon color={fg} />

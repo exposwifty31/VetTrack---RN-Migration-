@@ -89,7 +89,11 @@ export function deriveAttentionItems(
     if (
       item.custodyState === "checked_out" &&
       item.checkedOutAt != null &&
-      item.expectedReturnMinutes != null
+      item.expectedReturnMinutes != null &&
+      // Server data — reject negative/non-finite windows instead of deriving
+      // a bogus due timestamp or a false "overdue".
+      Number.isFinite(item.expectedReturnMinutes) &&
+      item.expectedReturnMinutes >= 0
     ) {
       const checkedOutMs = Date.parse(item.checkedOutAt);
       if (Number.isFinite(checkedOutMs)) {

@@ -8,7 +8,10 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
  */
 export type MainTabParamList = {
   Today: undefined;
-  EquipmentTab: { initialQuery?: string } | undefined;
+  // Deliberately param-free: query-seeded equipment searches PUSH the
+  // root-stack EquipmentList (its initialQuery seeds state at mount — a tab
+  // instance would ignore new params after its first mount).
+  EquipmentTab: undefined;
   Emergency: undefined;
   Menu: undefined;
 };

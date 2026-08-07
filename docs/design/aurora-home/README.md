@@ -62,10 +62,12 @@ Vertical order (all cards inset 22px horizontally, 10–12px between cards):
 3. **Scan hero — the primary action (never demote below the fold)**
    Double-bezel card: outer wrapper `rgba(124,58,237,.14)` bg +
    `rgba(139,92,246,.38)` border, 6px padding, radius 30; inner
-   `linear-gradient(150deg,#8B5CF6,#6D28D9)`, radius 24, padding 18–20px,
+   `linear-gradient(150deg,#7C3AED,#6D28D9)`, radius 24, padding 18–20px,
    inner highlight `inset 0 1px 1px rgba(255,255,255,.30)`.
+   (AA: solid white on `#7C3AED` = 5.70, on `#6D28D9` = 7.10 — the earlier
+   `#8B5CF6` top stop capped white at 4.23, failing 4.5 for the 12.5px line.)
    Row: 50px white-alpha circle with target icon · texts "סריקת תווית"
-   19px/700 white + "צ'ק־אאוט מהיר · QR / NFC" 12.5px `rgba(255,255,255,.85)`
+   19px/700 white + "צ'ק־אאוט מהיר · QR / NFC" 12.5px solid `#FFFFFF`
    · trailing 34px circle `rgba(255,255,255,.16)` with ← arrow (RTL forward).
    Identical in both themes. This is the only fully saturated element on the
    screen — all other cards are quiet surfaces.
@@ -129,7 +131,7 @@ Authoritative table (both variants + AA evidence):
 `direction-1c-aurora.md` in this bundle. Highlights: bg `#0D0B1C`/`#F7F5FC`,
 surface `#16122E`/`#FFFFFF`, raised `#1D1840`, fg `#F3F1FA`/`#171331`, muted
 `#A6A0C3`/`#5B5680`, tertiary `#8B84AD`/`#6E6893`, primary `#7C3AED`/`#6D28D9`
-(gradient `#8B5CF6→#6D28D9` on hero), accent `#22D3EE`/`#0891B2`, success
+(gradient `#7C3AED→#6D28D9` on hero), accent `#22D3EE`/`#0891B2`, success
 `#4ADE80`/`#15803D`, warning `#FBBF24`/`#B45309` (on-tint `#92400E`), danger
 `#F87171`/`#DC2626`, danger-solid `#DC2626`/`#B91C1C`, glass T1
 `rgba(167,139,250,.12)`+blur22 / `rgba(255,255,255,.55–.60)`+blur22, T2
