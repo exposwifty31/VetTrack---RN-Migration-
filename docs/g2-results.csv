@@ -36,6 +36,10 @@ rn,pixel7,3,o4_diag_cold_to_list_v1_instrument,3839,,,,owner,,ok,diagnostic_incl
 rn,pixel7,4,o4_diag_cold_to_list_v1_instrument,3531,,,,owner,,ok,diagnostic_includes_automation_overhead,75e4f9941196ae717247b57a1c434661ef0c525956b66799f4c5a0c3cef84197
 rn,pixel7,5,o4_diag_cold_to_list_v1_instrument,3783,,,,owner,,ok,diagnostic_includes_automation_overhead,af0e733ec1780f2730ea84049ed807e5c399b4023a9a072f9a3cb321ffcb3393
 # === footer (written once at verdict): ===
-# s1_verdict: <RN|Capacitor — written once at verdict>
-# s1_reason:  <verbatim concrete reason — written once at verdict>
-# s1_date:    <written once at verdict>
+# s1_verdict: RN
+# s1_reason:  "ראיתי הכל בלייב. RN נראה הרבה יותר טוב נקודה" (owner, verbatim, after live side-by-side use of both installed apps on the gate device)
+# s1_date:    2026-08-07
+# === declared deviation: O5 (paired task-times) WAIVED by explicit owner decision 2026-08-07 ===
+# ("דלג על o5 ו-s1 ראיתי הכל בלייב") — the subjective arm was delivered directly instead of
+# the timed pairs. Recorded as a deviation, not silently skipped. All four objective floors
+# (O1-O4) passed under pre-registration v2 with sha256-verified raw archives.
