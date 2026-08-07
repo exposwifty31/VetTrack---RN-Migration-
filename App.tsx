@@ -1,6 +1,13 @@
 import "./src/global.css";
 
 import type { ReactNode } from "react";
+import {
+  Rubik_400Regular,
+  Rubik_500Medium,
+  Rubik_600SemiBold,
+  Rubik_700Bold,
+  useFonts,
+} from "@expo-google-fonts/rubik";
 import { ClerkProvider } from "@clerk/clerk-expo";
 import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { NavigationContainer } from "@react-navigation/native";
@@ -30,6 +37,16 @@ const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
  * i18next (Slice 6) is initialized on import of ./src/i18n; Hebrew is default.
  */
 export default function App() {
+  // Aurora (G2.5): Rubik is the app family (400–700). Render nothing until the
+  // fonts resolve; on a load ERROR degrade gracefully to system fonts instead
+  // of blanking the app forever.
+  const [fontsLoaded, fontError] = useFonts({
+    Rubik_400Regular,
+    Rubik_500Medium,
+    Rubik_600SemiBold,
+    Rubik_700Bold,
+  });
+
   const tree = (
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
@@ -50,6 +67,10 @@ export default function App() {
   const withRoot = (node: ReactNode) => (
     <GestureHandlerRootView style={{ flex: 1 }}>{node}</GestureHandlerRootView>
   );
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   if (!publishableKey) {
     return withRoot(tree);
