@@ -188,5 +188,49 @@
     "refresh": "רענן נתונים",
     "nextRun": "איפוס דגימות → ריצה הבאה",
     "export": "ייצוא JSON של הריצה"
+  },
+  "tasks": {
+    "segmentAll": "כל המשימות",
+    "segmentMine": "המשימות שלי",
+    "today": "היום",
+    "prevDay": "היום הקודם",
+    "nextDay": "היום הבא",
+    "backToToday": "חזרה להיום",
+    "empty": "אין משימות ליום זה.",
+    "emptyMine": "אין משימות שהוקצו לך היום.",
+    "loadError": "לא ניתן לטעון משימות.",
+    "offShiftTitle": "מחוץ למשמרת",
+    "offShiftBody": "משימות זמינות במהלך משמרת פעילה. הן יופיעו כאן כשהמשמרת תתחיל.",
+    "noNotes": "ללא תיאור",
+    "mine": "שלי",
+    "start": "התחל",
+    "complete": "סיים",
+    "status": {
+      "pending": "ממתין",
+      "assigned": "הוקצה",
+      "scheduled": "מתוכנן",
+      "arrived": "הגיע",
+      "approved": "מאושר",
+      "in_progress": "בביצוע",
+      "completed": "הושלם",
+      "cancelled": "בוטל",
+      "no_show": "לא הגיע"
+    },
+    "priority": {
+      "critical": "קריטי",
+      "high": "גבוה"
+    },
+    "taskType": {
+      "maintenance": "תחזוקה",
+      "repair": "תיקון",
+      "inspection": "בדיקה"
+    },
+    "errors": {
+      "notOwned": "רק מי שהמשימה הוקצתה לו יכול לעדכן אותה.",
+      "invalidTransition": "סטטוס המשימה השתנה - רעננו ונסו שוב.",
+      "notAssigned": "למשימה אין גורם מוקצה.",
+      "alreadyApplied": "הפעולה כבר בוצעה.",
+      "offShift": "הפעולה זמינה רק במהלך משמרת פעילה."
+    }
   }
 }

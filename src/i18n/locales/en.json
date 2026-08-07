@@ -188,5 +188,49 @@
     "refresh": "Refresh readout",
     "nextRun": "Reset samples → next run",
     "export": "Export run JSON"
+  },
+  "tasks": {
+    "segmentAll": "All tasks",
+    "segmentMine": "My tasks",
+    "today": "Today",
+    "prevDay": "Previous day",
+    "nextDay": "Next day",
+    "backToToday": "Back to today",
+    "empty": "No tasks for this day.",
+    "emptyMine": "No tasks assigned to you today.",
+    "loadError": "Couldn't load tasks.",
+    "offShiftTitle": "You're off shift",
+    "offShiftBody": "Tasks are available during an active shift. They'll be here when your shift starts.",
+    "noNotes": "No description",
+    "mine": "Mine",
+    "start": "Start",
+    "complete": "Complete",
+    "status": {
+      "pending": "Pending",
+      "assigned": "Assigned",
+      "scheduled": "Scheduled",
+      "arrived": "Arrived",
+      "approved": "Approved",
+      "in_progress": "In progress",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "no_show": "No-show"
+    },
+    "priority": {
+      "critical": "Critical",
+      "high": "High"
+    },
+    "taskType": {
+      "maintenance": "Maintenance",
+      "repair": "Repair",
+      "inspection": "Inspection"
+    },
+    "errors": {
+      "notOwned": "Only the assigned technician can update this task.",
+      "invalidTransition": "The task status changed - refresh and try again.",
+      "notAssigned": "This task has no one assigned.",
+      "alreadyApplied": "This action was already applied.",
+      "offShift": "This action is available only during an active shift."
+    }
   }
 }
