@@ -71,6 +71,60 @@ function EnumRow({
   return <KeyValueRow label={label} value={known ?? raw} ltr={known == null} />;
 }
 
+function BundleGateNotes({ gate }: Readonly<{ gate: EquipmentDeployability["bundleGate"] }>) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {!gate.ok && gate.reason ? (
+        <Text className="font-rubik text-[13px] text-warning">
+          {t("equipmentDetail.readiness.gateBlocked", { reason: gate.reason })}
+        </Text>
+      ) : null}
+      {gate.failedConditions?.length ? (
+        <Text className="font-rubik text-[13px] text-warning" style={{ writingDirection: "ltr" }}>
+          {t("equipmentDetail.readiness.failedConditions", {
+            list: gate.failedConditions.join(", "),
+          })}
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
+function ReadinessContent({ data }: Readonly<{ data: EquipmentDeployability }>) {
+  const { t } = useTranslation();
+  return (
+    <View className="gap-2">
+      <Chip
+        label={
+          data.fullDeployable
+            ? t("equipmentDetail.readiness.deployable")
+            : t("equipmentDetail.readiness.notDeployable")
+        }
+        tone={data.fullDeployable ? "success" : "warning"}
+      />
+      <View>
+        <EnumRow
+          label={t("equipmentDetail.readiness.custody")}
+          known={custodyStateLabel(t, data.custodyState)}
+          raw={data.custodyState}
+        />
+        <EnumRow
+          label={t("equipmentDetail.readiness.readinessState")}
+          known={readinessLabel(t, data.readinessState)}
+          raw={data.readinessState}
+        />
+        <EnumRow
+          label={t("equipmentDetail.readiness.usage")}
+          known={usageLabel(t, data.usageState)}
+          raw={data.usageState}
+        />
+      </View>
+      <BundleGateNotes gate={data.bundleGate} />
+    </View>
+  );
+}
+
 export function ReadinessCard({ equipmentId }: Readonly<{ equipmentId: string }>) {
   const { t } = useTranslation();
 
@@ -90,45 +144,7 @@ export function ReadinessCard({ equipmentId }: Readonly<{ equipmentId: string }>
           onRetry={() => void query.refetch()}
         />
       ) : (
-        <View className="gap-2">
-          <Chip
-            label={
-              query.data.fullDeployable
-                ? t("equipmentDetail.readiness.deployable")
-                : t("equipmentDetail.readiness.notDeployable")
-            }
-            tone={query.data.fullDeployable ? "success" : "warning"}
-          />
-          <View>
-            <EnumRow
-              label={t("equipmentDetail.readiness.custody")}
-              known={custodyStateLabel(t, query.data.custodyState)}
-              raw={query.data.custodyState}
-            />
-            <EnumRow
-              label={t("equipmentDetail.readiness.readinessState")}
-              known={readinessLabel(t, query.data.readinessState)}
-              raw={query.data.readinessState}
-            />
-            <EnumRow
-              label={t("equipmentDetail.readiness.usage")}
-              known={usageLabel(t, query.data.usageState)}
-              raw={query.data.usageState}
-            />
-          </View>
-          {!query.data.bundleGate.ok && query.data.bundleGate.reason ? (
-            <Text className="font-rubik text-[13px] text-warning">
-              {t("equipmentDetail.readiness.gateBlocked", { reason: query.data.bundleGate.reason })}
-            </Text>
-          ) : null}
-          {query.data.bundleGate.failedConditions?.length ? (
-            <Text className="font-rubik text-[13px] text-warning" style={{ writingDirection: "ltr" }}>
-              {t("equipmentDetail.readiness.failedConditions", {
-                list: query.data.bundleGate.failedConditions.join(", "),
-              })}
-            </Text>
-          ) : null}
-        </View>
+        <ReadinessContent data={query.data} />
       )}
     </SectionCard>
   );

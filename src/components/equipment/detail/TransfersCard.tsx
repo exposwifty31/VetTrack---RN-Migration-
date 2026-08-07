@@ -16,6 +16,15 @@ import type { EquipmentTransferItem } from "@/types/api";
 
 import { SectionTitle } from "./DetailBits";
 
+/**
+ * A row is renderable when it carries a route, a note, or at least a parseable
+ * timestamp (date-only fallback row) — filtering BEFORE the empty-state branch
+ * so a payload of all-empty rows shows the honest empty state, never a blank card.
+ */
+export function hasTransferContent(item: EquipmentTransferItem): boolean {
+  return Boolean(item.toFolderName || item.note || formatDateTime(item.timestamp) != null);
+}
+
 function TransferRow({ item }: Readonly<{ item: EquipmentTransferItem }>) {
   const { t } = useTranslation();
   const when = formatDateTime(item.timestamp);
@@ -25,8 +34,6 @@ function TransferRow({ item }: Readonly<{ item: EquipmentTransferItem }>) {
       : item.toFolderName
         ? t("equipmentDetail.transfers.routeToOnly", { to: item.toFolderName })
         : null;
-
-  if (!route && !item.note) return null;
 
   return (
     <View className="gap-0.5 border-t border-border py-2.5">
@@ -63,16 +70,21 @@ export function TransfersCard({ equipmentId }: Readonly<{ equipmentId: string }>
           message={t("equipmentDetail.transfers.loadError")}
           onRetry={() => void query.refetch()}
         />
-      ) : query.data.length === 0 ? (
-        <Text className="font-rubik text-[13px] text-muted">
-          {t("equipmentDetail.transfers.empty")}
-        </Text>
       ) : (
-        <View>
-          {query.data.map((item) => (
-            <TransferRow key={item.id} item={item} />
-          ))}
-        </View>
+        (() => {
+          const rows = query.data.filter(hasTransferContent);
+          return rows.length === 0 ? (
+            <Text className="font-rubik text-[13px] text-muted">
+              {t("equipmentDetail.transfers.empty")}
+            </Text>
+          ) : (
+            <View>
+              {rows.map((item) => (
+                <TransferRow key={item.id} item={item} />
+              ))}
+            </View>
+          );
+        })()
       )}
     </SectionCard>
   );

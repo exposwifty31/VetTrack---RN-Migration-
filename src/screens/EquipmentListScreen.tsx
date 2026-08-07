@@ -19,6 +19,9 @@ import type { EquipmentListPage } from "@/types/api";
 
 import type { RootStackScreenProps } from "../navigation/types";
 
+/** LRU bound for the per-search ETag map — plenty for a session of live search. */
+const ETAG_CACHE_MAX = 50;
+
 const EMPTY_PAGE: EquipmentListPage = {
   items: [],
   total: 0,
@@ -46,25 +49,37 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
   // search's ETag on another search's request, so a 304 would return the wrong
   // page. The map stores ONLY the ETag string — 304 bodies are served from the
   // query cache (`queryClient.getQueryData`), so distinct searches no longer
-  // pin a full page each (the map grew unboundedly). If the cached body is
-  // gone (gc), skip If-None-Match — a 304 with nothing to serve would
-  // fabricate an empty page.
+  // pin a full page each. The map itself is a small LRU (touch on read,
+  // evict-oldest past ETAG_CACHE_MAX) so live search can't grow it unboundedly.
+  // If the cached body is gone (gc), skip If-None-Match — a 304 with nothing
+  // to serve would fabricate an empty page.
   const etagRef = useRef<Map<string, string>>(new Map());
 
   const listQuery = useQuery<EquipmentListPage>({
     queryKey,
     queryFn: async () => {
       const cacheKey = JSON.stringify(queryKey);
+      const etags = etagRef.current;
       const cachedPage = queryClient.getQueryData<EquipmentListPage>(queryKey);
-      const etag = cachedPage ? etagRef.current.get(cacheKey) : undefined;
+      const etag = cachedPage ? etags.get(cacheKey) : undefined;
+      if (etag) {
+        // LRU touch: re-insert so the hot key moves to the back of the map.
+        etags.delete(cacheKey);
+        etags.set(cacheKey, etag);
+      }
       const res = await api.equipment.list(params, etag);
       if (res.status === 304) {
         return cachedPage ?? EMPTY_PAGE;
       }
       if (res.etag) {
-        etagRef.current.set(cacheKey, res.etag);
+        etags.delete(cacheKey);
+        etags.set(cacheKey, res.etag);
+        if (etags.size > ETAG_CACHE_MAX) {
+          const oldest = etags.keys().next().value;
+          if (oldest !== undefined) etags.delete(oldest);
+        }
       } else {
-        etagRef.current.delete(cacheKey);
+        etags.delete(cacheKey);
       }
       return res.data;
     },

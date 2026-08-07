@@ -13,7 +13,7 @@
  * detail sub-keys nest under ['equipment']) — no polling, no refetchInterval.
  * Identity is resolved by the route's BootstrapGate before this mounts.
  */
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -44,18 +44,15 @@ import type { EquipmentDetail } from "@/types/api";
 
 import type { RootStackScreenProps } from "../navigation/types";
 
-const LTR = { writingDirection: "ltr" } as const;
-
 function HeaderCard({ detail }: Readonly<{ detail: EquipmentDetail }>) {
   const { t } = useTranslation();
   const verifiedAt = formatDateTime(detail.lastVerifiedAt);
   return (
     <SectionCard>
-      <Text
-        className="font-rubik-bold text-[20px] text-foreground"
-        numberOfLines={2}
-        style={LTR}
-      >
+      {/* Name/model/manufacturer are arbitrary clinic content (often Hebrew) —
+          they flow with the layout direction. Only guaranteed-Latin identifiers
+          (serial number) force writingDirection ltr (rn-design RTL guidance). */}
+      <Text className="font-rubik-bold text-[20px] text-foreground" numberOfLines={2}>
         {detail.name}
       </Text>
       <View className="mt-2 flex-row flex-wrap gap-2">
@@ -66,13 +63,12 @@ function HeaderCard({ detail }: Readonly<{ detail: EquipmentDetail }>) {
           <KeyValueRow label={t("equipmentDetail.identity.serial")} value={detail.serialNumber} ltr />
         ) : null}
         {detail.model ? (
-          <KeyValueRow label={t("equipmentDetail.identity.model")} value={detail.model} ltr />
+          <KeyValueRow label={t("equipmentDetail.identity.model")} value={detail.model} />
         ) : null}
         {detail.manufacturer ? (
           <KeyValueRow
             label={t("equipmentDetail.identity.manufacturer")}
             value={detail.manufacturer}
-            ltr
           />
         ) : null}
       </View>
@@ -126,11 +122,28 @@ export function EquipmentDetailScreen({
   }, [navigation, detailQuery.data]);
 
   const detail = detailQuery.data;
-  // "Now" anchor = when the detail data landed (the equipmentRowMeta idiom) —
-  // deterministic per fetch, refreshed by every SSE-driven invalidation.
-  const custody = detail
-    ? deriveCustody(detail, identity.data?.id, detailQuery.dataUpdatedAt)
-    : null;
+
+  // "Now" anchor for the overdue derivation: `dataUpdatedAt` re-anchors it on
+  // every fetch (no effect needed — it IS a wall-clock ms), and ONE local
+  // re-render is scheduled at the due boundary so an item flips to overdue on
+  // screen without waiting for a refetch. Clock-state only — no network, no
+  // interval; the zero-polling doctrine holds.
+  const [clockMs, setClockMs] = useState(() => Date.now());
+  const nowMs = Math.max(clockMs, detailQuery.dataUpdatedAt);
+
+  const custody = detail ? deriveCustody(detail, identity.data?.id, nowMs) : null;
+
+  const dueMs = custody?.kind === "held" ? custody.dueMs : null;
+  const isOverdue = custody?.kind === "held" ? custody.overdue : false;
+  useEffect(() => {
+    if (dueMs == null || isOverdue) return;
+    const delay = dueMs - Date.now() + 1;
+    // setTimeout overflows past 2^31-1 ms and would fire immediately, looping —
+    // a >24-day horizon re-anchors on the next data refresh instead.
+    if (delay > 0x7fffffff) return;
+    const timer = setTimeout(() => setClockMs(Date.now()), Math.max(delay, 0));
+    return () => clearTimeout(timer);
+  }, [dueMs, isOverdue]);
 
   const returnFeedback: CustodyFeedback = directReturn.isSuccess
     ? { tone: "success", message: t("equipmentDetail.return.success") }

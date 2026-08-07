@@ -221,11 +221,27 @@ export type EquipmentCheckoutResponse = {
   undoToken: string;
 };
 
+/** vt_equipment_returns row (finalizeReturnSideEffects → equipmentReturns.$inferSelect). */
+export type EquipmentReturnRecord = {
+  id: string;
+  clinicId: string;
+  equipmentId: string;
+  returnedById: string;
+  returnedByEmail: string;
+  returnedAt: string;
+  isPluggedIn: boolean;
+  plugInDeadlineMinutes: number;
+  plugInAlertSentAt?: string | null;
+  chargeAlertJobId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /** POST /:id/return 200 — returnRecord null when the item was already returned. */
 export type EquipmentReturnResponse = {
   equipment: EquipmentRow;
   undoToken: string;
-  returnRecord: unknown | null;
+  returnRecord: EquipmentReturnRecord | null;
 };
 
 /** POST /:id/scan 200 — the status-report path (report-issue uses status "issue"). */
