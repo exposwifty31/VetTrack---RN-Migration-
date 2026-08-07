@@ -44,23 +44,28 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
 
   // ETag threading scoped PER query key: a shared single-slot ref would send one
   // search's ETag on another search's request, so a 304 would return the wrong
-  // page. Key the ETag + cached page on the (normalized) query key.
-  const cacheRef = useRef<Map<string, { etag?: string; page: EquipmentListPage }>>(new Map());
+  // page. The map stores ONLY the ETag string — 304 bodies are served from the
+  // query cache (`queryClient.getQueryData`), so distinct searches no longer
+  // pin a full page each (the map grew unboundedly). If the cached body is
+  // gone (gc), skip If-None-Match — a 304 with nothing to serve would
+  // fabricate an empty page.
+  const etagRef = useRef<Map<string, string>>(new Map());
 
   const listQuery = useQuery<EquipmentListPage>({
     queryKey,
     queryFn: async () => {
       const cacheKey = JSON.stringify(queryKey);
-      const cached = cacheRef.current.get(cacheKey);
-      const res = await api.equipment.list(params, cached?.etag);
+      const cachedPage = queryClient.getQueryData<EquipmentListPage>(queryKey);
+      const etag = cachedPage ? etagRef.current.get(cacheKey) : undefined;
+      const res = await api.equipment.list(params, etag);
       if (res.status === 304) {
-        return (
-          cached?.page ??
-          queryClient.getQueryData<EquipmentListPage>(queryKey) ??
-          EMPTY_PAGE
-        );
+        return cachedPage ?? EMPTY_PAGE;
       }
-      cacheRef.current.set(cacheKey, { etag: res.etag, page: res.data });
+      if (res.etag) {
+        etagRef.current.set(cacheKey, res.etag);
+      } else {
+        etagRef.current.delete(cacheKey);
+      }
       return res.data;
     },
   });
