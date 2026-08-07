@@ -54,7 +54,7 @@ Every screen touching `/api` mounts under `BootstrapGate`.
 
 Common verification commands (every slice; per-slice extras noted inline):
 
-```
+```sh
 npm run typecheck && npm run lint && npm test
 npx expo run:ios          # or run:android — booted-device smoke per AGENTS.md bar
 ```
@@ -64,7 +64,7 @@ npx expo run:ios          # or run:android — booted-device smoke per AGENTS.md
 ### Slice 1 — G3 Foundations (shared kit + nav + realtime generalization) — **startable now**
 
 - **Scope:**
-  - Navigation: register **ALL** G3 routes (`EquipmentDetail: { equipmentId: string }`, `Tasks`, `MyEquipment`, `Alerts`, `Rooms`, `RoomDetail: { roomId: string }`, `ShiftChat`, `Handoff`, `Inventory`, `AutopilotQueue`) in `RootStackParamList` + `RootNavigator` (module-scope `BootstrapGate` wrappers like `GatedScan`), each pointing at a minimal gated placeholder screen file (`src/screens/<Name>Screen.tsx` — honest "בקרוב" empty-state, no data fetch). This makes every later slice new-file-only: it rewrites its own placeholder and never touches the navigation files.
+  - Navigation: register **ALL** G3 routes (`EquipmentDetail: { equipmentId: string }`, `Tasks`, `MyEquipment`, `Alerts`, `Rooms`, `RoomDetail: { roomId: string }`, `ShiftChat`, `Handoff`, `Inventory`, `AutopilotQueue`) in `RootStackParamList` + `RootNavigator` (module-scope `BootstrapGate` wrappers like `GatedScan`), each pointing at a minimal gated placeholder screen file (`src/screens/<Name>Screen.tsx` — honest empty-state rendering the new `common.comingSoon` i18n key (never hardcoded Hebrew, per the parity bar), no data fetch). This makes every later slice new-file-only: it rewrites its own placeholder and never touches the navigation files.
   - Shared UI kit (new files, `src/components/ui/`): `SectionCard`, `ListEmptyState`, `ErrorNote` (retry affordance), `RowSkeleton`, `Chip`. All Aurora-tokened, opaque surfaces, PressableScale where pressable, ≥44pt.
   - `src/components/ui/BottomSheet.tsx` — reusable sheet primitive following the CheckoutConfirm pattern exactly (Gesture Handler `Pan` + Reanimated, T2 glass `bg-glass-strong` intensity 55, radius-sheet, SPRING rise, 200 ms plain-dim backdrop, drag-down >120 px dismiss). **New file — do NOT refactor CheckoutConfirm to use it in this slice** (G2.5 owns that file; adoption is a post-G3 cleanup).
   - `src/hooks/useRealtimeInvalidation.ts` — generic subscribe-only hook: `{ typePrefixes?: string[], auditActionTypes?: string[], queryKeys: QueryKey[] }`. Doctrine identical to `useEquipmentRealtimeSync`: never opens/closes the stream, invalidates on matching `event` (domain-type prefix match OR `type === "audit_log"` with watched `actionType`) and on `reset`; **ignores `keepalive` and `state`**. This is how tasks/alerts/rooms/etc. get freshness — the server emits no dedicated domain events for them; every `logAudit()` inserts an `audit_log` outbox row (Scout 3).
@@ -256,7 +256,7 @@ npx expo run:ios          # or run:android — booted-device smoke per AGENTS.md
 
 ### Parallel track (optional, per gated plan line 450) — Offline read-cache for equipment/rooms
 
-The gated plan places the offline **read**-cache in G3 ("Dexie's radiation into api.ts + 3 UI components lands here"). It is not required for the daily-driver verdict if the owner accepts online-only reads for G3, but it is sanctioned to build in parallel any time after Slice 1:
+The gated plan places the offline **read**-cache in G3 (in this repo that means an op-sqlite read-through seam in the equipment/rooms fetch path plus the consuming UI cache states — the plan's original Dexie wording described the Capacitor client; the engine decision below supersedes it). It is not required for the daily-driver verdict if the owner accepts online-only reads for G3, but it is sanctioned to build in parallel any time after Slice 1:
 
 - Define `OfflineStorePort` in `src/core/ports/` (mirror existing port style, fail-loud).
 - Engine decision is **closed: op-sqlite** (caveats pre-verified: reactivity keys on rowid not PK; transaction-only callbacks; expo-updates Podfile clash fixed via `"expo.updates.useThirdPartySQLitePod": "true"`).
@@ -267,7 +267,7 @@ The gated plan places the offline **read**-cache in G3 ("Dexie's radiation into 
 
 ## 3. Slice dependency graph
 
-```
+```text
 Slice 1 (foundations + ALL route registrations, on current main)
   ├─ Slice 2 (equipment detail) ── Slice 4 (my equipment; serial after 2 — both extend api.ts)
   ├─ Slice 3 (tasks) ───────────── Slice 5 (home uplift; uses tasks module, owns HomeScreen)
@@ -290,20 +290,20 @@ After Slice 1 lands, Slices 2, 3, 6, 7, 8, 9, 10, 11 are mutually independent **
 ### Binding doctrine (verbatim — these are frozen surfaces)
 
 > **"No offline emergency queueing. Code Blue mutations must fail loud when offline. Do not extend the sync engine to cover them."**
-
+>
 > **"No polling-based recovery for Code Blue."** Reconnect goes through replay + reconciliation; the snapshot endpoint is reached only via the bounded degraded-mode path.
-
+>
 > **"No optimistic local termination of emergency state. UI follows server confirmation."** Session end is server-confirmed.
-
+>
 > KEEPALIVE events carry `{activeCodeBlueSessionId, stormHint}` and **never invalidate query caches**.
-
+>
 > ADR-009 (proposed): **push = alert only, never a state channel**; on wake, reconcile via existing SSE replay.
 
 ### Startable NOW, in parallel with G3 (ordered by leverage, from Scout 4)
 
 1. **Critical Alerts entitlement request (owner paperwork, zero code) — overdue, not merely startable.** Scheduled at G0; still unsubmitted as of 2026-07-31; `ios/App/App/App.entitlements` has **no critical-alerts entitlement key** (it does carry NFC reader-session formats, Sign in with Apple, aps-environment, and associated-domains — do not "fix" the file, only the missing key matters). Apple approval is unbounded and possibly denied — the single longest lead-time item in all of G4. Same class: Firebase project creation + FCM service-account + APNs `.p8` into the secret manager (env-bootstrap precedence, AES-256-GCM posture).
 2. **Port the offline emergency-block classifier into the RN fetch layer.** Everything needed is vendored (`classifyEmergencyEndpointFromManifest`, `EMERGENCY_OFFLINE_BLOCK_MUTATIONS`); FIFO ≤200 buffer maps to the `StoragePort` "session" kind. Enforces doctrine, pure client, small and testable. Precondition for any future emergency screen.
-3. **Code Blue read-only viewer.** Doctrine-compatible today: reads are not offline-blocked; KEEPALIVE already delivers `activeCodeBlueSessionId` through the typed port. Constraints: no polling (SSE events + keepalive-triggered refetch only), never persist emergency responses in any cache/persister, and visually honest — "viewer, not controller" (extends the current placeholder's no-pretense doctrine).
+3. **Code Blue read-only viewer.** Doctrine-compatible today: reads are not offline-blocked; KEEPALIVE already delivers `activeCodeBlueSessionId` through the typed port. Constraints: no polling — freshness comes from SSE events plus *bounded* reconciliation only on reconnect/`reset` or on an observed `activeCodeBlueSessionId` **transition** in the keepalive payload; KEEPALIVE itself never invalidates caches and must not drive unconditional refetching. Never persist emergency responses in any cache/persister, and visually honest — "viewer, not controller" (extends the current placeholder's no-pretense doctrine).
 4. **Offline read-cache for equipment/rooms** — G3 work by the plan's own text; see the parallel track above.
 5. **Client push scaffolding behind an `AlertingPort`** (token acquisition, permission state machine incl. `criticalAlert` runtime grant, foreground handling) with **one hard exclusion: do NOT create the production Android notification channel** — channels are immutable after creation and the Android urgency spec is undecided; dev-build channels under a throwaway ID only.
 6. **Contracts promotion PRs (vettrack repo, separate PRs per frozen-surface rule):** promote `RealtimeEnvelope` into `@vettrack/contracts` (flagged in `realtime.port.ts` itself); optionally a shared push-payload type for the ADR-009 alert envelope. RN consumes via `VETTRACK_SHA` bump in `vendor-vettrack.mjs`.
