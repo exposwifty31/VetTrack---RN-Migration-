@@ -29,6 +29,7 @@ export const taskKeys = {
   all: ["tasks"] as const,
   day: (day: string) => ["tasks", "day", day] as const,
   mine: () => ["tasks", "mine"] as const,
+  dashboard: () => ["tasks", "dashboard"] as const,
 };
 
 /**
@@ -112,6 +113,21 @@ function lifecycleHeaders(): Record<string, string> {
   return { "Idempotency-Key": requestId, "x-request-id": requestId };
 }
 
+/**
+ * GET /api/tasks/dashboard counts (G3 Slice 5 additive — the home tasks chip).
+ * The full payload (server/services/task-recall.service.ts
+ * `TaskDashboardPayload`) also carries today/overdue/upcoming/myTasks item
+ * lists; the chip consumes `counts` only, so only that field is typed here —
+ * extend when a consumer needs the lists (3b's concern), never re-declare.
+ */
+export type TasksDashboardCounts = Readonly<{
+  today: number;
+  overdue: number;
+  myTasks: number;
+}>;
+
+export type TasksDashboard = Readonly<{ counts: TasksDashboardCounts }>;
+
 export const tasksApi = {
   /** GET /api/appointments?day=YYYY-MM-DD — the clinic-timezone day window. */
   listByDay: async (day: string): Promise<Task[]> => {
@@ -126,6 +142,13 @@ export const tasksApi = {
     const body = await requestTasksJson<{ tasks: Task[] }>("/api/tasks/me");
     return body.tasks;
   },
+
+  /**
+   * GET /api/tasks/dashboard — technician+ floor (an off-shift caller gets
+   * 403 INSUFFICIENT_ROLE → map via isOffShiftError, same as the lists).
+   */
+  getTasksDashboard: async (): Promise<TasksDashboard> =>
+    requestTasksJson<TasksDashboard>("/api/tasks/dashboard"),
 
   /** POST /api/tasks/:id/start — idempotency scope `tasks:start`. */
   start: async (taskId: string): Promise<Task> => {

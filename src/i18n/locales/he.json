@@ -50,7 +50,32 @@
     "equipment": "רשימת ציוד",
     "scan": "סריקת תווית",
     "realtimeDebug": "פתח דיבאג זמן אמת (שלב 5)",
-    "g2Measure": "מדידת G2 (שער)"
+    "g2Measure": "מדידת G2 (שער)",
+    "shift": {
+      "onShift": "במשמרת",
+      "until": "עד {{time}}",
+      "nextShift": "המשמרת הבאה: {{time}}",
+      "noUpcoming": "אין משמרת מתוכננת בסידור",
+      "streak": "רצף ללא איחורים",
+      "scansToday": "סריקות היום",
+      "tasksDone": "משימות שהושלמו",
+      "loadError": "לא ניתן לטעון את נתוני המשמרת."
+    },
+    "activity": {
+      "title": "פעילות אחרונה",
+      "empty": "אין פעילות עדיין.",
+      "loadMore": "טען עוד",
+      "loadError": "לא ניתן לטעון פעילות.",
+      "scan": "סריקה",
+      "transfer": "העברה",
+      "transferRoute": "{{from}} ← {{to}}"
+    },
+    "chips": {
+      "tasks": "משימות היום",
+      "tasksOverdue": "{{count}} באיחור",
+      "tasksA11y": "פתיחת משימות",
+      "nudges": "תזכורות"
+    }
   },
   "aurora": {
     "greetingMorning": "בוקר טוב",
@@ -73,7 +98,9 @@
     "exceptionsTitle": "חריגות",
     "exceptionReason": "ללא סריקה ביותר מ־{{days}} ימים",
     "searchA11y": "חיפוש",
-    "settingsA11y": "הגדרות"
+    "settingsA11y": "הגדרות",
+    "chatA11y": "צ'אט משמרת",
+    "attentionAllA11y": "כל ההתראות"
   },
   "tabs": {
     "today": "היום",
@@ -392,6 +419,39 @@
       "notAssigned": "למשימה אין גורם מוקצה.",
       "alreadyApplied": "הפעולה כבר בוצעה.",
       "offShift": "הפעולה זמינה רק במהלך משמרת פעילה."
+    }
+  },
+  "shiftAdjustments": {
+    "request": "בקשת שינוי משמרת",
+    "extend": "הארכת משמרת",
+    "leaveEarly": "יציאה מוקדמת",
+    "requestedEnd": "שעת סיום מבוקשת",
+    "reason": "סיבה",
+    "reasonHint": "לפחות {{min}} תווים",
+    "pending": "בקשה ממתינה",
+    "cancel": "ביטול בקשה",
+    "submit": "שליחת בקשה",
+    "stepDownHour": "-1 שעה",
+    "stepDown": "-15 דק'",
+    "stepUp": "+15 דק'",
+    "stepUpHour": "+1 שעה",
+    "stepDownA11y": "15 דקות מוקדם יותר",
+    "stepUpA11y": "15 דקות מאוחר יותר",
+    "stepDownHourA11y": "שעה מוקדם יותר",
+    "stepUpHourA11y": "שעה מאוחר יותר",
+    "status": {
+      "pending": "ממתינה",
+      "approved": "אושרה",
+      "rejected": "נדחתה",
+      "cancelled": "בוטלה"
+    },
+    "errors": {
+      "notOnShift": "אפשר לבקש שינוי רק במהלך משמרת פעילה.",
+      "duplicatePending": "כבר קיימת בקשה ממתינה למשמרת זו.",
+      "notAnExtension": "הארכה חייבת להסתיים אחרי סיום המשמרת הנוכחי.",
+      "notEarlier": "יציאה מוקדמת חייבת להסתיים לפני סיום המשמרת הנוכחי.",
+      "invalidTime": "יש להזין שעה תקינה (HH:MM).",
+      "invalidReason": "הסיבה חייבת להיות באורך 3-500 תווים."
     }
   }
 }

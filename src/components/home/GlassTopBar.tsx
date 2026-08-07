@@ -12,7 +12,7 @@ import { useUniwind } from "uniwind";
 
 import { PressableScale } from "@/components/PressableScale";
 
-import { BellIcon, SearchIcon, SlidersIcon } from "./icons";
+import { BellIcon, ChatIcon, SearchIcon, SlidersIcon } from "./icons";
 import { VT_MARK_XML } from "./vt-mark-xml";
 
 /** Visual bar height (44pt row + vertical padding) for scroll-under offsets. */
@@ -29,6 +29,8 @@ type GlassTopBarProps = Readonly<{
   unreadCount?: number;
   onSearchPress: () => void;
   onSettingsPress: () => void;
+  /** G3 Slice 5: shift-chat launcher (Slice 8's surface, pre-wired here). */
+  onChatPress?: () => void;
 }>;
 
 export function GlassTopBar({
@@ -37,6 +39,7 @@ export function GlassTopBar({
   unreadCount,
   onSearchPress,
   onSettingsPress,
+  onChatPress,
 }: GlassTopBarProps) {
   const { t } = useTranslation();
   const { theme } = useUniwind();
@@ -82,6 +85,17 @@ export function GlassTopBar({
             <Text className="text-[#A78BFA] light:text-[#6D28D9]">Track</Text>
           </Text>
         </View>
+
+        {onChatPress ? (
+          <PressableScale
+            className="h-11 w-11 items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel={t("aurora.chatA11y")}
+            onPress={onChatPress}
+          >
+            <ChatIcon color={fg} />
+          </PressableScale>
+        ) : null}
 
         <PressableScale
           className="h-11 w-11 items-center justify-center"

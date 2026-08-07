@@ -119,11 +119,14 @@ export function AttentionCard({
   items,
   loadFailed = false,
   onItemPress,
+  onHeaderPress,
 }: Readonly<{
   items: AttentionItem[] | null;
   /** Fetch failed — render an honest load-error line, never a fake all-clear. */
   loadFailed?: boolean;
   onItemPress: (item: AttentionItem) => void;
+  /** G3 Slice 5: header jump to the Alerts screen (Slice 6's surface). */
+  onHeaderPress?: () => void;
 }>) {
   const { t } = useTranslation();
   const { theme } = useUniwind();
@@ -169,9 +172,26 @@ export function AttentionCard({
         className={`overflow-hidden rounded-[24px] border bg-surface ${borderClass}`}
         style={{ boxShadow: light ? "0 8px 20px rgba(23,19,49,0.04)" : undefined }}
       >
-        <Text className="px-5 pb-0.5 pt-3 font-rubik-semibold text-[12.5px] text-text-tertiary">
-          {t("aurora.attentionTitle")}
-        </Text>
+        {onHeaderPress ? (
+          // Header row = the jump to the Alerts screen. List-header press: the
+          // AttentionRow static-pressed idiom (no scale on list surfaces).
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("aurora.attentionAllA11y")}
+            onPress={onHeaderPress}
+            className="min-h-[44px] flex-row items-center px-5 pt-1 active:opacity-80"
+          >
+            <Text className="font-rubik-semibold text-[12.5px] text-text-tertiary">
+              {t("aurora.attentionTitle")}
+            </Text>
+            <View className="flex-1" />
+            <Text className="font-rubik text-[14px] text-text-tertiary">{FORWARD_CHEVRON}</Text>
+          </Pressable>
+        ) : (
+          <Text className="px-5 pb-0.5 pt-3 font-rubik-semibold text-[12.5px] text-text-tertiary">
+            {t("aurora.attentionTitle")}
+          </Text>
+        )}
 
         {body}
       </View>
