@@ -73,6 +73,35 @@ function useDurationLabel() {
   };
 }
 
+/** The changed-fields diff for an edit (PATCH needs ≥1). Instant-compares the */
+/** rebuilt window so an untouched time is never re-sent. */
+function buildTaskDiff(
+  task: Task,
+  values: {
+    notes: string;
+    priority: TaskPriority;
+    vetId: string | null;
+    window: { startTime: string; endTime: string } | null;
+  },
+): TaskUpdateInput {
+  const diff: TaskUpdateInput = {};
+  const trimmed = values.notes.trim();
+  if (trimmed !== (task.notes ?? "").trim()) diff.notes = trimmed || null;
+  if (values.priority !== ((task.priority ?? "normal") as TaskPriority)) {
+    diff.priority = values.priority;
+  }
+  if ((values.vetId ?? null) !== (task.vetId ?? null)) diff.vetId = values.vetId;
+  if (values.window) {
+    const startChanged = Date.parse(values.window.startTime) !== Date.parse(task.startTime);
+    const endChanged = Date.parse(values.window.endTime) !== Date.parse(task.endTime);
+    if (startChanged || endChanged) {
+      diff.startTime = values.window.startTime;
+      diff.endTime = values.window.endTime;
+    }
+  }
+  return diff;
+}
+
 function SheetContent({ request, day, gateRole, onClose }: SheetContentProps) {
   const { t } = useTranslation();
   const { theme } = useUniwind();
@@ -119,25 +148,9 @@ function SheetContent({ request, day, gateRole, onClose }: SheetContentProps) {
   const window = buildTaskWindow(anchorDay, startClock, durationMinutes);
 
   // Edit → the changed-fields diff (PATCH needs ≥1). Create → the full body.
-  const changed = useMemo<TaskUpdateInput>(() => {
-    if (!editing) return {};
-    const diff: TaskUpdateInput = {};
-    const trimmed = notes.trim();
-    if (trimmed !== (editing.notes ?? "").trim()) diff.notes = trimmed || null;
-    if (priority !== ((editing.priority ?? "normal") as TaskPriority)) {
-      diff.priority = priority;
-    }
-    if ((vetId ?? null) !== (editing.vetId ?? null)) diff.vetId = vetId;
-    if (window) {
-      const startChanged = Date.parse(window.startTime) !== Date.parse(editing.startTime);
-      const endChanged = Date.parse(window.endTime) !== Date.parse(editing.endTime);
-      if (startChanged || endChanged) {
-        diff.startTime = window.startTime;
-        diff.endTime = window.endTime;
-      }
-    }
-    return diff;
-  }, [editing, notes, priority, vetId, window]);
+  // Not memoized: `window` is a fresh object each render, so a memo never hits;
+  // the diff is a cheap field comparison.
+  const changed = editing ? buildTaskDiff(editing, { notes, priority, vetId, window }) : {};
 
   const isDirty = !editing || Object.keys(changed).length > 0;
   const busy = create.isPending || update.isPending || cancel.isPending;
