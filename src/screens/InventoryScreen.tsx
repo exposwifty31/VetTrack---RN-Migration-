@@ -49,6 +49,64 @@ type SheetState =
   | Readonly<{ kind: "restock"; container: { id: string; name: string } }>
   | null;
 
+type InventoryContentProps = Readonly<{
+  offShift: boolean;
+  isPending: boolean;
+  isError: boolean;
+  containers: ContainerListItem[];
+  renderItem: ListRenderItem<ContainerListItem>;
+  onRetry: () => void;
+}>;
+
+/** The list body's phase dispatch (off-shift / loading / error / empty / list),
+ * as early-return statements so the screen stays branch-light (SonarCloud gate). */
+function InventoryContent({
+  offShift,
+  isPending,
+  isError,
+  containers,
+  renderItem,
+  onRetry,
+}: InventoryContentProps) {
+  const { t } = useTranslation();
+
+  if (offShift) {
+    return (
+      <View className="flex-1 justify-center">
+        <ListEmptyState title={t("inventory.offShiftTitle")} body={t("inventory.offShiftBody")} />
+      </View>
+    );
+  }
+  if (isPending) {
+    return (
+      <View>
+        <RowSkeleton />
+        <RowSkeleton />
+        <RowSkeleton />
+      </View>
+    );
+  }
+  if (isError) {
+    return <ErrorNote message={t("inventory.loadError")} onRetry={onRetry} />;
+  }
+  if (containers.length === 0) {
+    return (
+      <View className="flex-1 justify-center">
+        <ListEmptyState title={t("inventory.empty")} body={t("inventory.emptyBody")} />
+      </View>
+    );
+  }
+  return (
+    <FlashList
+      data={containers}
+      renderItem={renderItem}
+      keyExtractor={(item) => item.id}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 24 }}
+    />
+  );
+}
+
 export function InventoryScreen() {
   const { t } = useTranslation();
 
@@ -116,34 +174,14 @@ export function InventoryScreen() {
           <Text className="mt-0.5 font-rubik text-[13px] text-muted">{t("inventory.subtitle")}</Text>
         </View>
 
-        {offShift ? (
-          <View className="flex-1 justify-center">
-            <ListEmptyState
-              title={t("inventory.offShiftTitle")}
-              body={t("inventory.offShiftBody")}
-            />
-          </View>
-        ) : listQuery.isPending ? (
-          <View>
-            <RowSkeleton />
-            <RowSkeleton />
-            <RowSkeleton />
-          </View>
-        ) : listQuery.isError ? (
-          <ErrorNote message={t("inventory.loadError")} onRetry={onRetry} />
-        ) : containers.length === 0 ? (
-          <View className="flex-1 justify-center">
-            <ListEmptyState title={t("inventory.empty")} body={t("inventory.emptyBody")} />
-          </View>
-        ) : (
-          <FlashList
-            data={containers}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 24 }}
-          />
-        )}
+        <InventoryContent
+          offShift={offShift}
+          isPending={listQuery.isPending}
+          isError={listQuery.isError}
+          containers={containers}
+          renderItem={renderItem}
+          onRetry={onRetry}
+        />
       </View>
 
       {sheet?.kind === "dispense" ? (

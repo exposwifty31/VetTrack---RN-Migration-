@@ -9,8 +9,12 @@
  * Uses the Slice-1 `BottomSheet` (the screen's one T2 blur — mutually exclusive
  * with the dispense sheet, so ≤1 blur holds). Steppers give press feedback
  * (non-danger); no content/layout animation.
+ *
+ * Structured as small named children (RestockLineRow / RestockIntro /
+ * RestockForm) with an `if/else if` phase dispatch, so the composition root
+ * stays branch-light (SonarCloud cognitive-complexity gate).
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -25,7 +29,7 @@ import {
   restockApi,
   retryUnlessClientError,
 } from "@/lib/api/containers";
-import type { ContainerInventoryLine } from "@/types/containers";
+import type { ContainerInventoryLine, ContainerInventoryView } from "@/types/containers";
 
 import { QuantityStepper } from "./QuantityStepper";
 
@@ -46,6 +50,177 @@ function effectiveObserved(line: ContainerInventoryLine, counts: Record<string, 
   const itemId = line.itemId;
   if (itemId != null && counts[itemId] !== undefined) return counts[itemId];
   return line.sessionObservedQuantity ?? line.actual;
+}
+
+/**
+ * Commit each touched line's observed count to the session, then finish (the
+ * sole commit point). A line is skipped when untouched, or when its edit equals
+ * the count the server already holds — so a retry never re-scans unchanged rows.
+ */
+async function commitRestockCounts(
+  sessionId: string,
+  lines: readonly ContainerInventoryLine[],
+  counts: Record<string, number>,
+): Promise<void> {
+  for (const line of lines) {
+    const itemId = line.itemId as string;
+    const observed = counts[itemId];
+    if (observed === undefined) continue;
+    if (observed === (line.sessionObservedQuantity ?? line.actual)) continue;
+    await restockApi.scan(sessionId, itemId, observed);
+  }
+  await restockApi.finish(sessionId);
+}
+
+/** One countable line: label + expected/on-hand context + the observed stepper. */
+function RestockLineRow({
+  label,
+  expected,
+  onHand,
+  value,
+  onChange,
+}: Readonly<{
+  label: string;
+  expected: number;
+  onHand: number;
+  value: number;
+  onChange: (next: number) => void;
+}>) {
+  const { t } = useTranslation();
+  return (
+    <View className="flex-row items-center justify-between gap-3 border-b border-border py-2.5">
+      <View className="flex-1">
+        <Text className="font-rubik-medium text-[14px] text-foreground" numberOfLines={2}>
+          {label}
+        </Text>
+        <Text className="mt-0.5 font-rubik text-[11px] text-text-tertiary">
+          {t("restock.expected")}{" "}
+          <Text style={{ writingDirection: "ltr" }}>{expected}</Text>
+          {"   "}
+          {t("restock.onHand")}{" "}
+          <Text style={{ writingDirection: "ltr" }}>{onHand}</Text>
+        </Text>
+      </View>
+      <QuantityStepper
+        value={value}
+        max={RESTOCK_MAX}
+        onChange={onChange}
+        decrementLabel={t("inventory.decrease")}
+        incrementLabel={t("inventory.increase")}
+      />
+    </View>
+  );
+}
+
+/** No open session yet: the intro copy + the Start-session entry point. */
+function RestockIntro({
+  errorKey,
+  starting,
+  onStart,
+  onClose,
+}: Readonly<{
+  errorKey: RestockErrorKey;
+  starting: boolean;
+  onStart: () => void;
+  onClose: () => void;
+}>) {
+  const { t } = useTranslation();
+  return (
+    <View className="mt-4">
+      <Text className="font-rubik text-[13px] text-muted">{t("restock.intro")}</Text>
+      {errorKey ? (
+        <Text className="mt-3 font-rubik-semibold text-[14px] text-danger light:text-[#B91C1C]">
+          {t(errorKey)}
+        </Text>
+      ) : null}
+      <View className="mt-4">
+        <PrimaryButton
+          label={starting ? t("restock.starting") : t("restock.start")}
+          onPress={onStart}
+          disabled={starting}
+        />
+      </View>
+      <View className="mt-2.5">
+        <QuietButton label={t("dispense.close")} onPress={onClose} />
+      </View>
+    </View>
+  );
+}
+
+type RestockFormProps = Readonly<{
+  progress: ContainerInventoryView["sessionProgress"];
+  lines: readonly ContainerInventoryLine[];
+  counts: Record<string, number>;
+  onSetCount: (itemId: string, next: number) => void;
+  errorKey: RestockErrorKey;
+  busy: boolean;
+  finishing: boolean;
+  onFinish: () => void;
+  onCancel: () => void;
+}>;
+
+/** Open session: the per-item observed-count list + finish / cancel controls. */
+function RestockForm({
+  progress,
+  lines,
+  counts,
+  onSetCount,
+  errorKey,
+  busy,
+  finishing,
+  onFinish,
+  onCancel,
+}: RestockFormProps) {
+  const { t } = useTranslation();
+  return (
+    <View className="mt-4">
+      {progress ? (
+        <Text className="mb-2 font-rubik text-[12px] text-text-tertiary">
+          {t("restock.progress", {
+            scanned: progress.scannedCount,
+            total: progress.totalCount,
+          })}
+        </Text>
+      ) : null}
+
+      <ScrollView
+        style={{ maxHeight: 260 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {lines.map((line) => {
+          const itemId = line.itemId as string;
+          return (
+            <RestockLineRow
+              key={itemId}
+              label={line.label}
+              expected={line.expected}
+              onHand={line.actual}
+              value={effectiveObserved(line, counts)}
+              onChange={(next) => onSetCount(itemId, next)}
+            />
+          );
+        })}
+      </ScrollView>
+
+      {errorKey ? (
+        <Text className="mt-3 font-rubik-semibold text-[14px] text-danger light:text-[#B91C1C]">
+          {t(errorKey)}
+        </Text>
+      ) : null}
+
+      <View className="mt-5">
+        <PrimaryButton
+          label={finishing ? t("restock.finishing") : t("restock.finish")}
+          onPress={onFinish}
+          disabled={busy}
+        />
+      </View>
+      <View className="mt-2.5">
+        <QuietButton label={t("restock.cancelSession")} onPress={onCancel} disabled={busy} />
+      </View>
+    </View>
+  );
 }
 
 export function RestockSheet({ container, onClose }: RestockSheetProps) {
@@ -83,17 +258,8 @@ export function RestockSheet({ container, onClose }: RestockSheetProps) {
   });
 
   const finishMutation = useMutation({
-    mutationFn: async (sessionId: string) => {
-      // Commit each touched line's observed count, then finish (the sole commit).
-      for (const line of countableLines) {
-        const itemId = line.itemId as string;
-        const observed = counts[itemId];
-        if (observed === undefined) continue;
-        if (observed === (line.sessionObservedQuantity ?? line.actual)) continue;
-        await restockApi.scan(sessionId, itemId, observed);
-      }
-      await restockApi.finish(sessionId);
-    },
+    // Commit each touched line's observed count, then finish (the sole commit).
+    mutationFn: (sessionId: string) => commitRestockCounts(sessionId, countableLines, counts),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: containerKeys.all });
       onClose();
@@ -117,6 +283,54 @@ export function RestockSheet({ container, onClose }: RestockSheetProps) {
 
   const busy = finishMutation.isPending || cancelMutation.isPending;
 
+  let body: ReactNode;
+  if (viewQuery.isPending) {
+    body = (
+      <View className="mt-4">
+        <RowSkeleton />
+        <RowSkeleton />
+      </View>
+    );
+  } else if (viewQuery.isError) {
+    body = (
+      <View className="mt-4">
+        <ErrorNote message={t("restock.loadError")} onRetry={() => void viewQuery.refetch()} />
+      </View>
+    );
+  } else if (!activeSession) {
+    body = (
+      <RestockIntro
+        errorKey={errorKey}
+        starting={startMutation.isPending}
+        onStart={() => startMutation.mutate()}
+        onClose={onClose}
+      />
+    );
+  } else if (countableLines.length === 0) {
+    body = (
+      <View className="mt-4">
+        <Text className="font-rubik text-[14px] text-muted">{t("restock.empty")}</Text>
+        <View className="mt-4">
+          <QuietButton label={t("dispense.close")} onPress={onClose} />
+        </View>
+      </View>
+    );
+  } else {
+    body = (
+      <RestockForm
+        progress={view?.sessionProgress ?? null}
+        lines={countableLines}
+        counts={counts}
+        onSetCount={setCount}
+        errorKey={errorKey}
+        busy={busy}
+        finishing={finishMutation.isPending}
+        onFinish={() => finishMutation.mutate(activeSession.id)}
+        onCancel={() => cancelMutation.mutate(activeSession.id)}
+      />
+    );
+  }
+
   return (
     // Claim any touch not consumed by a sheet child so a tap in the dimmed area
     // above the sheet cannot fall through to the live container rows behind
@@ -132,110 +346,7 @@ export function RestockSheet({ container, onClose }: RestockSheetProps) {
           {container.name}
         </Text>
 
-        {viewQuery.isPending ? (
-          <View className="mt-4">
-            <RowSkeleton />
-            <RowSkeleton />
-          </View>
-        ) : viewQuery.isError ? (
-          <View className="mt-4">
-            <ErrorNote message={t("restock.loadError")} onRetry={() => void viewQuery.refetch()} />
-          </View>
-        ) : !activeSession ? (
-          <View className="mt-4">
-            <Text className="font-rubik text-[13px] text-muted">{t("restock.intro")}</Text>
-            {errorKey ? (
-              <Text className="mt-3 font-rubik-semibold text-[14px] text-danger light:text-[#B91C1C]">
-                {t(errorKey)}
-              </Text>
-            ) : null}
-            <View className="mt-4">
-              <PrimaryButton
-                label={startMutation.isPending ? t("restock.starting") : t("restock.start")}
-                onPress={() => startMutation.mutate()}
-                disabled={startMutation.isPending}
-              />
-            </View>
-            <View className="mt-2.5">
-              <QuietButton label={t("dispense.close")} onPress={onClose} />
-            </View>
-          </View>
-        ) : countableLines.length === 0 ? (
-          <View className="mt-4">
-            <Text className="font-rubik text-[14px] text-muted">{t("restock.empty")}</Text>
-            <View className="mt-4">
-              <QuietButton label={t("dispense.close")} onPress={onClose} />
-            </View>
-          </View>
-        ) : (
-          <View className="mt-4">
-            {view?.sessionProgress ? (
-              <Text className="mb-2 font-rubik text-[12px] text-text-tertiary">
-                {t("restock.progress", {
-                  scanned: view.sessionProgress.scannedCount,
-                  total: view.sessionProgress.totalCount,
-                })}
-              </Text>
-            ) : null}
-
-            <ScrollView
-              style={{ maxHeight: 260 }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              {countableLines.map((line) => {
-                const itemId = line.itemId as string;
-                return (
-                  <View
-                    key={itemId}
-                    className="flex-row items-center justify-between gap-3 border-b border-border py-2.5"
-                  >
-                    <View className="flex-1">
-                      <Text className="font-rubik-medium text-[14px] text-foreground" numberOfLines={2}>
-                        {line.label}
-                      </Text>
-                      <Text className="mt-0.5 font-rubik text-[11px] text-text-tertiary">
-                        {t("restock.expected")}{" "}
-                        <Text style={{ writingDirection: "ltr" }}>{line.expected}</Text>
-                        {"   "}
-                        {t("restock.onHand")}{" "}
-                        <Text style={{ writingDirection: "ltr" }}>{line.actual}</Text>
-                      </Text>
-                    </View>
-                    <QuantityStepper
-                      value={effectiveObserved(line, counts)}
-                      max={RESTOCK_MAX}
-                      onChange={(next) => setCount(itemId, next)}
-                      decrementLabel={t("inventory.decrease")}
-                      incrementLabel={t("inventory.increase")}
-                    />
-                  </View>
-                );
-              })}
-            </ScrollView>
-
-            {errorKey ? (
-              <Text className="mt-3 font-rubik-semibold text-[14px] text-danger light:text-[#B91C1C]">
-                {t(errorKey)}
-              </Text>
-            ) : null}
-
-            <View className="mt-5">
-              <PrimaryButton
-                label={finishMutation.isPending ? t("restock.finishing") : t("restock.finish")}
-                onPress={() => finishMutation.mutate(activeSession.id)}
-                disabled={busy}
-              />
-            </View>
-            <View className="mt-2.5">
-              <QuietButton
-                label={t("restock.cancelSession")}
-                onPress={() => cancelMutation.mutate(activeSession.id)}
-                disabled={busy}
-              />
-            </View>
-          </View>
-        )}
+        {body}
       </BottomSheet>
     </View>
   );

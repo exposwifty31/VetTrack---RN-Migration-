@@ -56,6 +56,16 @@ describe("buildDispenseRequest", () => {
       buildDispenseRequest({ quantities: { i1: 1.5 }, isEmergency: false, bypassReason: null }),
     ).toEqual({ ok: false, reason: "NO_ITEMS" });
   });
+
+  it("orders lines by a deterministic localeCompare of itemId", () => {
+    const result = buildDispenseRequest({
+      quantities: { c: 1, a: 2, b: 3, aa: 4 },
+      isEmergency: false,
+      bypassReason: null,
+    });
+    if (!result.ok) throw new Error("expected a valid payload");
+    expect(result.payload.items.map((line) => line.itemId)).toEqual(["a", "aa", "b", "c"]);
+  });
 });
 
 describe("dispensePayloadSignature (idempotency-key stability)", () => {

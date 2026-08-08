@@ -9,8 +9,12 @@
  * held in a ref — a retry of the identical attempt reuses it so a network drop
  * after the server committed cannot double-decrement stock (the server replays
  * its cached result). `retry: 0` — fail loud, online-only (no offline queueing).
+ *
+ * Structured as small named children (DispenseItemRow / EmergencyToggle /
+ * BypassReasonPicker / DispenseForm) with an `if/else if` phase dispatch, so the
+ * composition root stays branch-light (SonarCloud cognitive-complexity gate).
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -28,7 +32,12 @@ import {
   retryUnlessClientError,
   type DispenseErrorKey,
 } from "@/lib/api/containers";
-import { BYPASS_REASONS, type BypassReason, type DispenseRequest } from "@/types/containers";
+import {
+  BYPASS_REASONS,
+  type BypassReason,
+  type ContainerInventoryLine,
+  type DispenseRequest,
+} from "@/types/containers";
 
 import {
   buildDispenseRequest,
@@ -55,6 +64,197 @@ type DispenseSheetProps = Readonly<{
   container: DispenseSheetTarget;
   onClose: () => void;
 }>;
+
+/** One dispensable item row: label + available-count + the LTR quantity stepper. */
+function DispenseItemRow({
+  label,
+  available,
+  value,
+  onChange,
+}: Readonly<{
+  label: string;
+  available: number;
+  value: number;
+  onChange: (next: number) => void;
+}>) {
+  const { t } = useTranslation();
+  return (
+    <View className="flex-row items-center justify-between gap-3 border-b border-border py-2.5">
+      <View className="flex-1">
+        <Text className="font-rubik-medium text-[14px] text-foreground" numberOfLines={2}>
+          {label}
+        </Text>
+        <Text className="mt-0.5 font-rubik text-[11px] text-text-tertiary">
+          {t("dispense.available")}{" "}
+          <Text style={{ writingDirection: "ltr" }}>{available}</Text>
+        </Text>
+      </View>
+      <QuantityStepper
+        value={value}
+        max={available}
+        onChange={onChange}
+        decrementLabel={t("inventory.decrease")}
+        incrementLabel={t("inventory.increase")}
+      />
+    </View>
+  );
+}
+
+/** Emergency toggle — solid danger fill, ZERO glass, ZERO animation (plain
+ * Pressable, never PressableScale). The danger doctrine is a hard constraint. */
+function EmergencyToggle({
+  isEmergency,
+  onToggle,
+}: Readonly<{ isEmergency: boolean; onToggle: () => void }>) {
+  const { t } = useTranslation();
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityState={{ checked: isEmergency }}
+      accessibilityLabel={t("dispense.emergencyToggle")}
+      onPress={onToggle}
+      className={`mt-4 min-h-[48px] flex-row items-center justify-between rounded-[16px] px-4 py-3 ${
+        isEmergency ? "bg-danger-solid" : "border border-border bg-surface"
+      }`}
+    >
+      <Text
+        className={`font-rubik-semibold text-[15px] ${
+          isEmergency ? "text-white" : "text-foreground"
+        }`}
+      >
+        {t("dispense.emergencyToggle")}
+      </Text>
+      <Text className={`font-rubik-bold text-[14px] ${isEmergency ? "text-white" : "text-muted"}`}>
+        {isEmergency ? "●" : "○"}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** The required bypass-reason segment (shown only while emergency is armed) —
+ * a segmented radio keyed off the closed server enum; solid danger, no glass. */
+function BypassReasonPicker({
+  bypassReason,
+  onChoose,
+}: Readonly<{
+  bypassReason: BypassReason | null;
+  onChoose: (reason: BypassReason) => void;
+}>) {
+  const { t } = useTranslation();
+  return (
+    <View className="mt-2">
+      <Text className="font-rubik text-[12px] text-danger light:text-[#B91C1C]">
+        {t("dispense.emergencyHint")}
+      </Text>
+      <Text className="mt-3 font-rubik-semibold text-[13px] text-foreground">
+        {t("dispense.reasonTitle")}
+      </Text>
+      <View className="mt-2 gap-2">
+        {BYPASS_REASONS.map((reason) => {
+          const selected = bypassReason === reason;
+          return (
+            <Pressable
+              key={reason}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              onPress={() => onChoose(reason)}
+              className={`min-h-[44px] justify-center rounded-[14px] px-4 py-2.5 ${
+                selected ? "bg-danger-solid" : "border border-border bg-surface"
+              }`}
+            >
+              <Text
+                className={`font-rubik-semibold text-[14px] ${
+                  selected ? "text-white" : "text-foreground"
+                }`}
+              >
+                {t(REASON_KEY[reason])}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+type DispenseFormProps = Readonly<{
+  dispensable: readonly ContainerInventoryLine[];
+  quantities: Readonly<Record<string, number>>;
+  onSetQty: (itemId: string, next: number) => void;
+  isEmergency: boolean;
+  onToggleEmergency: () => void;
+  bypassReason: BypassReason | null;
+  onChooseReason: (reason: BypassReason) => void;
+  errorKey: DispenseErrorKey | null;
+  canConfirm: boolean;
+  pending: boolean;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}>;
+
+/** The interactive dispense body: item picker + emergency segment + confirm. */
+function DispenseForm({
+  dispensable,
+  quantities,
+  onSetQty,
+  isEmergency,
+  onToggleEmergency,
+  bypassReason,
+  onChooseReason,
+  errorKey,
+  canConfirm,
+  pending,
+  confirmLabel,
+  onConfirm,
+  onClose,
+}: DispenseFormProps) {
+  const { t } = useTranslation();
+  return (
+    <View className="mt-4">
+      <Text className="mb-1 font-rubik-semibold text-[13px] text-foreground">
+        {t("dispense.itemsTitle")}
+      </Text>
+      <ScrollView
+        style={{ maxHeight: 240 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {dispensable.map((line) => {
+          const itemId = line.itemId as string;
+          return (
+            <DispenseItemRow
+              key={itemId}
+              label={line.label}
+              available={line.actual}
+              value={quantities[itemId] ?? 0}
+              onChange={(next) => onSetQty(itemId, next)}
+            />
+          );
+        })}
+      </ScrollView>
+
+      <EmergencyToggle isEmergency={isEmergency} onToggle={onToggleEmergency} />
+
+      {isEmergency ? (
+        <BypassReasonPicker bypassReason={bypassReason} onChoose={onChooseReason} />
+      ) : null}
+
+      {errorKey ? (
+        <Text className="mt-3 font-rubik-semibold text-[14px] text-danger light:text-[#B91C1C]">
+          {t(errorKey)}
+        </Text>
+      ) : null}
+
+      <View className="mt-5">
+        <PrimaryButton label={confirmLabel} onPress={onConfirm} disabled={!canConfirm || pending} />
+      </View>
+      <View className="mt-2.5">
+        <QuietButton label={t("dispense.cancel")} onPress={onClose} disabled={pending} />
+      </View>
+    </View>
+  );
+}
 
 export function DispenseSheet({ container, onClose }: DispenseSheetProps) {
   const { t } = useTranslation();
@@ -121,6 +321,60 @@ export function DispenseSheet({ container, onClose }: DispenseSheetProps) {
   const pending = dispenseMutation.isPending;
   const confirmLabel = pending ? t("dispense.confirming") : t("dispense.confirm");
 
+  let body: ReactNode;
+  if (itemsQuery.isPending) {
+    body = (
+      <View className="mt-4">
+        <RowSkeleton />
+        <RowSkeleton />
+      </View>
+    );
+  } else if (itemsQuery.isError) {
+    body = (
+      <View className="mt-4">
+        <ErrorNote message={t("dispense.loadError")} onRetry={() => void itemsQuery.refetch()} />
+      </View>
+    );
+  } else if (done) {
+    body = (
+      <View className="mt-4">
+        <Text className="font-rubik-semibold text-[15px] text-success light:text-[#166534]">
+          {t("dispense.success")}
+        </Text>
+        <View className="mt-4">
+          <QuietButton label={t("dispense.close")} onPress={onClose} />
+        </View>
+      </View>
+    );
+  } else if (dispensable.length === 0) {
+    body = (
+      <View className="mt-4">
+        <Text className="font-rubik text-[14px] text-muted">{t("dispense.noItems")}</Text>
+        <View className="mt-4">
+          <QuietButton label={t("dispense.close")} onPress={onClose} />
+        </View>
+      </View>
+    );
+  } else {
+    body = (
+      <DispenseForm
+        dispensable={dispensable}
+        quantities={quantities}
+        onSetQty={setQty}
+        isEmergency={isEmergency}
+        onToggleEmergency={toggleEmergency}
+        bypassReason={bypassReason}
+        onChooseReason={chooseReason}
+        errorKey={errorKey}
+        canConfirm={validation.ok}
+        pending={pending}
+        confirmLabel={confirmLabel}
+        onConfirm={onConfirm}
+        onClose={onClose}
+      />
+    );
+  }
+
   return (
     // Claim any touch not consumed by a sheet child so a tap in the dimmed area
     // above the sheet cannot fall through to the live container rows behind
@@ -136,141 +390,7 @@ export function DispenseSheet({ container, onClose }: DispenseSheetProps) {
           {container.name}
         </Text>
 
-        {itemsQuery.isPending ? (
-          <View className="mt-4">
-            <RowSkeleton />
-            <RowSkeleton />
-          </View>
-        ) : itemsQuery.isError ? (
-          <View className="mt-4">
-            <ErrorNote message={t("dispense.loadError")} onRetry={() => void itemsQuery.refetch()} />
-          </View>
-        ) : done ? (
-          <View className="mt-4">
-            <Text className="font-rubik-semibold text-[15px] text-success light:text-[#166534]">
-              {t("dispense.success")}
-            </Text>
-            <View className="mt-4">
-              <QuietButton label={t("dispense.close")} onPress={onClose} />
-            </View>
-          </View>
-        ) : dispensable.length === 0 ? (
-          <View className="mt-4">
-            <Text className="font-rubik text-[14px] text-muted">{t("dispense.noItems")}</Text>
-            <View className="mt-4">
-              <QuietButton label={t("dispense.close")} onPress={onClose} />
-            </View>
-          </View>
-        ) : (
-          <View className="mt-4">
-            <Text className="mb-1 font-rubik-semibold text-[13px] text-foreground">
-              {t("dispense.itemsTitle")}
-            </Text>
-            <ScrollView
-              style={{ maxHeight: 240 }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              {dispensable.map((line) => (
-                <View
-                  key={line.itemId as string}
-                  className="flex-row items-center justify-between gap-3 border-b border-border py-2.5"
-                >
-                  <View className="flex-1">
-                    <Text className="font-rubik-medium text-[14px] text-foreground" numberOfLines={2}>
-                      {line.label}
-                    </Text>
-                    <Text className="mt-0.5 font-rubik text-[11px] text-text-tertiary">
-                      {t("dispense.available")}{" "}
-                      <Text style={{ writingDirection: "ltr" }}>{line.actual}</Text>
-                    </Text>
-                  </View>
-                  <QuantityStepper
-                    value={quantities[line.itemId as string] ?? 0}
-                    max={line.actual}
-                    onChange={(next) => setQty(line.itemId as string, next)}
-                    decrementLabel={t("inventory.decrease")}
-                    incrementLabel={t("inventory.increase")}
-                  />
-                </View>
-              ))}
-            </ScrollView>
-
-            {/* Emergency toggle — solid danger fill, ZERO glass, ZERO animation. */}
-            <Pressable
-              accessibilityRole="switch"
-              accessibilityState={{ checked: isEmergency }}
-              accessibilityLabel={t("dispense.emergencyToggle")}
-              onPress={toggleEmergency}
-              className={`mt-4 min-h-[48px] flex-row items-center justify-between rounded-[16px] px-4 py-3 ${
-                isEmergency ? "bg-danger-solid" : "border border-border bg-surface"
-              }`}
-            >
-              <Text
-                className={`font-rubik-semibold text-[15px] ${
-                  isEmergency ? "text-white" : "text-foreground"
-                }`}
-              >
-                {t("dispense.emergencyToggle")}
-              </Text>
-              <Text className={`font-rubik-bold text-[14px] ${isEmergency ? "text-white" : "text-muted"}`}>
-                {isEmergency ? "●" : "○"}
-              </Text>
-            </Pressable>
-
-            {isEmergency ? (
-              <View className="mt-2">
-                <Text className="font-rubik text-[12px] text-danger light:text-[#B91C1C]">
-                  {t("dispense.emergencyHint")}
-                </Text>
-                <Text className="mt-3 font-rubik-semibold text-[13px] text-foreground">
-                  {t("dispense.reasonTitle")}
-                </Text>
-                <View className="mt-2 gap-2">
-                  {BYPASS_REASONS.map((reason) => {
-                    const selected = bypassReason === reason;
-                    return (
-                      <Pressable
-                        key={reason}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected }}
-                        onPress={() => chooseReason(reason)}
-                        className={`min-h-[44px] justify-center rounded-[14px] px-4 py-2.5 ${
-                          selected ? "bg-danger-solid" : "border border-border bg-surface"
-                        }`}
-                      >
-                        <Text
-                          className={`font-rubik-semibold text-[14px] ${
-                            selected ? "text-white" : "text-foreground"
-                          }`}
-                        >
-                          {t(REASON_KEY[reason])}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            ) : null}
-
-            {errorKey ? (
-              <Text className="mt-3 font-rubik-semibold text-[14px] text-danger light:text-[#B91C1C]">
-                {t(errorKey)}
-              </Text>
-            ) : null}
-
-            <View className="mt-5">
-              <PrimaryButton
-                label={confirmLabel}
-                onPress={onConfirm}
-                disabled={!validation.ok || pending}
-              />
-            </View>
-            <View className="mt-2.5">
-              <QuietButton label={t("dispense.cancel")} onPress={onClose} disabled={pending} />
-            </View>
-          </View>
-        )}
+        {body}
       </BottomSheet>
     </View>
   );

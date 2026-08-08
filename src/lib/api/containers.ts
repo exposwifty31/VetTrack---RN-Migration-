@@ -29,7 +29,7 @@
  *   404 NOT_FOUND (CONTAINER_NOT_FOUND | INVENTORY_ITEM_NOT_FOUND)
  *   503 COP_VALIDATION_UNAVAILABLE | SERVICE_UNAVAILABLE
  */
-import { ApiCodedError, requestJson, retryUnlessClientError } from "@/lib/api/coded-error";
+import { ApiCodedError, requestJson } from "@/lib/api/coded-error";
 import type {
   ContainerInventoryView,
   ContainerListItem,
@@ -39,7 +39,7 @@ import type {
   RestockSessionRow,
 } from "@/types/containers";
 
-export { retryUnlessClientError };
+export { retryUnlessClientError } from "@/lib/api/coded-error";
 
 /** Canonical containers query-key factory — everything nests under `all`. */
 export const containerKeys = {

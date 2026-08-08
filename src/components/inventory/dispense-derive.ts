@@ -21,11 +21,14 @@ export type DispenseInput = Readonly<{
   bypassReason: BypassReason | null;
 }>;
 
-/** Positive, integer quantities only, sorted by itemId for a stable signature. */
+/** Positive, integer quantities only, sorted by itemId for a stable signature.
+ * The itemId sort uses `localeCompare` for a well-defined, deterministic order
+ * (never the default coercion sort) so identical payloads always serialize to
+ * the same signature — the retry-reuses-one-key idempotency guarantee. */
 function toLines(quantities: Readonly<Record<string, number>>): DispenseLineInput[] {
   return Object.keys(quantities)
     .filter((itemId) => Number.isInteger(quantities[itemId]) && quantities[itemId] > 0)
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .map((itemId) => ({ itemId, quantity: quantities[itemId] }));
 }
 
