@@ -602,5 +602,65 @@
     "confirmDiscardBody": "Every count you entered will be lost.",
     "confirmDiscardConfirm": "Discard",
     "confirmDiscardKeep": "Keep counting"
+  },
+  "rooms": {
+    "title": "Rooms",
+    "empty": "No rooms",
+    "emptyBody": "Rooms you create will appear here.",
+    "totalLabel": "total",
+    "availableLabel": "available",
+    "inUseLabel": "in use",
+    "issuesLabel": "issues",
+    "swept": {
+      "never": "Never swept",
+      "today": "Swept today",
+      "yesterday": "Swept yesterday",
+      "on": "Swept {{date}}",
+      "by": "by {{name}}"
+    }
+  },
+  "roomDetail": {
+    "loadError": "Couldn't load the room.",
+    "homedCount": "{{count}} homed items",
+    "homedCount_one": "{{count}} homed item",
+    "homedCount_other": "{{count}} homed items",
+    "activity": {
+      "title": "Recent activity",
+      "empty": "No recent activity",
+      "loadError": "Couldn't load activity."
+    },
+    "bucket": {
+      "atHome": "At home",
+      "checkedOut": "In use",
+      "returnedUnverified": "Unverified",
+      "returnedAway": "Away",
+      "misplaced": "Off station",
+      "missing": "Missing",
+      "unassigned": "Unassigned",
+      "noStation": "No station"
+    },
+    "sweep": {
+      "title": "Room contents",
+      "start": "Start sweep",
+      "confirmAll": "Mark all present",
+      "clearAll": "Clear",
+      "commit": "Confirm sweep",
+      "committing": "Confirming...",
+      "summary": "{{present}} present · {{missing}} missing",
+      "result": "Swept: {{confirmed}} confirmed · {{missing}} missing",
+      "resultSkipped": "{{skipped}} no station",
+      "accounted": "In use",
+      "noStation": "No station",
+      "inUse": "In use · {{who}}",
+      "notFoundHere": "Not found here",
+      "notFoundError": "Couldn't report.",
+      "commitError": "Couldn't confirm the sweep.",
+      "loadError": "Couldn't load the room list.",
+      "empty": "No items homed to this room",
+      "emptyBody": "Items homed to this room will appear here."
+    },
+    "bulkVerify": "Verify all items",
+    "bulkVerifyDone": "All verified",
+    "bulkVerifyError": "Verification failed."
   }
 }
