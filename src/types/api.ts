@@ -14,6 +14,12 @@ export type MeUser = {
   id: string;
   email: string;
   name?: string | null;
+  /**
+   * Editable display name (server `users.displayName`, returned by GET
+   * /api/users/me alongside `name`). PATCH /:id/display_name writes this; the
+   * account editor pre-fills from it (falling back to `name`).
+   */
+  displayName?: string | null;
   role?: string;
   clinicId?: string | null;
   status?: string;
