@@ -515,6 +515,34 @@
     "notAuthorized": "You're not authorized to acknowledge this handover",
     "actionError": "That didn't go through. Try again"
   },
+  "autopilot": {
+    "empty": "No proposals to review",
+    "proposedBy": "Suggested by Autopilot",
+    "rationale": "Cited facts",
+    "decisionError": "Couldn't apply that decision. Try again.",
+    "alreadyDecided": "This proposal was already decided.",
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "edit": "Edit"
+    },
+    "kind": {
+      "shiftHandoverDraft": "Shift handover",
+      "coordinatorReassign": "Coordinator reassignment",
+      "restockPo": "Restock order",
+      "crashCartDrift": "Crash cart check"
+    },
+    "rejectSheet": {
+      "title": "Reject proposal",
+      "placeholder": "Why are you rejecting this?",
+      "submit": "Reject"
+    },
+    "editSheet": {
+      "title": "Edit proposal",
+      "placeholder": "Add a note",
+      "submit": "Save"
+    }
+  },
   "inventory": {
     "title": "Inventory",
     "subtitle": "Consumables & crash-cart stock",
