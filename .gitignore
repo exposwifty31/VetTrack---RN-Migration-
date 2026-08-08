@@ -47,3 +47,4 @@ yarn-error.*
 
 # Pinned vettrack checkout for @vettrack/* file: deps (see scripts/vendor-vettrack.mjs)
 .vendor/
+docs/vettrack-g4-g5-slice13-verified.md
