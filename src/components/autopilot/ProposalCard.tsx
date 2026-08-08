@@ -18,7 +18,7 @@ import { proposalKindLabelKey } from "./proposal-derive";
 type ProposalCardProps = Readonly<{
   proposal: ActionProposal;
   editable: boolean;
-  /** A decision is in flight for THIS proposal — every action disables. */
+  /** A decision is in flight anywhere on the queue — every action disables. */
   busy: boolean;
   onApprove: (proposal: ActionProposal) => void;
   onReject: (proposal: ActionProposal) => void;

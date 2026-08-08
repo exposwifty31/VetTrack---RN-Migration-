@@ -105,7 +105,9 @@ function SheetContent({ spec, isPending, errorMessage, onSubmit, onClose }: Shee
       <PressableScale
         accessibilityRole="button"
         accessibilityLabel={t("common.cancel")}
-        className="min-h-[44px] items-center justify-center"
+        accessibilityState={{ disabled: isPending }}
+        disabled={isPending}
+        className={`min-h-[44px] items-center justify-center ${isPending ? "opacity-50" : ""}`}
         onPress={onClose}
       >
         <Text className="font-rubik-semibold text-[14px] text-muted">{t("common.cancel")}</Text>
@@ -130,16 +132,23 @@ export function ProposalReasonSheet({
   onSubmit,
   onClose,
 }: ProposalReasonSheetProps) {
+  // While the decision is in flight the sheet stays put: Android back,
+  // drag-to-dismiss and Cancel are all suppressed. Dismissing mid-flight would
+  // hide the decision error (this sheet is the only place it renders) and could
+  // strand a second decision racing the first. Success closes it from the screen.
+  const dismiss = () => {
+    if (!isPending) onClose();
+  };
   return (
     <Modal
       visible={spec != null}
       transparent
       animationType="none"
       statusBarTranslucent
-      onRequestClose={onClose}
+      onRequestClose={dismiss}
     >
       {spec != null ? (
-        <BottomSheet onDismiss={onClose}>
+        <BottomSheet onDismiss={dismiss}>
           {/* key remounts fresh text state per opening (proposal + mode). */}
           <SheetContent
             key={spec.token}
@@ -147,7 +156,7 @@ export function ProposalReasonSheet({
             isPending={isPending}
             errorMessage={errorMessage}
             onSubmit={onSubmit}
-            onClose={onClose}
+            onClose={dismiss}
           />
         </BottomSheet>
       ) : null}

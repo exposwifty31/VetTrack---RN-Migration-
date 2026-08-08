@@ -77,13 +77,12 @@ export function AutopilotQueueScreen() {
   const [sheetErrorKey, setSheetErrorKey] = useState<DecisionErrorKey | null>(null);
   const [topErrorKey, setTopErrorKey] = useState<DecisionErrorKey | null>(null);
 
-  const busyId = approve.isPending
-    ? approve.variables
-    : reject.isPending
-      ? reject.variables?.id
-      : edit.isPending
-        ? edit.variables?.id
-        : null;
+  // One global decision lock. approve/edit/reject are screen-wide singleton
+  // mutations, so a pending decision is inherently queue-global — gate EVERY
+  // proposal's controls (and the open sheet) while any is in flight. A
+  // per-proposal `busyId` left sibling cards actionable, letting a second
+  // decision race the first.
+  const decisionPending = approve.isPending || reject.isPending || edit.isPending;
 
   const onApprove = useCallback(
     (proposal: ActionProposal) => {
@@ -142,13 +141,13 @@ export function AutopilotQueueScreen() {
       <ProposalCard
         proposal={item}
         editable={isNoteEditable(item.kind, item.draftContent)}
-        busy={item.id === busyId}
+        busy={decisionPending}
         onApprove={onApprove}
         onReject={onOpenReject}
         onEdit={onOpenEdit}
       />
     ),
-    [busyId, onApprove, onOpenReject, onOpenEdit],
+    [decisionPending, onApprove, onOpenReject, onOpenEdit],
   );
 
   const sheetSpec = useMemo<ProposalSheetSpec | null>(() => {
