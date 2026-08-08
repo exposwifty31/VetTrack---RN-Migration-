@@ -118,7 +118,10 @@ export function RestockSheet({ container, onClose }: RestockSheetProps) {
   const busy = finishMutation.isPending || cancelMutation.isPending;
 
   return (
-    <View style={StyleSheet.absoluteFill}>
+    // Claim any touch not consumed by a sheet child so a tap in the dimmed area
+    // above the sheet cannot fall through to the live container rows behind
+    // (children keep responder priority, so buttons + the drag gesture still work).
+    <View style={StyleSheet.absoluteFill} onStartShouldSetResponder={() => true}>
       <BottomSheet onDismiss={onClose}>
         <Text className="font-rubik-bold text-[20px] text-foreground">{t("restock.title")}</Text>
         <Text
