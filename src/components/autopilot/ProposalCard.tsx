@@ -62,7 +62,7 @@ function ProposalCardImpl({
   const handleEdit = useCallback(() => onEdit(proposal), [onEdit, proposal]);
 
   return (
-    <View className="mb-2.5 rounded-md border border-border bg-surface p-4">
+    <View className="mb-2.5 rounded-md border border-border bg-surface-raised p-4">
       <View className="mb-2 flex-row items-center justify-between gap-3">
         <Chip label={t(proposalKindLabelKey(proposal.kind))} tone="info" />
         {createdAt ? (
