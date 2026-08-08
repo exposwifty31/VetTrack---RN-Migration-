@@ -18,15 +18,24 @@
  *
  * Identity is resolved by the route's BootstrapGate (GatedRoomDetail).
  */
-import { ScrollView, Text, View } from "react-native";
+import { useCallback, useMemo } from "react";
+import { Text, View } from "react-native";
+import { FlashList, type ListRenderItem } from "@shopify/flash-list";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { useIdentity } from "@/app/useIdentity";
 import { AuroraBackground } from "@/components/home/AuroraBackground";
 import { RoomActivityCard } from "@/components/rooms/RoomActivityCard";
-import { RoomSweepSection } from "@/components/rooms/RoomSweepSection";
+import { buildSweepListModel, type SweepListRow } from "@/components/rooms/rooms-derive";
+import {
+  SweepFooter,
+  SweepHeader,
+  SweepListRowView,
+  SweepStatus,
+} from "@/components/rooms/RoomSweepSection";
 import { StatPill, SweptMeta } from "@/components/rooms/RoomBits";
+import { useRoomSweep } from "@/components/rooms/useRoomSweep";
 import { ErrorNote } from "@/components/ui/ErrorNote";
 import { RowSkeleton } from "@/components/ui/RowSkeleton";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -92,6 +101,37 @@ export function RoomDetailScreen({ route }: RootStackScreenProps<"RoomDetail">) 
     retry: retryUnlessClientError,
   });
 
+  // The sweep worklist IS the screen's virtualized list (rn-best-practices:
+  // never `.map` a collection inside a ScrollView). Fixed content rides the
+  // list header/footer; the ≤5-entry activity feed is bounded, so it stays in
+  // the footer rather than a second (illegally nested) FlashList.
+  const sweep = useRoomSweep(roomId);
+  const { sweeping, confirmedIds, toggle, reportNotFound, notFoundPendingId } = sweep;
+
+  const listData = useMemo(
+    () =>
+      buildSweepListModel({
+        sweepable: sweep.sweepable,
+        noStation: sweep.noStation,
+        accounted: sweep.accounted,
+      }),
+    [sweep.sweepable, sweep.noStation, sweep.accounted],
+  );
+
+  const renderItem = useCallback<ListRenderItem<SweepListRow>>(
+    ({ item: row }) => (
+      <SweepListRowView
+        row={row}
+        sweeping={sweeping}
+        confirmed={row.kind === "item" && confirmedIds.has(row.item.id)}
+        notFoundPending={row.kind === "item" && notFoundPendingId === row.item.id}
+        onToggle={toggle}
+        onNotFound={reportNotFound}
+      />
+    ),
+    [sweeping, confirmedIds, notFoundPendingId, toggle, reportNotFound],
+  );
+
   const detail = detailQuery.data;
   // A stable, render-pure "now": dataUpdatedAt (ms) is only read once `detail`
   // resolved, so it is always a valid instant (never the 0 pre-fetch value).
@@ -100,29 +140,41 @@ export function RoomDetailScreen({ route }: RootStackScreenProps<"RoomDetail">) 
   return (
     <View className="flex-1 bg-background">
       <AuroraBackground />
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 12, paddingBottom: 40, gap: 12 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {detailQuery.isPending ? (
-          <View>
-            <RowSkeleton />
-            <RowSkeleton />
-          </View>
-        ) : detailQuery.isError ? (
+      {detailQuery.isPending ? (
+        <View style={{ paddingHorizontal: 22, paddingTop: 12 }}>
+          <RowSkeleton />
+          <RowSkeleton />
+        </View>
+      ) : detailQuery.isError ? (
+        <View style={{ paddingHorizontal: 22, paddingTop: 12 }}>
           <ErrorNote
             message={t("roomDetail.loadError")}
             onRetry={() => void detailQuery.refetch()}
           />
-        ) : detail ? (
-          <>
-            <HeaderCard detail={detail} nowMs={nowMs} />
-            <RoomSweepSection roomId={roomId} canBulkVerify={canBulkVerify} />
-            <RoomActivityCard roomId={roomId} />
-          </>
-        ) : null}
-      </ScrollView>
+        </View>
+      ) : detail ? (
+        <FlashList
+          data={listData}
+          renderItem={renderItem}
+          keyExtractor={(row) => row.key}
+          getItemType={(row) => row.kind}
+          ListHeaderComponent={
+            <View style={{ gap: 12 }}>
+              <HeaderCard detail={detail} nowMs={nowMs} />
+              <SweepHeader sweep={sweep} />
+            </View>
+          }
+          ListEmptyComponent={<SweepStatus worklistQuery={sweep.worklistQuery} />}
+          ListFooterComponent={
+            <View style={{ gap: 12 }}>
+              <SweepFooter sweep={sweep} canBulkVerify={canBulkVerify} />
+              <RoomActivityCard roomId={roomId} />
+            </View>
+          }
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 12, paddingBottom: 40 }}
+        />
+      ) : null}
     </View>
   );
 }

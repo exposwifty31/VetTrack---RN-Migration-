@@ -9,13 +9,22 @@ import type { ReconciliationBucket, SweepItem } from "@/lib/api/docking";
 
 import {
   buildSweepCommitPayload,
+  buildSweepListModel,
   deriveRoomSweptState,
+  isNoStation,
   isSweepable,
   partitionSweepItems,
   sweepBucketLabelKey,
   sweepBucketTone,
   sweepSummary,
 } from "../rooms-derive";
+
+/** A resting item homed to the room but with no resolvable home dock. */
+const noStationOver = {
+  bucket: "no_station",
+  homeDockId: null,
+  homeDockName: null,
+} satisfies Partial<SweepItem>;
 
 // rooms-derive → @/lib/datetime → @/i18n → safe-storage hits the MMKV native
 // module, absent under jest — mock the helpers (the datetime.test.ts pattern).
@@ -68,20 +77,30 @@ describe("sweepBucketLabelKey", () => {
   });
 });
 
-describe("isSweepable / partitionSweepItems", () => {
-  it("treats an item with a holder as accounted (not sweepable)", () => {
+describe("isNoStation / isSweepable / partitionSweepItems", () => {
+  it("treats a checked-out item as accounted (not sweepable)", () => {
     expect(isSweepable(makeItem({ id: "a" }))).toBe(true);
     expect(isSweepable(makeItem({ id: "b", checkedOutById: "user-1" }))).toBe(false);
   });
 
-  it("splits resting vs checked-out, preserving order", () => {
+  it("treats a resting no-station item as neither sweepable nor accounted", () => {
+    const item = makeItem({ id: "n1", ...noStationOver });
+    expect(isNoStation(item)).toBe(true);
+    // Resting (no holder) but no home dock → NOT sweepable (skipped on commit).
+    expect(isSweepable(item)).toBe(false);
+  });
+
+  it("splits resting-stationed / no-station / checked-out, preserving order", () => {
     const items = [
       makeItem({ id: "r1" }),
+      makeItem({ id: "n1", ...noStationOver }),
       makeItem({ id: "c1", checkedOutById: "user-1", bucket: "checked_out" }),
       makeItem({ id: "r2" }),
+      makeItem({ id: "n2", ...noStationOver }),
     ];
-    const { sweepable, accounted } = partitionSweepItems(items);
+    const { sweepable, noStation, accounted } = partitionSweepItems(items);
     expect(sweepable.map((i) => i.id)).toEqual(["r1", "r2"]);
+    expect(noStation.map((i) => i.id)).toEqual(["n1", "n2"]);
     expect(accounted.map((i) => i.id)).toEqual(["c1"]);
   });
 });
@@ -107,6 +126,12 @@ describe("buildSweepCommitPayload", () => {
     expect(buildSweepCommitPayload(items, new Set(["c1"]))).toEqual([]);
     expect(buildSweepCommitPayload(items, new Set())).toEqual([]);
   });
+
+  it("NEVER includes a confirmed no-station id (skipped, not swept)", () => {
+    const withNoStation = [makeItem({ id: "r1" }), makeItem({ id: "n1", ...noStationOver })];
+    // A confirmed no-station id is excluded — the server would skip it anyway.
+    expect(buildSweepCommitPayload(withNoStation, new Set(["r1", "n1"]))).toEqual(["r1"]);
+  });
 });
 
 describe("sweepSummary", () => {
@@ -120,6 +145,43 @@ describe("sweepSummary", () => {
     const summary = sweepSummary(items, new Set(["r1"]));
     // total counts resting only (3), not the checked-out item.
     expect(summary).toEqual({ total: 3, present: 1, missing: 2 });
+  });
+
+  it("excludes no-station items from the summary (skipped, neither present nor missing)", () => {
+    const items = [
+      makeItem({ id: "r1" }),
+      makeItem({ id: "r2" }),
+      makeItem({ id: "n1", ...noStationOver }),
+      makeItem({ id: "n2", ...noStationOver }),
+    ];
+    // Confirming the no-station item does not move any tally.
+    const summary = sweepSummary(items, new Set(["r1", "n1"]));
+    expect(summary).toEqual({ total: 2, present: 1, missing: 1 });
+  });
+});
+
+describe("buildSweepListModel", () => {
+  it("emits sweepable rows, then labelled no-station and accounted groups", () => {
+    const partition = partitionSweepItems([
+      makeItem({ id: "r1" }),
+      makeItem({ id: "n1", ...noStationOver }),
+      makeItem({ id: "c1", checkedOutById: "user-1", bucket: "checked_out" }),
+    ]);
+    const rows = buildSweepListModel(partition);
+    expect(rows).toEqual([
+      { kind: "item", key: "r1", item: partition.sweepable[0] },
+      { kind: "label", key: "label:no_station", labelKey: "roomDetail.sweep.noStation" },
+      { kind: "item", key: "n1", item: partition.noStation[0] },
+      { kind: "label", key: "label:accounted", labelKey: "roomDetail.sweep.accounted" },
+      { kind: "item", key: "c1", item: partition.accounted[0] },
+    ]);
+  });
+
+  it("omits a group's label when that partition is empty", () => {
+    const partition = partitionSweepItems([makeItem({ id: "r1" }), makeItem({ id: "r2" })]);
+    const rows = buildSweepListModel(partition);
+    expect(rows.every((row) => row.kind === "item")).toBe(true);
+    expect(rows).toHaveLength(2);
   });
 });
 

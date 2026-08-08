@@ -15,6 +15,7 @@ import { ErrorNote } from "@/components/ui/ErrorNote";
 import { ListEmptyState } from "@/components/ui/ListEmptyState";
 import { RowSkeleton } from "@/components/ui/RowSkeleton";
 import { SectionCard } from "@/components/ui/SectionCard";
+import { retryUnlessClientError } from "@/lib/api/coded-error";
 import { roomKeys, roomsApi, type RoomActivityEntry } from "@/lib/api/rooms";
 import { formatDateTime } from "@/lib/datetime";
 
@@ -70,6 +71,8 @@ export function RoomActivityCard({ roomId }: Readonly<{ roomId: string }>) {
   const activityQuery = useQuery<RoomActivityEntry[]>({
     queryKey: roomKeys.activity(roomId),
     queryFn: () => roomsApi.activity(roomId),
+    // Don't retry permanent 401/403/404 — reuse the rooms/docking retry policy.
+    retry: retryUnlessClientError,
   });
 
   return (

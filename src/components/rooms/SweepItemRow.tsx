@@ -19,7 +19,7 @@ import { PressableScale } from "@/components/PressableScale";
 import { Chip } from "@/components/ui/Chip";
 import type { SweepItem } from "@/lib/api/docking";
 
-import { isSweepable, sweepBucketLabelKey, sweepBucketTone } from "./rooms-derive";
+import { isNoStation, isSweepable, sweepBucketLabelKey, sweepBucketTone } from "./rooms-derive";
 
 type SweepItemRowProps = Readonly<{
   item: SweepItem;
@@ -44,9 +44,21 @@ function CheckBox({ confirmed }: Readonly<{ confirmed: boolean }>) {
   );
 }
 
+/** The muted subtitle: home station · in-use holder · no-station · accounted. */
+function useRowSubtitle(item: SweepItem): string {
+  const { t } = useTranslation();
+  if (item.checkedOutById != null) {
+    return item.checkedOutByEmail
+      ? t("roomDetail.sweep.inUse", { who: ltrIsolate(item.checkedOutByEmail) })
+      : t("roomDetail.sweep.accounted");
+  }
+  if (isNoStation(item)) return t("roomDetail.sweep.noStation");
+  return item.homeDockName ?? t("roomDetail.sweep.noStation");
+}
+
 function RowBody({ item }: Readonly<{ item: SweepItem }>) {
   const { t } = useTranslation();
-  const sweepable = isSweepable(item);
+  const subtitle = useRowSubtitle(item);
   return (
     <View className="flex-1">
       <View className="flex-row items-center justify-between gap-2">
@@ -57,11 +69,7 @@ function RowBody({ item }: Readonly<{ item: SweepItem }>) {
         <Chip label={t(sweepBucketLabelKey(item.bucket))} tone={sweepBucketTone(item.bucket)} />
       </View>
       <Text className="mt-0.5 font-rubik text-[12px] text-muted" numberOfLines={1}>
-        {sweepable
-          ? item.homeDockName ?? t("roomDetail.sweep.noStation")
-          : item.checkedOutByEmail
-            ? t("roomDetail.sweep.inUse", { who: ltrIsolate(item.checkedOutByEmail) })
-            : t("roomDetail.sweep.accounted")}
+        {subtitle}
       </Text>
     </View>
   );

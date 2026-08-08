@@ -1,11 +1,20 @@
 /**
- * Room contents + sweep flow: worklist → confirm-present checklist → commit,
- * plus per-item not-found-here and a technician+ bulk-verify shortcut.
+ * Room-sweep UI, decomposed into focused pieces the RoomDetail FlashList
+ * composes (rn-best-practices: the worklist renders through a FlashList `data`
+ * model, never `.map` inside a ScrollView — see RoomDetailScreen). This file
+ * owns the fixed chrome that rides the list header/footer plus the per-row
+ * renderers; the item collection itself is the FlashList `data`.
  *
- * Aurora: opaque SectionCard, zero blur (the whole RoomDetail screen keeps a
- * zero-blur budget — the sweep is inline, not a modal, since the nav is frozen
- * and no transparentModal route can be added). The commit CTA is the prominent
- * primary; danger tokens appear only as static bucket chips.
+ *   - `SweepHeader`       → ListHeaderComponent tail: title, homed count, the
+ *     last-commit result banner, and (in sweep mode) the summary + bulk toggles.
+ *   - `SweepStatus`       → ListEmptyComponent: honest pending / error / empty.
+ *   - `SweepListRowView`  → renderItem body (section label OR one item row).
+ *   - `SweepFooter`       → ListFooterComponent head: not-found error + the
+ *     action bar (commit/cancel while sweeping, else start + bulk-verify).
+ *
+ * Aurora: opaque rows on the aurora background (the RoomsScreen/HomeScreen list
+ * grammar), zero blur. Danger tokens appear only as static bucket chips; the
+ * commit CTA is the prominent primary.
  */
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
@@ -14,62 +23,72 @@ import { PrimaryButton, QuietButton, SectionTitle } from "@/components/equipment
 import { ErrorNote } from "@/components/ui/ErrorNote";
 import { ListEmptyState } from "@/components/ui/ListEmptyState";
 import { RowSkeleton } from "@/components/ui/RowSkeleton";
-import { SectionCard } from "@/components/ui/SectionCard";
-import { isInsufficientRoleError } from "@/lib/api/docking";
+import { isInsufficientRoleError, type SweepCommitResult } from "@/lib/api/docking";
 
-import { sweepSummary } from "./rooms-derive";
+import {
+  sweepSummary,
+  type SweepListRow,
+  type SweepSectionLabelKey,
+  type SweepSummary,
+} from "./rooms-derive";
 import { SweepItemRow } from "./SweepItemRow";
-import { useRoomSweep } from "./useRoomSweep";
+import type { UseRoomSweep } from "./useRoomSweep";
 
-type RoomSweepSectionProps = Readonly<{
-  roomId: string;
-  /** Pre-gated on `hasRoleAtLeast(effectiveRole, "technician")` by the screen. */
-  canBulkVerify: boolean;
-}>;
+type CommitMutation = UseRoomSweep["commit"];
+type BulkVerifyMutation = UseRoomSweep["bulkVerify"];
 
-export function RoomSweepSection({ roomId, canBulkVerify }: RoomSweepSectionProps) {
+/** Green last-commit summary banner (survives the sweep-mode reset). */
+function SweepResultBanner({ result }: Readonly<{ result: SweepCommitResult }>) {
   const { t } = useTranslation();
-  const sweep = useRoomSweep(roomId);
-  const {
-    worklistQuery,
-    items,
-    sweepable,
-    accounted,
-    sweeping,
-    confirmedIds,
-    startSweep,
-    cancelSweep,
-    toggle,
-    confirmAll,
-    clearAll,
-    commit,
-    notFoundPendingId,
-    reportNotFound,
-    notFoundError,
-    bulkVerify,
-  } = sweep;
-
-  const summary = sweepSummary(items, confirmedIds);
-  const commitResult = commit.data;
-  const bulkVerifyOffShift = bulkVerify.isError && isInsufficientRoleError(bulkVerify.error);
-
-  const renderRow = (item: (typeof items)[number]) => (
-    <SweepItemRow
-      key={item.id}
-      item={item}
-      sweeping={sweeping}
-      confirmed={confirmedIds.has(item.id)}
-      onToggle={toggle}
-      onNotFound={reportNotFound}
-      notFoundPending={notFoundPendingId === item.id}
-    />
+  const skippedSuffix =
+    result.skippedNoStationCount > 0
+      ? ` · ${t("roomDetail.sweep.resultSkipped", { skipped: result.skippedNoStationCount })}`
+      : "";
+  return (
+    <View className="mb-2 rounded-md border border-border bg-surface-raised px-3 py-2">
+      <Text className="font-rubik-semibold text-[13px] text-success">
+        {t("roomDetail.sweep.result", {
+          confirmed: result.confirmedCount,
+          missing: result.missingCount,
+        })}
+        {skippedSuffix}
+      </Text>
+    </View>
   );
+}
+
+/** Sweep-mode present/missing tally + the confirm-all / clear-all shortcuts. */
+function SweepControls({
+  summary,
+  onConfirmAll,
+  onClearAll,
+}: Readonly<{ summary: SweepSummary; onConfirmAll: () => void; onClearAll: () => void }>) {
+  const { t } = useTranslation();
+  return (
+    <View className="mb-2 flex-row items-center justify-between gap-3">
+      <Text className="font-rubik-semibold text-[13px] text-foreground">
+        {t("roomDetail.sweep.summary", { present: summary.present, missing: summary.missing })}
+      </Text>
+      <View className="flex-row gap-2">
+        <QuietButton label={t("roomDetail.sweep.confirmAll")} onPress={onConfirmAll} />
+        <QuietButton label={t("roomDetail.sweep.clearAll")} onPress={onClearAll} />
+      </View>
+    </View>
+  );
+}
+
+/** Fixed chrome above the sweep list: title, homed count, banner, controls. */
+export function SweepHeader({ sweep }: Readonly<{ sweep: UseRoomSweep }>) {
+  const { t } = useTranslation();
+  const { items, sweeping, confirmedIds, commit, confirmAll, clearAll } = sweep;
+  const summary = sweepSummary(items, confirmedIds);
+  const hasItems = items.length > 0;
 
   return (
-    <SectionCard>
+    <View>
       <View className="mb-3 flex-row items-center justify-between gap-3">
         <SectionTitle title={t("roomDetail.sweep.title")} />
-        {items.length > 0 ? (
+        {hasItems ? (
           <Text
             className="font-rubik text-[12px] text-muted"
             style={{ writingDirection: "ltr" }}
@@ -78,123 +97,184 @@ export function RoomSweepSection({ roomId, canBulkVerify }: RoomSweepSectionProp
           </Text>
         ) : null}
       </View>
+      {hasItems && commit.data ? <SweepResultBanner result={commit.data} /> : null}
+      {sweeping ? (
+        <SweepControls summary={summary} onConfirmAll={confirmAll} onClearAll={clearAll} />
+      ) : null}
+    </View>
+  );
+}
 
-      {worklistQuery.isPending ? (
-        <View>
-          <RowSkeleton />
-          <RowSkeleton />
-        </View>
-      ) : worklistQuery.isError ? (
-        <ErrorNote
-          message={t("roomDetail.sweep.loadError")}
-          onRetry={() => void worklistQuery.refetch()}
+/** ListEmptyComponent: the sweep list's honest pending / error / empty states. */
+export function SweepStatus({
+  worklistQuery,
+}: Readonly<{ worklistQuery: UseRoomSweep["worklistQuery"] }>) {
+  const { t } = useTranslation();
+  if (worklistQuery.isPending) {
+    return (
+      <View>
+        <RowSkeleton />
+        <RowSkeleton />
+      </View>
+    );
+  }
+  if (worklistQuery.isError) {
+    return (
+      <ErrorNote
+        message={t("roomDetail.sweep.loadError")}
+        onRetry={() => void worklistQuery.refetch()}
+      />
+    );
+  }
+  return (
+    <ListEmptyState title={t("roomDetail.sweep.empty")} body={t("roomDetail.sweep.emptyBody")} />
+  );
+}
+
+/** A section-divider label row (no-station / accounted groups). */
+function SweepSectionLabel({ labelKey }: Readonly<{ labelKey: SweepSectionLabelKey }>) {
+  const { t } = useTranslation();
+  return (
+    <Text className="mb-1 mt-2 font-rubik-semibold text-[12px] text-text-tertiary">
+      {t(labelKey)}
+    </Text>
+  );
+}
+
+/** renderItem body: a section label or one sweep item row. */
+export function SweepListRowView({
+  row,
+  sweeping,
+  confirmed,
+  notFoundPending,
+  onToggle,
+  onNotFound,
+}: Readonly<{
+  row: SweepListRow;
+  sweeping: boolean;
+  confirmed: boolean;
+  notFoundPending: boolean;
+  onToggle: (id: string) => void;
+  onNotFound: (id: string) => void;
+}>) {
+  if (row.kind === "label") return <SweepSectionLabel labelKey={row.labelKey} />;
+  return (
+    <SweepItemRow
+      item={row.item}
+      sweeping={sweeping}
+      confirmed={confirmed}
+      onToggle={onToggle}
+      onNotFound={onNotFound}
+      notFoundPending={notFoundPending}
+    />
+  );
+}
+
+/** Commit / cancel actions while a sweep is open. */
+function SweepCommitActions({
+  commit,
+  onCancel,
+}: Readonly<{ commit: CommitMutation; onCancel: () => void }>) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <PrimaryButton
+        label={commit.isPending ? t("roomDetail.sweep.committing") : t("roomDetail.sweep.commit")}
+        disabled={commit.isPending}
+        onPress={() => commit.mutate()}
+      />
+      <QuietButton label={t("common.cancel")} disabled={commit.isPending} onPress={onCancel} />
+      {commit.isError ? (
+        <Text className="text-center font-rubik text-[13px] text-danger">
+          {t("roomDetail.sweep.commitError")}
+        </Text>
+      ) : null}
+    </>
+  );
+}
+
+/** The off-shift / error note under the bulk-verify shortcut. */
+function BulkVerifyNote({ offShift, isError }: Readonly<{ offShift: boolean; isError: boolean }>) {
+  const { t } = useTranslation();
+  if (offShift) {
+    return (
+      <Text className="text-center font-rubik text-[13px] text-muted">{t("common.offShift")}</Text>
+    );
+  }
+  if (isError) {
+    return (
+      <Text className="text-center font-rubik text-[13px] text-danger">
+        {t("roomDetail.bulkVerifyError")}
+      </Text>
+    );
+  }
+  return null;
+}
+
+/** Start-sweep primary + the technician+ bulk-verify shortcut. */
+function SweepStartActions({
+  canBulkVerify,
+  bulkVerify,
+  offShift,
+  onStart,
+}: Readonly<{
+  canBulkVerify: boolean;
+  bulkVerify: BulkVerifyMutation;
+  offShift: boolean;
+  onStart: () => void;
+}>) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <PrimaryButton label={t("roomDetail.sweep.start")} onPress={onStart} />
+      {canBulkVerify ? (
+        <QuietButton
+          label={
+            bulkVerify.isSuccess ? t("roomDetail.bulkVerifyDone") : t("roomDetail.bulkVerify")
+          }
+          disabled={bulkVerify.isPending || bulkVerify.isSuccess}
+          onPress={() => bulkVerify.mutate()}
         />
-      ) : items.length === 0 ? (
-        <ListEmptyState
-          title={t("roomDetail.sweep.empty")}
-          body={t("roomDetail.sweep.emptyBody")}
-        />
-      ) : (
-        <View className="gap-1">
-          {/* Last-commit result banner (survives the mode reset). */}
-          {commitResult ? (
-            <View className="mb-2 rounded-md border border-border bg-surface-raised px-3 py-2">
-              <Text className="font-rubik-semibold text-[13px] text-success">
-                {t("roomDetail.sweep.result", {
-                  confirmed: commitResult.confirmedCount,
-                  missing: commitResult.missingCount,
-                })}
-                {commitResult.skippedNoStationCount > 0
-                  ? ` · ${t("roomDetail.sweep.resultSkipped", {
-                      skipped: commitResult.skippedNoStationCount,
-                    })}`
-                  : ""}
-              </Text>
-            </View>
-          ) : null}
+      ) : null}
+      <BulkVerifyNote offShift={offShift} isError={bulkVerify.isError} />
+    </>
+  );
+}
 
-          {sweeping ? (
-            <View className="mb-2 flex-row items-center justify-between gap-3">
-              <Text className="font-rubik-semibold text-[13px] text-foreground">
-                {t("roomDetail.sweep.summary", {
-                  present: summary.present,
-                  missing: summary.missing,
-                })}
-              </Text>
-              <View className="flex-row gap-2">
-                <QuietButton label={t("roomDetail.sweep.confirmAll")} onPress={confirmAll} />
-                <QuietButton label={t("roomDetail.sweep.clearAll")} onPress={clearAll} />
-              </View>
-            </View>
-          ) : null}
+/**
+ * ListFooterComponent head: the not-found error + the action bar. Renders
+ * nothing when the worklist has no items — the action bar lived inside the
+ * items-present branch of the pre-FlashList card, so pending/error/empty
+ * states show no actions.
+ */
+export function SweepFooter({
+  sweep,
+  canBulkVerify,
+}: Readonly<{ sweep: UseRoomSweep; canBulkVerify: boolean }>) {
+  const { t } = useTranslation();
+  const { items, sweeping, commit, cancelSweep, startSweep, bulkVerify, notFoundError } = sweep;
+  if (items.length === 0) return null;
+  const bulkVerifyOffShift = bulkVerify.isError && isInsufficientRoleError(bulkVerify.error);
 
-          {/* Sweepable (resting) items. */}
-          {sweepable.map(renderRow)}
-
-          {/* Accounted (checked-out) items — read-only, D-9. */}
-          {accounted.length > 0 ? (
-            <>
-              <Text className="mb-1 mt-2 font-rubik-semibold text-[12px] text-text-tertiary">
-                {t("roomDetail.sweep.accounted")}
-              </Text>
-              {accounted.map(renderRow)}
-            </>
-          ) : null}
-
-          {notFoundError ? (
-            <Text className="mt-1 font-rubik text-[12px] text-danger">
-              {t("roomDetail.sweep.notFoundError")}
-            </Text>
-          ) : null}
-
-          {/* Action bar. */}
-          <View className="mt-3 gap-2">
-            {sweeping ? (
-              <>
-                <PrimaryButton
-                  label={commit.isPending ? t("roomDetail.sweep.committing") : t("roomDetail.sweep.commit")}
-                  disabled={commit.isPending}
-                  onPress={() => commit.mutate()}
-                />
-                <QuietButton
-                  label={t("common.cancel")}
-                  disabled={commit.isPending}
-                  onPress={cancelSweep}
-                />
-                {commit.isError ? (
-                  <Text className="text-center font-rubik text-[13px] text-danger">
-                    {t("roomDetail.sweep.commitError")}
-                  </Text>
-                ) : null}
-              </>
-            ) : (
-              <>
-                <PrimaryButton label={t("roomDetail.sweep.start")} onPress={startSweep} />
-                {canBulkVerify ? (
-                  <QuietButton
-                    label={
-                      bulkVerify.isSuccess
-                        ? t("roomDetail.bulkVerifyDone")
-                        : t("roomDetail.bulkVerify")
-                    }
-                    disabled={bulkVerify.isPending || bulkVerify.isSuccess}
-                    onPress={() => bulkVerify.mutate()}
-                  />
-                ) : null}
-                {bulkVerifyOffShift ? (
-                  <Text className="text-center font-rubik text-[13px] text-muted">
-                    {t("common.offShift")}
-                  </Text>
-                ) : bulkVerify.isError ? (
-                  <Text className="text-center font-rubik text-[13px] text-danger">
-                    {t("roomDetail.bulkVerifyError")}
-                  </Text>
-                ) : null}
-              </>
-            )}
-          </View>
-        </View>
-      )}
-    </SectionCard>
+  return (
+    <View>
+      {notFoundError ? (
+        <Text className="mt-1 font-rubik text-[12px] text-danger">
+          {t("roomDetail.sweep.notFoundError")}
+        </Text>
+      ) : null}
+      <View className="mt-3 gap-2">
+        {sweeping ? (
+          <SweepCommitActions commit={commit} onCancel={cancelSweep} />
+        ) : (
+          <SweepStartActions
+            canBulkVerify={canBulkVerify}
+            bulkVerify={bulkVerify}
+            offShift={bulkVerifyOffShift}
+            onStart={startSweep}
+          />
+        )}
+      </View>
+    </View>
   );
 }

@@ -55,27 +55,78 @@ export function sweepBucketLabelKey(bucket: ReconciliationBucket): SweepBucketLa
   return BUCKET_LABEL_KEYS[bucket];
 }
 
-/** Resting = no holder. Only resting items are sweepable (D-9). */
-export function isSweepable(item: Pick<SweepItem, "checkedOutById">): boolean {
-  return item.checkedOutById == null;
+/**
+ * No-station = resting item with no resolvable home dock (server bucket
+ * `no_station`). Confirming one is a server no-op: the commit contract counts
+ * it in `skippedNoStationCount` — neither swept nor missing — so it must be
+ * kept OUT of the sweepable checklist, the present/missing summary, and the
+ * commit payload, and rendered as its own explicit read-only group.
+ */
+export function isNoStation(item: Pick<SweepItem, "bucket">): boolean {
+  return item.bucket === "no_station";
+}
+
+/**
+ * Sweepable = resting (no holder, D-9) AND has a resolvable home station.
+ * A resting `no_station` item is NOT sweepable — see `isNoStation`.
+ */
+export function isSweepable(item: Pick<SweepItem, "checkedOutById" | "bucket">): boolean {
+  return item.checkedOutById == null && !isNoStation(item);
 }
 
 export type SweepPartition = Readonly<{
-  /** Resting items — toggleable in the checklist. */
+  /** Resting items with a home station — toggleable in the checklist. */
   sweepable: SweepItem[];
+  /** Resting items with no home station — read-only, skipped on commit. */
+  noStation: SweepItem[];
   /** Checked-out items — read-only, accounted, never swept/missing. */
   accounted: SweepItem[];
 }>;
 
-/** Split the worklist into the sweepable (resting) and accounted (in-use) sets. */
+/**
+ * Split the worklist into three disjoint sets: sweepable (resting + stationed),
+ * noStation (resting, no home dock → skipped), and accounted (in-use). The
+ * checked-out check wins first so a checked-out item never leaks into another
+ * bucket (D-9).
+ */
 export function partitionSweepItems(items: readonly SweepItem[]): SweepPartition {
   const sweepable: SweepItem[] = [];
+  const noStation: SweepItem[] = [];
   const accounted: SweepItem[] = [];
   for (const item of items) {
-    if (isSweepable(item)) sweepable.push(item);
-    else accounted.push(item);
+    if (item.checkedOutById != null) accounted.push(item);
+    else if (isNoStation(item)) noStation.push(item);
+    else sweepable.push(item);
   }
-  return { sweepable, accounted };
+  return { sweepable, noStation, accounted };
+}
+
+/**
+ * A flat, virtualization-friendly row model for the room-sweep FlashList
+ * (rn-best-practices: the collection renders through a FlashList `data` model,
+ * never `.map` inside a ScrollView). Section labels are interleaved as their
+ * own rows so a single list carries all three partitions.
+ */
+/** The two section-divider labels the sweep list can emit (typed i18n keys). */
+export type SweepSectionLabelKey = "roomDetail.sweep.noStation" | "roomDetail.sweep.accounted";
+
+export type SweepListRow =
+  | Readonly<{ kind: "label"; key: string; labelKey: SweepSectionLabelKey }>
+  | Readonly<{ kind: "item"; key: string; item: SweepItem }>;
+
+/** Flatten a partition into `[sweepable…, (label) noStation…, (label) accounted…]`. */
+export function buildSweepListModel(partition: SweepPartition): SweepListRow[] {
+  const rows: SweepListRow[] = [];
+  for (const item of partition.sweepable) rows.push({ kind: "item", key: item.id, item });
+  if (partition.noStation.length > 0) {
+    rows.push({ kind: "label", key: "label:no_station", labelKey: "roomDetail.sweep.noStation" });
+    for (const item of partition.noStation) rows.push({ kind: "item", key: item.id, item });
+  }
+  if (partition.accounted.length > 0) {
+    rows.push({ kind: "label", key: "label:accounted", labelKey: "roomDetail.sweep.accounted" });
+    for (const item of partition.accounted) rows.push({ kind: "item", key: item.id, item });
+  }
+  return rows;
 }
 
 /**
@@ -95,8 +146,9 @@ export function buildSweepCommitPayload(
 export type SweepSummary = Readonly<{ total: number; present: number; missing: number }>;
 
 /**
- * Present/missing tallies over the SWEEPABLE set only (checked-out items are
- * neither). `present` = confirmed resting; `missing` = the rest.
+ * Present/missing tallies over the SWEEPABLE set only — checked-out AND
+ * no-station items are excluded (they are accounted / skipped, never
+ * swept/missing). `present` = confirmed stationed-resting; `missing` = the rest.
  */
 export function sweepSummary(
   items: readonly SweepItem[],
