@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { ltrIsolate, SectionTitle } from "@/components/equipment/detail/DetailBits";
+import { statusLabel } from "@/components/equipment/detail/HistoryCard";
 import { statusTone } from "@/components/equipment/detail/equipment-detail-derive";
 import { Chip } from "@/components/ui/Chip";
 import { ErrorNote } from "@/components/ui/ErrorNote";
@@ -18,6 +19,7 @@ import { roomKeys, roomsApi, type RoomActivityEntry } from "@/lib/api/rooms";
 import { formatDateTime } from "@/lib/datetime";
 
 function ActivityRow({ entry }: Readonly<{ entry: RoomActivityEntry }>) {
+  const { t } = useTranslation();
   const when = formatDateTime(entry.timestamp);
   // userName is admin-only (server-stripped otherwise); email is guaranteed
   // Latin → force LTR isolate.
@@ -40,7 +42,7 @@ function ActivityRow({ entry }: Readonly<{ entry: RoomActivityEntry }>) {
       </View>
       <View className="flex-row items-center justify-between gap-3">
         {entry.status ? (
-          <Chip label={entry.status} tone={statusTone(entry.status)} />
+          <Chip label={statusLabel(t, entry.status)} tone={statusTone(entry.status)} />
         ) : (
           <View />
         )}
