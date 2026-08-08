@@ -184,7 +184,29 @@
   },
   "menu": {
     "title": "Menu",
-    "devSection": "Developer & debug tools"
+    "endShift": "End shift",
+    "show": "Show",
+    "hide": "Hide",
+    "sections": {
+      "operations": "Operations",
+      "session": "Shift",
+      "account": "Account",
+      "developer": "Developer tools"
+    }
+  },
+  "account": {
+    "displayName": "Display name",
+    "displayNamePlaceholder": "Enter display name",
+    "edit": "Edit",
+    "save": "Save",
+    "language": "Language",
+    "restartHint": "Text direction (RTL/LTR) updates the next time the app restarts.",
+    "signOut": "Sign out",
+    "signOutConfirmTitle": "Sign out?",
+    "signOutConfirmMessage": "You'll need to sign in again to use the app.",
+    "displayNameInvalid": "Display name can't be empty.",
+    "updateError": "Couldn't update your display name. Try again.",
+    "localeError": "Couldn't save your language. Try again."
   },
   "bootstrap": {
     "reauth": "Session expired. Sign in again to continue.",

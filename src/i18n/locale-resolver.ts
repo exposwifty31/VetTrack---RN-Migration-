@@ -53,14 +53,19 @@ export function resolveInitialLocale(): Locale {
  * Persist an explicit locale choice and update the launch cache so a subsequent
  * resolveInitialLocale() in the same launch stays consistent. Best-effort write
  * (never throws to the caller); the port itself still surfaces failures loudly.
+ * Returns whether the durable write SUCCEEDED — callers use this to avoid moving
+ * native state (e.g. the RTL flag) ahead of what actually persisted.
  */
-export function persistLocale(locale: Locale): void {
+export function persistLocale(locale: Locale): boolean {
+  let persisted = false;
   try {
-    safeStorageSetItem(LOCALE_STORAGE_KEY, locale, "local");
+    persisted = safeStorageSetItem(LOCALE_STORAGE_KEY, locale, "local");
   } catch {
     // best-effort — a failed persist must not crash a language toggle
+    persisted = false;
   }
   cachedInitialLocale = locale;
+  return persisted;
 }
 
 /** Test-only: clear the launch cache between suites. */

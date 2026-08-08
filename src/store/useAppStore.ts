@@ -10,9 +10,15 @@ import { create } from 'zustand';
 type AppState = {
   nfcSupported: boolean | null;
   setNfcSupported: (value: boolean | null) => void;
+  /** Menu → Developer section expansion (client UI state; collapsed by default). */
+  developerMenuExpanded: boolean;
+  toggleDeveloperMenu: () => void;
 };
 
 export const useAppStore = create<AppState>((set) => ({
   nfcSupported: null,
   setNfcSupported: (value) => set({ nfcSupported: value }),
+  developerMenuExpanded: false,
+  toggleDeveloperMenu: () =>
+    set((state) => ({ developerMenuExpanded: !state.developerMenuExpanded })),
 }));
