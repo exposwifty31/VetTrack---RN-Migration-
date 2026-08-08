@@ -67,6 +67,25 @@ function parseClock(time: string): { hours: number; minutes: number } | null {
   return { hours, minutes };
 }
 
+type LocalParts = { year: number; monthIndex: number; dayOfMonth: number; hours: number; minutes: number };
+
+/**
+ * True when a local `Date` faithfully represents the wall-clock parts it was
+ * built from. A false result flags one of two silent-corruption cases the JS
+ * `Date` constructor hides by normalizing: a calendar-invalid day (e.g.
+ * "2026-02-31" rolling into March) OR a local time skipped by a DST
+ * spring-forward gap (e.g. 02:30 becoming 03:30 on a US spring-forward day).
+ */
+export function localPartsMatch(date: Date, parts: LocalParts): boolean {
+  return (
+    date.getFullYear() === parts.year &&
+    date.getMonth() === parts.monthIndex &&
+    date.getDate() === parts.dayOfMonth &&
+    date.getHours() === parts.hours &&
+    date.getMinutes() === parts.minutes
+  );
+}
+
 /**
  * Build the timezone-qualified ISO window the server expects from the selected
  * calendar day + a local start clock + a positive duration. Anchors at the
@@ -92,11 +111,18 @@ export function buildTaskWindow(
     parsedClock.hours,
     parsedClock.minutes,
   );
-  // Reject calendar-invalid days (Date silently rolls "2026-02-31" into March).
+  // Reject calendar-invalid days AND local times skipped by a DST spring-forward
+  // gap — both surface as the constructed local Date not round-tripping its parts
+  // (see localPartsMatch). A caught mismatch keeps Save disabled instead of
+  // posting a window an hour off (or on the wrong month) from what was picked.
   if (
-    start.getFullYear() !== parsedDay.year ||
-    start.getMonth() !== parsedDay.monthIndex ||
-    start.getDate() !== parsedDay.dayOfMonth
+    !localPartsMatch(start, {
+      year: parsedDay.year,
+      monthIndex: parsedDay.monthIndex,
+      dayOfMonth: parsedDay.dayOfMonth,
+      hours: parsedClock.hours,
+      minutes: parsedClock.minutes,
+    })
   ) {
     return null;
   }
@@ -187,6 +213,31 @@ export function assigneeOptions(meta: TaskMeta | undefined): AssigneeOption[] {
     if (a.onShift !== b.onShift) return a.onShift ? -1 : 1;
     return a.label.localeCompare(b.label);
   });
+}
+
+/** Constant key for the leading "unassigned" row (never collides with a user id). */
+export const UNASSIGNED_ROW_KEY = "__unassigned__";
+
+/**
+ * A single row in the horizontal assignee picker — the leading "unassigned"
+ * sentinel then one row per staffer. Modeled as a union so a recycling list
+ * (FlashList) renders both kinds through one `renderItem` with a stable key.
+ */
+export type AssigneeRow =
+  | { readonly kind: "unassigned" }
+  | { readonly kind: "staff"; readonly option: AssigneeOption };
+
+/** Prepend the unassigned sentinel to the flattened options → the list `data`. */
+export function buildAssigneeRows(options: readonly AssigneeOption[]): AssigneeRow[] {
+  return [
+    { kind: "unassigned" },
+    ...options.map((option) => ({ kind: "staff", option }) as const),
+  ];
+}
+
+/** Stable, unique key per assignee row (the FlashList `keyExtractor`). */
+export function assigneeRowKey(row: AssigneeRow): string {
+  return row.kind === "unassigned" ? UNASSIGNED_ROW_KEY : row.option.id;
 }
 
 /** Literal union so the strictly-typed `t` accepts the mapped result. */

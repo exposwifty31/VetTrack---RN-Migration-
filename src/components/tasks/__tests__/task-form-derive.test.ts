@@ -9,6 +9,8 @@ import type { TaskMeta } from "@/types/tasks";
 import {
   addClockMinutes,
   assigneeOptions,
+  assigneeRowKey,
+  buildAssigneeRows,
   buildTaskWindow,
   canAssignTasks,
   canCancelTasks,
@@ -16,8 +18,10 @@ import {
   clampDuration,
   clockFromIso,
   durationMinutesBetween,
+  localPartsMatch,
   mutationErrorKey,
   splitDuration,
+  UNASSIGNED_ROW_KEY,
   MAX_DURATION_MINUTES,
   MIN_DURATION_MINUTES,
 } from "../task-form-derive";
@@ -83,6 +87,49 @@ describe("buildTaskWindow", () => {
 
   it("rejects a calendar-invalid day (no silent Date rollover)", () => {
     expect(buildTaskWindow("2026-02-31", "09:00", 60)).toBeNull();
+  });
+});
+
+describe("localPartsMatch — the DST-gap / calendar-rollover guard", () => {
+  // TZ-independent: jest's worker timezone can't be flipped at runtime (V8 caches
+  // it), so instead of forcing a real DST zone we hand the guard the Date it WOULD
+  // receive after normalization and assert the mismatch is caught. This is the
+  // exact symptom of a spring-forward gap: requested 02:30, Date became 03:30.
+  const base = { year: 2026, monthIndex: 2, dayOfMonth: 8 };
+
+  it("rejects a wall-clock hour the OS shifted (the DST spring-forward gap)", () => {
+    // The Date buildTaskWindow gets back for a skipped 02:30 is the 03:30 instant.
+    const normalized = new Date(2026, 2, 8, 3, 30);
+    expect(localPartsMatch(normalized, { ...base, hours: 2, minutes: 30 })).toBe(false);
+  });
+
+  it("rejects a shifted minute and a rolled-over calendar day", () => {
+    expect(localPartsMatch(new Date(2026, 2, 8, 2, 45), { ...base, hours: 2, minutes: 30 })).toBe(
+      false,
+    );
+    // "2026-02-31" → Date rolls into March; month no longer matches.
+    const rolled = new Date(2026, 1, 31, 9, 0);
+    expect(localPartsMatch(rolled, { year: 2026, monthIndex: 1, dayOfMonth: 31, hours: 9, minutes: 0 })).toBe(
+      false,
+    );
+  });
+
+  it("accepts a Date that faithfully round-trips every part", () => {
+    const faithful = new Date(2026, 2, 8, 1, 30);
+    expect(localPartsMatch(faithful, { ...base, hours: 1, minutes: 30 })).toBe(true);
+  });
+});
+
+describe("buildTaskWindow — DST spring-forward gap (end-to-end, DST zones only)", () => {
+  it("returns null for a time skipped by the gap when the runtime is in a DST zone", () => {
+    // Only exercises end-to-end where the runtime timezone actually has the
+    // 02:00→03:00 gap on this date; jest's worker TZ can't be flipped at runtime,
+    // so probe and skip otherwise (the deterministic coverage is localPartsMatch).
+    const gapExists = new Date(2026, 2, 8, 2, 30).getHours() !== 2;
+    if (!gapExists) return;
+    expect(buildTaskWindow("2026-03-08", "02:30", 60)).toBeNull();
+    // A real time on the same day still builds.
+    expect(buildTaskWindow("2026-03-08", "03:30", 60)).not.toBeNull();
   });
 });
 
@@ -176,6 +223,35 @@ describe("assigneeOptions", () => {
 
   it("returns [] for undefined meta", () => {
     expect(assigneeOptions(undefined)).toEqual([]);
+  });
+});
+
+describe("buildAssigneeRows / assigneeRowKey", () => {
+  const options = [
+    { id: "v1", label: "Dr. Bruce", role: "vet", onShift: true },
+    { id: "v2", label: "v2", role: "vet", onShift: true },
+    { id: "t3", label: "Cara", role: "technician", onShift: false },
+  ] as const;
+
+  it("prepends the unassigned sentinel then one row per staffer, order preserved", () => {
+    const rows = buildAssigneeRows(options);
+    expect(rows).toHaveLength(options.length + 1);
+    expect(rows[0]).toEqual({ kind: "unassigned" });
+    expect(rows.slice(1).map((row) => (row.kind === "staff" ? row.option.id : null))).toEqual(
+      options.map((o) => o.id),
+    );
+  });
+
+  it("emits a stable, unique key per row (the sentinel + each option id)", () => {
+    const rows = buildAssigneeRows(options);
+    const keys = rows.map(assigneeRowKey);
+    expect(keys[0]).toBe(UNASSIGNED_ROW_KEY);
+    expect(keys.slice(1)).toEqual(options.map((o) => o.id));
+    expect(new Set(keys).size).toBe(keys.length); // no collisions
+  });
+
+  it("is just the sentinel for an empty roster", () => {
+    expect(buildAssigneeRows([])).toEqual([{ kind: "unassigned" }]);
   });
 });
 

@@ -131,8 +131,6 @@ function SheetContent({ request, day, gateRole, onClose }: SheetContentProps) {
     () => (editing?.priority ?? "normal") as TaskPriority,
   );
   const [vetId, setVetId] = useState<string | null>(() => editing?.vetId ?? null);
-  const [confirmingCancel, setConfirmingCancel] = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
 
   const { create, update, cancel } = useTaskMutations();
 
@@ -156,7 +154,10 @@ function SheetContent({ request, day, gateRole, onClose }: SheetContentProps) {
   const busy = create.isPending || update.isPending || cancel.isPending;
   const saveDisabled = busy || !window || !isDirty;
 
-  const activeError = create.error ?? update.error ?? cancel.error;
+  // Only the save path (create OR update — mutually exclusive per keyed sheet
+  // instance). The cancel error is owned + rendered by CancelTaskAction, so a
+  // stale save error can never mask a cancellation failure and vice-versa.
+  const activeError = create.error ?? update.error;
   const serverErrorKey = activeError ? taskErrorKey(activeError) : null;
 
   const onSave = () => {
@@ -174,14 +175,6 @@ function SheetContent({ request, day, gateRole, onClose }: SheetContentProps) {
     if (trimmed) input.notes = trimmed;
     if (vetId) input.vetId = vetId;
     create.mutate(input, { onSuccess: onClose });
-  };
-
-  const onConfirmCancel = () => {
-    if (!editing || busy) return;
-    cancel.mutate(
-      { id: editing.id, reason: cancelReason.trim() || undefined },
-      { onSuccess: onClose },
-    );
   };
 
   return (
@@ -261,67 +254,111 @@ function SheetContent({ request, day, gateRole, onClose }: SheetContentProps) {
         <Text className="font-rubik-semibold text-[14px] text-muted">{t("common.cancel")}</Text>
       </PressableScale>
 
-      {/* Danger cancel-task action — static (no scale, no glass) per the danger rule. */}
+      {/* Danger cancel-task action — static (no scale, no glass) per the danger */}
+      {/* rule; owns its own confirm state + coded error (see CancelTaskAction). */}
       {editing && canCancel ? (
-        confirmingCancel ? (
-          <View className="mt-1 gap-2.5 rounded-[16px] border border-danger-solid p-3">
-            <Text className="font-rubik-semibold text-[13px] text-foreground">
-              {t("tasks.form.cancelConfirm")}
-            </Text>
-            <TextInput
-              className="min-h-[44px] rounded-[12px] border border-border bg-surface px-3.5 py-2.5 font-rubik text-[13px] text-foreground"
-              placeholder={t("tasks.form.cancelReasonPlaceholder")}
-              placeholderTextColor={light ? "#5B5680" : "#A6A0C3"}
-              value={cancelReason}
-              onChangeText={setCancelReason}
-              maxLength={CANCEL_REASON_MAX_LENGTH}
-              accessibilityLabel={t("tasks.form.cancelReason")}
-            />
-            <View className="flex-row gap-2.5">
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("tasks.form.keepTask")}
-                disabled={busy}
-                className="min-h-[44px] flex-1 items-center justify-center rounded-[14px] border border-border bg-surface px-4 py-2.5"
-                onPress={() => setConfirmingCancel(false)}
-              >
-                <Text className="font-rubik-semibold text-[14px] text-muted">
-                  {t("tasks.form.keepTask")}
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("tasks.form.confirmCancelTask")}
-                accessibilityState={{ disabled: busy }}
-                disabled={busy}
-                className={`min-h-[44px] flex-1 items-center justify-center rounded-[14px] bg-danger-solid px-4 py-2.5 ${
-                  busy ? "opacity-60" : ""
-                }`}
-                onPress={onConfirmCancel}
-              >
-                {/* AA: white on --color-danger-solid = 4.83 dark / 6.47 light. */}
-                <Text className="font-rubik-semibold text-[14px] text-white">
-                  {t("tasks.form.confirmCancelTask")}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("tasks.form.cancelTask")}
-            className="min-h-[44px] items-center justify-center rounded-[14px] border border-danger-solid px-4 py-2.5"
-            onPress={() => {
-              cancel.reset();
-              setConfirmingCancel(true);
-            }}
-          >
-            <Text className="font-rubik-semibold text-[14px] text-danger">
-              {t("tasks.form.cancelTask")}
-            </Text>
-          </Pressable>
-        )
+        <CancelTaskAction
+          task={editing}
+          cancel={cancel}
+          saving={create.isPending || update.isPending}
+          light={light}
+          onClose={onClose}
+        />
       ) : null}
+    </View>
+  );
+}
+
+type CancelTaskActionProps = Readonly<{
+  task: Task;
+  cancel: ReturnType<typeof useTaskMutations>["cancel"];
+  /** A create/update is in flight — the cancel buttons disable alongside Save. */
+  saving: boolean;
+  light: boolean;
+  onClose: () => void;
+}>;
+
+/**
+ * The danger cancel-task affordance, extracted so `SheetContent` stays under the
+ * cognitive-complexity limit. Owns its confirm/reason state AND its own coded
+ * error: a cancellation failure renders here, beside the action, and can never
+ * be masked by (or mask) a stale create/update error on the save path.
+ */
+function CancelTaskAction({ task, cancel, saving, light, onClose }: CancelTaskActionProps) {
+  const { t } = useTranslation();
+  const [confirming, setConfirming] = useState(false);
+  const [reason, setReason] = useState("");
+  const busy = saving || cancel.isPending;
+  const errorKey = cancel.error ? taskErrorKey(cancel.error) : null;
+
+  if (!confirming) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("tasks.form.cancelTask")}
+        className="min-h-[44px] items-center justify-center rounded-[14px] border border-danger-solid px-4 py-2.5"
+        onPress={() => {
+          cancel.reset();
+          setConfirming(true);
+        }}
+      >
+        <Text className="font-rubik-semibold text-[14px] text-danger">
+          {t("tasks.form.cancelTask")}
+        </Text>
+      </Pressable>
+    );
+  }
+
+  return (
+    <View className="mt-1 gap-2.5 rounded-[16px] border border-danger-solid p-3">
+      <Text className="font-rubik-semibold text-[13px] text-foreground">
+        {t("tasks.form.cancelConfirm")}
+      </Text>
+      <TextInput
+        className="min-h-[44px] rounded-[12px] border border-border bg-surface px-3.5 py-2.5 font-rubik text-[13px] text-foreground"
+        placeholder={t("tasks.form.cancelReasonPlaceholder")}
+        placeholderTextColor={light ? "#5B5680" : "#A6A0C3"}
+        value={reason}
+        onChangeText={setReason}
+        maxLength={CANCEL_REASON_MAX_LENGTH}
+        accessibilityLabel={t("tasks.form.cancelReason")}
+      />
+      {errorKey ? (
+        <Text className="text-center font-rubik-semibold text-[13px] text-danger">
+          {t(errorKey)}
+        </Text>
+      ) : null}
+      <View className="flex-row gap-2.5">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("tasks.form.keepTask")}
+          disabled={busy}
+          className="min-h-[44px] flex-1 items-center justify-center rounded-[14px] border border-border bg-surface px-4 py-2.5"
+          onPress={() => setConfirming(false)}
+        >
+          <Text className="font-rubik-semibold text-[14px] text-muted">
+            {t("tasks.form.keepTask")}
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("tasks.form.confirmCancelTask")}
+          accessibilityState={{ disabled: busy }}
+          disabled={busy}
+          className={`min-h-[44px] flex-1 items-center justify-center rounded-[14px] bg-danger-solid px-4 py-2.5 ${
+            busy ? "opacity-60" : ""
+          }`}
+          onPress={() => {
+            if (busy) return;
+            cancel.mutate({ id: task.id, reason: reason.trim() || undefined }, { onSuccess: onClose });
+          }}
+        >
+          {/* AA: white on --color-danger-solid = 4.83 dark / 6.47 light. */}
+          <Text className="font-rubik-semibold text-[14px] text-white">
+            {t("tasks.form.confirmCancelTask")}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }

@@ -6,14 +6,20 @@
  * are pinned `direction:"ltr"` so the stepper order never mirrors under RTL, and
  * assignee labels are FSI/PDI-isolated for Latin names inside RTL copy.
  */
-import { memo } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { memo, useCallback } from "react";
+import { Text, View } from "react-native";
+import { FlashList, type ListRenderItem } from "@shopify/flash-list";
 import { useTranslation } from "react-i18next";
 
 import { PressableScale } from "@/components/PressableScale";
 import type { TaskPriority } from "@/types/tasks";
 
-import type { AssigneeOption } from "./task-form-derive";
+import {
+  assigneeRowKey,
+  buildAssigneeRows,
+  type AssigneeOption,
+  type AssigneeRow,
+} from "./task-form-derive";
 
 /** FSI…PDI isolate — a Latin name/email stays LTR inside RTL sentence flow. */
 function ltrIsolate(value: string): string {
@@ -195,10 +201,21 @@ function AssigneeChip({
   );
 }
 
+/** 8px inter-chip gap (was the `ScrollView` contentContainer `gap`). */
+function AssigneeSeparator() {
+  return <View style={{ width: 8 }} />;
+}
+
+/** 44pt min tap target + border + 2pt vertical breathing — fixes the horizontal
+ *  list's cross-axis size (a horizontal FlashList needs an explicit height). */
+const ASSIGNEE_ROW_HEIGHT = 52;
+
 /**
  * Horizontal assignee picker: an "Unassigned" chip plus one chip per staffer
- * (on-shift first, marked with a success dot). Horizontal scroll never mirrors
- * wrongly — RTL flips the start edge natively.
+ * (on-shift first, marked with a success dot). A recycling `FlashList` (2.x) so
+ * a large roster reuses chip cells instead of mounting every staffer. `extraData`
+ * carries `selectedId` so the recycler re-renders cells when the selection moves.
+ * Horizontal scroll still flips its start edge natively under RTL.
  */
 export function AssigneePicker({
   options,
@@ -212,30 +229,47 @@ export function AssigneePicker({
   loading: boolean;
 }>) {
   const { t } = useTranslation();
+  const rows = buildAssigneeRows(options);
+
+  const renderItem = useCallback<ListRenderItem<AssigneeRow>>(
+    ({ item }) => {
+      if (item.kind === "unassigned") {
+        return (
+          <AssigneeChip
+            label={t("tasks.form.unassigned")}
+            selected={selectedId == null}
+            onPress={() => onSelect(null)}
+          />
+        );
+      }
+      const { option } = item;
+      return (
+        <AssigneeChip
+          label={ltrIsolate(option.label)}
+          selected={option.id === selectedId}
+          onShiftMark={option.onShift}
+          onPress={() => onSelect(option.id)}
+        />
+      );
+    },
+    [t, selectedId, onSelect],
+  );
+
   return (
     <View>
       <Text className="mb-1.5 font-rubik text-[12.5px] text-muted">{t("tasks.form.assignee")}</Text>
-      <ScrollView
+      <FlashList
         horizontal
+        data={rows}
+        renderItem={renderItem}
+        keyExtractor={assigneeRowKey}
+        extraData={selectedId}
         showsHorizontalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ gap: 8, paddingVertical: 2 }}
-      >
-        <AssigneeChip
-          label={t("tasks.form.unassigned")}
-          selected={selectedId == null}
-          onPress={() => onSelect(null)}
-        />
-        {options.map((option) => (
-          <AssigneeChip
-            key={option.id}
-            label={ltrIsolate(option.label)}
-            selected={option.id === selectedId}
-            onShiftMark={option.onShift}
-            onPress={() => onSelect(option.id)}
-          />
-        ))}
-      </ScrollView>
+        ItemSeparatorComponent={AssigneeSeparator}
+        contentContainerStyle={{ paddingVertical: 2 }}
+        style={{ height: ASSIGNEE_ROW_HEIGHT }}
+      />
       {loading && options.length === 0 ? (
         <Text className="mt-1 font-rubik text-[11.5px] text-muted">{t("common.loading")}</Text>
       ) : null}

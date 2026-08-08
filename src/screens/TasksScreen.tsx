@@ -33,7 +33,7 @@ import { TasksDayNav } from "@/components/tasks/TasksDayNav";
 import { TasksListContent } from "@/components/tasks/TasksListContent";
 import { TasksSegmentControl } from "@/components/tasks/TasksSegmentControl";
 import { canEditTasks } from "@/components/tasks/task-form-derive";
-import { sortByStartTime, type TaskSegment } from "@/components/tasks/tasks-derive";
+import { resolveFormDay, sortByStartTime, type TaskSegment } from "@/components/tasks/tasks-derive";
 import { useTaskDay } from "@/components/tasks/useTaskDay";
 import { useTaskLifecycle } from "@/components/tasks/useTaskLifecycle";
 import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
@@ -182,7 +182,14 @@ export function TasksScreen() {
         </PressableScale>
       ) : null}
 
-      <TaskFormSheet request={formRequest} day={day} gateRole={gateRole} onClose={closeForm} />
+      {/* Create anchors on TODAY in the `mine` view (its list is clinic-today), */}
+      {/* never the stale `all`-segment day that persists in state. Edit overrides. */}
+      <TaskFormSheet
+        request={formRequest}
+        day={resolveFormDay(segment, today, day)}
+        gateRole={gateRole}
+        onClose={closeForm}
+      />
     </View>
   );
 }

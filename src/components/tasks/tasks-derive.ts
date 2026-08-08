@@ -18,6 +18,17 @@ import type { Task } from "@/types/tasks";
 /** The two list scopes the screen offers. `mine` = the server's clinic-today scope. */
 export type TaskSegment = "all" | "mine";
 
+/**
+ * The calendar day a NEW task should anchor to. The `mine` segment always shows
+ * the clinic's today, but the `all`-segment day selection persists in state
+ * across a segment switch — so a create started from `mine` anchors on today,
+ * not a stale previously-navigated day. Edit ignores this (it anchors on the
+ * task's own start day).
+ */
+export function resolveFormDay(segment: TaskSegment, today: string, selectedDay: string): string {
+  return segment === "mine" ? today : selectedDay;
+}
+
 export const START_ELIGIBLE_STATUSES = ["scheduled", "assigned", "arrived", "approved"] as const;
 
 export function canStartFromStatus(status: string): boolean {
