@@ -17,6 +17,43 @@
     "offShift": "Off shift",
     "comingSoon": "Coming soon"
   },
+  "alerts": {
+    "summary": "{{total}} open · {{urgent}} urgent",
+    "empty": "All clear",
+    "emptyBody": "No active equipment alerts.",
+    "loadError": "Failed to load alerts. Try again.",
+    "actionError": "Couldn't update the alert. Try again.",
+    "actionForbidden": "Off shift — alert actions are unavailable.",
+    "acknowledge": "I'm handling this",
+    "handling": "Handling",
+    "resolve": "Mark resolved",
+    "resolved": "Resolved",
+    "reopenHint": "Still flagged — it can re-open if the condition persists.",
+    "section": {
+      "urgent": "Urgent",
+      "maintenance": "Maintenance"
+    },
+    "type": {
+      "issue": "Active issue",
+      "overdue": "Overdue",
+      "sterilizationDue": "Sterilization due",
+      "inactive": "Inactive"
+    },
+    "detail": {
+      "issue": "Active issue — not yet resolved",
+      "overdue": "{{count}} days overdue",
+      "overdue_one": "1 day overdue",
+      "overdue_other": "{{count}} days overdue",
+      "sterilizationDue": "Not sterilized in 7+ days",
+      "inactive": "No scan in 14+ days"
+    },
+    "resolveSheet": {
+      "title": "Mark alert resolved",
+      "body": "This stops the reminder for this item. It can re-open if the condition persists.",
+      "notePlaceholder": "Add a note (optional)",
+      "confirm": "Mark resolved"
+    }
+  },
   "nav": {
     "home": "Home",
     "signIn": "Sign in",
@@ -446,6 +483,37 @@
       "invalidTime": "Enter a valid time (HH:MM).",
       "invalidReason": "The reason must be 3-500 characters."
     }
+  },
+  "handoff": {
+    "title": "Shift handover",
+    "generatedAt": "Generated {{when}}",
+    "revision": "Revision",
+    "noneYet": "No handover has been generated yet",
+    "loadError": "Couldn't load the shift handover",
+    "summary": {
+      "title": "Changes this shift",
+      "custody": "Custody",
+      "taskState": "Tasks",
+      "alerts": "Alerts",
+      "dispenses": "Dispenses",
+      "signals": "Observed signals"
+    },
+    "openItems": {
+      "title": "Open items"
+    },
+    "worklist": {
+      "title": "Patient worklist",
+      "notConfigured": "No practice-management system connected",
+      "empty": "No patients on the worklist",
+      "error": "Couldn't fetch the patient worklist ({{code}})",
+      "byTech": "Handled by {{name}}"
+    },
+    "acknowledge": "Acknowledge",
+    "acknowledgedAt": "Acknowledged {{when}}",
+    "acknowledgedState": "Acknowledged",
+    "unconfirm": "Unconfirm",
+    "notAuthorized": "You're not authorized to acknowledge this handover",
+    "actionError": "That didn't go through. Try again"
   },
   "shiftChat": {
     "online": "Online: {{count}}",
