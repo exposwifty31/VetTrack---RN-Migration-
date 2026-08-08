@@ -144,6 +144,9 @@ export const AlertRow = memo(function AlertRow({
 
   return (
     <View className="mb-2.5 rounded-md border border-border bg-surface px-4 py-3">
+      {/* Press-scale is the sanctioned transform-only row feedback (motion.ts) —
+          NOT content/danger animation: the row surface is neutral `bg-surface`;
+          the danger family lives only in the static severity Chip below. */}
       <PressableScale
         accessibilityRole="button"
         onPress={() => {
