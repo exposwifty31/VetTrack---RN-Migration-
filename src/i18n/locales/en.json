@@ -700,5 +700,27 @@
     "bulkVerify": "Verify all items",
     "bulkVerifyDone": "All verified",
     "bulkVerifyError": "Verification failed."
+  },
+  "shiftChat": {
+    "online": "Online: {{count}}",
+    "online_one": "Online: {{count}}",
+    "online_other": "Online: {{count}}",
+    "typing": "{{names}} typing…",
+    "pinned": "Pinned",
+    "placeholder": "Message your shift…",
+    "send": "Send",
+    "sendError": "Message not sent. Check your connection and try again.",
+    "offWindow": "You're off shift",
+    "offWindowBody": "Shift chat opens when your rostered shift starts.",
+    "loadError": "Couldn't load shift chat.",
+    "empty": "No messages yet",
+    "emptyBody": "Say hello to your shift.",
+    "broadcast": "Broadcast",
+    "systemUpdate": "Shift update",
+    "urgent": "Urgent",
+    "ack": "Acknowledge",
+    "acked": "Acknowledged",
+    "pin": "Pin",
+    "seniorOnly": "Seniors and above can pin messages."
   }
 }

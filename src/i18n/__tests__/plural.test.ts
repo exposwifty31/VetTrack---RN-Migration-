@@ -63,3 +63,36 @@ describe("plural form selection (counts 1 / 2 / 3, both locales)", () => {
     expect(tEn("myEquipment.checkedOutCount", { count: 1 })).toBe("1 checked out");
   });
 });
+
+/**
+ * `shiftChat.online` is count-bearing ("Online: {{count}}"). Its copy is identical
+ * across plural forms (the format carries no grammatical singular/plural), so a
+ * runtime-only assertion would pass via i18next's bare-key fallback even if the
+ * plural resources were removed. The STRUCTURAL checks below lock the resources'
+ * presence per locale's CLDR categories; the runtime checks prove clean {{count}}
+ * interpolation at singular / dual / plural counts.
+ */
+describe("shiftChat.online plural resource", () => {
+  const tHe = i18n.getFixedT("he");
+  const tEn = i18n.getFixedT("en");
+
+  it("defines en's {one, other} forms plus the bare fallback", () => {
+    expect(en.shiftChat).toHaveProperty("online");
+    expect(en.shiftChat).toHaveProperty("online_one");
+    expect(en.shiftChat).toHaveProperty("online_other");
+  });
+
+  it("defines he's {one, two, other} forms plus the bare fallback", () => {
+    expect(he.shiftChat).toHaveProperty("online");
+    expect(he.shiftChat).toHaveProperty("online_one");
+    expect(he.shiftChat).toHaveProperty("online_two");
+    expect(he.shiftChat).toHaveProperty("online_other");
+  });
+
+  it("resolves a count-bearing string at 1 / 2 / 3 in both locales", () => {
+    for (const count of [1, 2, 3]) {
+      expect(tHe("shiftChat.online", { count })).toBe(`מחוברים: ${count}`);
+      expect(tEn("shiftChat.online", { count })).toBe(`Online: ${count}`);
+    }
+  });
+});

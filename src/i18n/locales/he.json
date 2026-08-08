@@ -709,5 +709,28 @@
     "bulkVerify": "אמת את כל הפריטים",
     "bulkVerifyDone": "כל הפריטים אומתו",
     "bulkVerifyError": "האימות נכשל."
+  },
+  "shiftChat": {
+    "online": "מחוברים: {{count}}",
+    "online_one": "מחוברים: {{count}}",
+    "online_two": "מחוברים: {{count}}",
+    "online_other": "מחוברים: {{count}}",
+    "typing": "{{names}} מקלידים…",
+    "pinned": "מוצמד",
+    "placeholder": "כתבו הודעה למשמרת…",
+    "send": "שליחה",
+    "sendError": "ההודעה לא נשלחה. בדקו את החיבור ונסו שוב.",
+    "offWindow": "אתם מחוץ למשמרת",
+    "offWindowBody": "צ'אט המשמרת נפתח עם תחילת המשמרת המשובצת.",
+    "loadError": "לא הצלחנו לטעון את צ'אט המשמרת.",
+    "empty": "אין עדיין הודעות",
+    "emptyBody": "פתחו את השיחה עם המשמרת.",
+    "broadcast": "שידור",
+    "systemUpdate": "עדכון משמרת",
+    "urgent": "דחוף",
+    "ack": "אישור קבלה",
+    "acked": "אושר",
+    "pin": "הצמדה",
+    "seniorOnly": "בכירים ומעלה יכולים להצמיד הודעות."
   }
 }
