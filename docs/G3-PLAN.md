@@ -1,7 +1,7 @@
 # G3-PLAN.md — Daily-Driver Parity Gate
 
 **Repo:** `VetTrack---RN-Migration-` (Expo SDK 57 · RN 0.86.2 · New Architecture · CNG prebuild · Uniwind/Aurora · npm) 
-**Written:** 2026-08-07, synthesized from four scouts (Capacitor surface map · RN repo state · server API surface · G4 readiness); **v1.1 — revised same day per adversarial-critic verification** (sequencing rebased on post-#21 main; route-registration collision model fixed; 4 seams pre-resolved against server code; 2 API body specs corrected). 
+**Written:** 2026-08-07, synthesized from four scouts (Capacitor surface map · RN repo state · server API surface · G4 readiness); **v1.1 — revised same day per adversarial-critic verification** (sequencing rebased on post-#21 main; route-registration collision model fixed; 4 seams pre-resolved against server code; 2 API body specs corrected). **v1.2 (2026-08-08):** Slice 8 anchored to `docs/g3-slice8-inapp-chat-anchor.md` per owner instruction — no scope/doctrine change. 
 **Governance:** per `AGENTS.md`, slice PRs ship under the owner's standing 2026-08-07 instruction to execute G3; each slice = one PR from one agent in an isolated worktree, merged only after CI green + genuine CodeRabbit review + 0 unresolved threads. Jest + tsc are necessary but NOT sufficient — every slice verifies on a booted simulator/device before claiming done.
 
 ---
@@ -185,6 +185,13 @@ npx expo run:ios          # or run:android — booted-device smoke per AGENTS.md
 ### Slice 8 — Shift chat
 
 - **Scope:** `ShiftChatScreen` — messages within the caller's roster-derived chat window, send, ack, reactions, typing; pin pre-gated senior+. Entry points are NOT this slice's: Home header launcher = Slice 5, Menu entry = Slice 12. Archive route = deferred (C).
+- **Anchor (owner-added 2026-08-08): `docs/g3-slice8-inapp-chat-anchor.md`** — *"Engineering In-App Chat: Patterns from the Leaders and a Staged Build Plan"* (full-text conversion of the owner's source PDF). The document's client-side patterns bind this slice's build:
+  - **Send path:** optimistic echo + a client-generated message id (`Crypto.randomUUID()`, per the established scan idiom) carried on every send; reconcile the optimistic row by that id on ack; a retry after timeout/reconnect resends the **same** id. **Verify at build whether `POST /api/shift-chat/messages` accepts/persists a client id for dedup** (read `server/routes/shift-chat.ts`); if it doesn't, idempotent-send is an additive vettrack companion PR (same class as seam §6.4) — do NOT fake dedup client-side and do NOT block the slice on it.
+  - **Ordering:** server order is authoritative — sort and cursor strictly by server-assigned fields; never order by client clocks; client timestamps are display-only.
+  - **Sync:** persist the highest seen cursor; the focused-foreground `?after=` fetch is exactly the anchor's cursor-delta pattern — delta-fetch after the cursor and dedupe by id (the accumulation+dedupe test below is the enforcement).
+  - **Typing/presence — ephemeral only:** debounce `POST /typing` (emit at most ~once per 3–5 s, auto-expire ~5 s client-side, stop on send/blur); never persisted, never invalidates query caches.
+  - **Unread:** if surfaced, derive from a read cursor — no client-maintained unread counters. (The existing server surface is per-message ack; do not invent a cursor endpoint — honest-seams rule.)
+  - **The anchor does NOT relicense G3 scope:** transport stays focused-poll-only (seam §6.9 stands — no socket.io/WebSocket in this slice); no durable offline pending-send queue (the G4 write-queue boundary holds — the optimistic echo lives in memory only); no E2EE; all server schema/transport/scaling recommendations (per-conversation `seq`, Redis adapter, stage triggers) are vettrack-repo evolution under its own frozen-surface rules, not RN work.
 - **API (`src/lib/api/shift-chat.ts`; all technician+ floor — handle 403 for off-window users):**
   - `GET /api/shift-chat/messages?after=<cursor>` — incremental fetch. **The sanctioned polling exception:** interval fetch ONLY while the chat screen is focused AND app is foregrounded (AppState + navigation-focus gated; stop on blur/background). This mirrors web transport (gt-poll + collab nudge — shift chat is explicitly NOT on SSE).
   - `POST /api/shift-chat/messages` · `POST /api/shift-chat/messages/:id/ack` · `POST /api/shift-chat/reactions` · `POST /api/shift-chat/typing`
@@ -351,9 +358,9 @@ ADR-009 and the gated plan both note the emergency-alerting gap is an **existing
 8. **`EquipmentTruthResponse` — RESOLVED (critic, 2026-08-07).** Exported at the pinned SHA (`.vendor/vettrack/shared/equipment-truth.ts:19` → `shared/index.ts:15`). Slice 2 builds the truth section.
 9. **No socket.io-client in the RN repo** — the shift-chat `/collab-ws` new-message nudge cannot be wired in G3 without adding the dependency. G3 ships focused-poll-only; the nudge is a follow-up decision (dep add + ephemeral-only doctrine).
 10. **`RealtimeEnvelope` is defined locally** in `realtime.port.ts` — contracts has no realtime envelope type. Promotion = separate vettrack contracts PR (G4 memo item 6).
-11. **Restock scope conflict — MOSTLY RESOLVED (critic, 2026-08-07).** Scout 3's "console/program routes" classification was partially wrong: `server/routes/restock.ts` POST session routes are `requireEffectiveRole("student")` (mobile-eligible); only `GET /sessions` is `requireAdmin`. Slice 10 ships container-level restock first and should expect the session-program verification to come back mobile-usable.
+11. **Restock scope conflict — MOSTLY RESOLVED (critic, 2026-08-07).** Scout 3's "console/program routes" classification was partially wrong: `server/routes/restock.ts` POST session routes are `requireEffectiveRole("student")` (mobile-eligible; only `GET /sessions` is admin-only), so expect the verification to come back mobile-usable. Slice 10 ships container-level restock first and should expect the session-program verification to come back mobile-usable.
 12. **Container NFC tag format** for the scan→dispense entry (`?nfcTagId=`) — verify what the physical tags encode before extending `extractEquipmentId`'s fallback chain (Slice 10).
 
 ---
 
-*End of G3-PLAN.md (v1.1). First action: dispatch Slice 1 on current main; once it lands, fan out Slices 2/3/6/7/8/9/10/11 in isolated worktrees per the owner's parallelism appetite.*
+*End of G3-PLAN.md (v1.2). First action: dispatch Slice 1 on current main; once it lands, fan out Slices 2/3/6/7/8/9/10/11 in isolated worktrees per the owner's parallelism appetite.*
