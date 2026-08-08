@@ -192,7 +192,26 @@
   },
   "menu": {
     "title": "תפריט",
-    "devSection": "כלי פיתוח ובדיקה"
+    "endShift": "סיום משמרת",
+    "sections": {
+      "operations": "תפעול",
+      "session": "משמרת",
+      "account": "חשבון",
+      "developer": "כלי פיתוח ובדיקה"
+    }
+  },
+  "account": {
+    "displayName": "שם תצוגה",
+    "displayNamePlaceholder": "הזן שם תצוגה",
+    "edit": "עריכה",
+    "save": "שמירה",
+    "language": "שפה",
+    "restartHint": "כיוון הכתיבה (ימין-לשמאל/שמאל-לימין) יעודכן בהפעלה הבאה של האפליקציה.",
+    "signOut": "התנתקות",
+    "signOutConfirmTitle": "להתנתק?",
+    "signOutConfirmMessage": "יהיה עליך להתחבר מחדש כדי להשתמש באפליקציה.",
+    "displayNameInvalid": "יש להזין שם תצוגה באורך 1 עד 60 תווים.",
+    "updateError": "עדכון שם התצוגה נכשל. נסה שוב."
   },
   "bootstrap": {
     "reauth": "פג תוקף החיבור. התחבר שוב כדי להמשיך.",
