@@ -119,7 +119,7 @@ function BroadcastMessage({
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel={acked ? t("shiftChat.acked") : t("shiftChat.ack")}
-          accessibilityState={{ disabled: acked }}
+          accessibilityState={{ disabled: acked || ackPendingId === message.id }}
           disabled={acked || ackPendingId === message.id}
           className={`min-h-[36px] justify-center rounded-full px-4 ${
             acked ? "bg-surface" : "bg-primary"
