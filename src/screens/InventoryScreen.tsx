@@ -1,18 +1,208 @@
-/** G3 route placeholder — honest coming-soon, zero fetching, zero blur. */
-import { View } from "react-native";
+/**
+ * Inventory — G3 Slice 10: container list (blueprint targets + aggregate qty)
+ * with per-container Dispense + Restock actions.
+ *
+ * Doctrine wiring:
+ *   - Freshness is SSE-only: `useRealtimeInvalidation` on the verified container
+ *     audit actionTypes (containers emit no dedicated domain events — Scout 3).
+ *     KEEPALIVE never invalidates; no polling, no refetchInterval. Restock
+ *     commits invalidate imperatively (the session program emits no audit rows).
+ *   - Off-shift (403 INSUFFICIENT_ROLE from the student floor, OR a client role
+ *     below student) → the dedicated off-shift empty state, never an error toast.
+ *   - Rows are opaque `SectionCard`s; the ONE blur layer is whichever sheet is
+ *     open (mutually exclusive → ≤1 blur holds). Emergency dispense is solid
+ *     danger, never glassed/animated.
+ *   - The Inventory route is param-free (nav frozen); a scanned container is
+ *     handed over via a one-shot module ref, consumed ONCE at mount by a lazy
+ *     `useState` initializer (never a setState effect — repo lint rule).
+ *
+ * Rendered inside `GatedInventory`'s BootstrapGate, so identity is resolved.
+ */
+import { useCallback, useState } from "react";
+import { Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { FlashList, type ListRenderItem } from "@shopify/flash-list";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { useIdentity } from "@/app/useIdentity";
 import { AuroraBackground } from "@/components/home/AuroraBackground";
+import { ContainerRow } from "@/components/inventory/ContainerRow";
+import { DispenseSheet } from "@/components/inventory/DispenseSheet";
+import { consumePendingDispenseContainer } from "@/components/inventory/pending-container";
+import { RestockSheet } from "@/components/inventory/RestockSheet";
+import { ErrorNote } from "@/components/ui/ErrorNote";
 import { ListEmptyState } from "@/components/ui/ListEmptyState";
+import { RowSkeleton } from "@/components/ui/RowSkeleton";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
+import {
+  CONTAINER_AUDIT_ACTION_TYPES,
+  containerKeys,
+  containersApi,
+  isOffShiftError,
+  retryUnlessClientError,
+} from "@/lib/api/containers";
+import { hasRoleAtLeast } from "@/lib/roles";
+import type { ContainerListItem } from "@/types/containers";
+
+type SheetState =
+  | Readonly<{ kind: "dispense"; container: { id: string; name: string } }>
+  | Readonly<{ kind: "restock"; container: { id: string; name: string } }>
+  | null;
+
+type InventoryContentProps = Readonly<{
+  offShift: boolean;
+  isPending: boolean;
+  isError: boolean;
+  containers: ContainerListItem[];
+  renderItem: ListRenderItem<ContainerListItem>;
+  onRetry: () => void;
+}>;
+
+/** The list body's phase dispatch (off-shift / loading / error / empty / list),
+ * as early-return statements so the screen stays branch-light (SonarCloud gate). */
+function InventoryContent({
+  offShift,
+  isPending,
+  isError,
+  containers,
+  renderItem,
+  onRetry,
+}: InventoryContentProps) {
+  const { t } = useTranslation();
+
+  if (offShift) {
+    return (
+      <View className="flex-1 justify-center">
+        <ListEmptyState title={t("inventory.offShiftTitle")} body={t("inventory.offShiftBody")} />
+      </View>
+    );
+  }
+  if (isPending) {
+    return (
+      <View>
+        <RowSkeleton />
+        <RowSkeleton />
+        <RowSkeleton />
+      </View>
+    );
+  }
+  if (isError) {
+    return <ErrorNote message={t("inventory.loadError")} onRetry={onRetry} />;
+  }
+  if (containers.length === 0) {
+    return (
+      <View className="flex-1 justify-center">
+        <ListEmptyState title={t("inventory.empty")} body={t("inventory.emptyBody")} />
+      </View>
+    );
+  }
+  return (
+    <FlashList
+      data={containers}
+      renderItem={renderItem}
+      keyExtractor={(item) => item.id}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 24 }}
+    />
+  );
+}
 
 export function InventoryScreen() {
   const { t } = useTranslation();
+
+  const identity = useIdentity();
+  const effectiveRole = identity.data?.effectiveRole ?? identity.data?.role ?? "";
+  const canUse = hasRoleAtLeast(effectiveRole, "student");
+
+  const [sheet, setSheet] = useState<SheetState>(null);
+
+  // Consume the scan→dispense hand-off on every focus (not a mount-only read):
+  // `navigate("Inventory")` returns to the retained route, whose mount init would
+  // not re-run — so a scan while Inventory is already mounted opens the sheet
+  // when the screen re-focuses. `consume` is a one-shot read-and-clear.
+  useFocusEffect(
+    useCallback(() => {
+      const pending = consumePendingDispenseContainer();
+      if (pending) setSheet({ kind: "dispense", container: pending });
+    }, []),
+  );
+
+  useRealtimeInvalidation({
+    auditActionTypes: CONTAINER_AUDIT_ACTION_TYPES,
+    queryKeys: [containerKeys.all],
+  });
+
+  const listQuery = useQuery<ContainerListItem[], Error>({
+    queryKey: containerKeys.list(),
+    queryFn: () => containersApi.list(),
+    enabled: canUse,
+    retry: retryUnlessClientError,
+  });
+
+  const onDispense = useCallback((container: ContainerListItem) => {
+    setSheet({ kind: "dispense", container: { id: container.id, name: container.name } });
+  }, []);
+
+  const onRestock = useCallback((container: ContainerListItem) => {
+    setSheet({ kind: "restock", container: { id: container.id, name: container.name } });
+  }, []);
+
+  const closeSheet = useCallback(() => setSheet(null), []);
+
+  const renderItem = useCallback<ListRenderItem<ContainerListItem>>(
+    ({ item }) => (
+      <ContainerRow
+        container={item}
+        dispenseLabel={t("inventory.dispense")}
+        restockLabel={t("inventory.restock")}
+        onShelfLabel={t("inventory.onShelf")}
+        targetLabel={t("inventory.target")}
+        onDispense={onDispense}
+        onRestock={onRestock}
+      />
+    ),
+    [t, onDispense, onRestock],
+  );
+
+  const onRetry = useCallback(() => {
+    void listQuery.refetch();
+  }, [listQuery]);
+
+  const offShift = !canUse || isOffShiftError(listQuery.error);
+  const containers = listQuery.data ?? [];
+
+  // Only open a mutation sheet once inventory access is CONFIRMED. A scanned
+  // pending container seeds `sheet` before the role/list request settles; without
+  // this gate the sheet would render (and fire its own inventory request) for a
+  // user the server will 403, overlaying the required off-shift state.
+  const canRenderSheet = canUse && listQuery.isSuccess;
+
   return (
     <View className="flex-1 bg-background">
       <AuroraBackground />
-      <View className="flex-1 items-center justify-center">
-        <ListEmptyState title={t("common.comingSoon")} />
+      <View className="flex-1 px-[22px] pt-3">
+        <View className="mb-3">
+          <Text className="font-rubik-bold text-[20px] text-foreground">{t("inventory.title")}</Text>
+          <Text className="mt-0.5 font-rubik text-[13px] text-muted">{t("inventory.subtitle")}</Text>
+        </View>
+
+        <InventoryContent
+          offShift={offShift}
+          isPending={listQuery.isPending}
+          isError={listQuery.isError}
+          containers={containers}
+          renderItem={renderItem}
+          onRetry={onRetry}
+        />
       </View>
+
+      {canRenderSheet && sheet?.kind === "dispense" ? (
+        <DispenseSheet container={sheet.container} onClose={closeSheet} />
+      ) : null}
+      {canRenderSheet && sheet?.kind === "restock" ? (
+        <RestockSheet container={sheet.container} onClose={closeSheet} />
+      ) : null}
     </View>
   );
 }

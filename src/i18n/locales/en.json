@@ -552,5 +552,153 @@
     "unconfirm": "Unconfirm",
     "notAuthorized": "You're not authorized to acknowledge this handover",
     "actionError": "That didn't go through. Try again"
+  },
+  "autopilot": {
+    "empty": "No proposals to review",
+    "proposedBy": "Suggested by Autopilot",
+    "rationale": "Cited facts",
+    "decisionError": "Couldn't apply that decision. Try again.",
+    "alreadyDecided": "This proposal was already decided.",
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "edit": "Edit"
+    },
+    "kind": {
+      "shiftHandoverDraft": "Shift handover",
+      "coordinatorReassign": "Coordinator reassignment",
+      "restockPo": "Restock order",
+      "crashCartDrift": "Crash cart check"
+    },
+    "rejectSheet": {
+      "title": "Reject proposal",
+      "placeholder": "Why are you rejecting this?",
+      "submit": "Reject"
+    },
+    "editSheet": {
+      "title": "Edit proposal",
+      "placeholder": "Add a note",
+      "submit": "Save"
+    }
+  },
+  "inventory": {
+    "title": "Inventory",
+    "subtitle": "Consumables & crash-cart stock",
+    "empty": "No containers yet.",
+    "emptyBody": "Containers your clinic stocks will appear here.",
+    "offShiftTitle": "Off shift",
+    "offShiftBody": "Inventory is available during an active shift.",
+    "loadError": "Couldn't load inventory.",
+    "onShelf": "On shelf",
+    "target": "Target",
+    "dispense": "Dispense",
+    "restock": "Restock",
+    "decrease": "Decrease quantity",
+    "increase": "Increase quantity"
+  },
+  "dispense": {
+    "title": "Dispense",
+    "itemsTitle": "Items",
+    "noItems": "No stocked items to dispense.",
+    "available": "In stock",
+    "confirm": "Dispense",
+    "confirming": "Dispensing…",
+    "cancel": "Cancel",
+    "close": "Close",
+    "emergencyToggle": "Emergency dispense",
+    "emergencyHint": "Bypasses order matching — a reason is required.",
+    "reasonTitle": "Reason",
+    "reason": {
+      "EMERGENCY_CPR": "CPR / resuscitation",
+      "PROTOCOL_OVERRIDE": "Protocol override",
+      "TECH_ERROR": "Correcting an error"
+    },
+    "success": "Dispensed.",
+    "blocked": "Blocked: these items don't match active orders for this context. A clinician must resolve it.",
+    "insufficientStock": "Not enough stock for one of the items.",
+    "conflict": "This dispense was already submitted.",
+    "error": "Couldn't dispense. Try again.",
+    "loadError": "Couldn't load this container's items."
+  },
+  "restock": {
+    "title": "Restock",
+    "intro": "Count what's on the shelf. Nothing changes until you finish.",
+    "start": "Start restock",
+    "starting": "Starting…",
+    "expected": "Target",
+    "onHand": "On hand",
+    "progress": "{{scanned}}/{{total}} counted",
+    "finish": "Finish restock",
+    "finishing": "Finishing…",
+    "cancelSession": "Discard session",
+    "empty": "No items to restock.",
+    "loadError": "Couldn't load this container's items.",
+    "error": "Something went wrong. Try again.",
+    "scanError": "Couldn't save that count.",
+    "partialError": "Some counts were saved, but the session didn't finish. Reopen to review.",
+    "confirmDiscardTitle": "Discard count?",
+    "confirmDiscardBody": "Every count you entered will be lost.",
+    "confirmDiscardConfirm": "Discard",
+    "confirmDiscardKeep": "Keep counting"
+  },
+  "rooms": {
+    "title": "Rooms",
+    "empty": "No rooms",
+    "emptyBody": "Rooms you create will appear here.",
+    "totalLabel": "total",
+    "availableLabel": "available",
+    "inUseLabel": "in use",
+    "issuesLabel": "issues",
+    "swept": {
+      "never": "Never swept",
+      "today": "Swept today",
+      "yesterday": "Swept yesterday",
+      "on": "Swept {{date}}",
+      "by": "by {{name}}"
+    }
+  },
+  "roomDetail": {
+    "loadError": "Couldn't load the room.",
+    "homedCount": "{{count}} homed items",
+    "homedCount_one": "{{count}} homed item",
+    "homedCount_other": "{{count}} homed items",
+    "activity": {
+      "title": "Recent activity",
+      "empty": "No recent activity",
+      "loadError": "Couldn't load activity."
+    },
+    "bucket": {
+      "atHome": "At home",
+      "checkedOut": "In use",
+      "returnedUnverified": "Unverified",
+      "returnedAway": "Away",
+      "misplaced": "Off station",
+      "missing": "Missing",
+      "unassigned": "Unassigned",
+      "noStation": "No station"
+    },
+    "sweep": {
+      "title": "Room contents",
+      "start": "Start sweep",
+      "confirmAll": "Mark all present",
+      "clearAll": "Clear",
+      "commit": "Confirm sweep",
+      "committing": "Confirming...",
+      "summary": "{{present}} present · {{missing}} missing",
+      "result": "Swept: {{confirmed}} confirmed · {{missing}} missing",
+      "resultSkipped": "{{skipped}} no station",
+      "accounted": "In use",
+      "noStation": "No station",
+      "inUse": "In use · {{who}}",
+      "notFoundHere": "Not found here",
+      "notFoundError": "Couldn't report.",
+      "commitError": "Couldn't confirm the sweep.",
+      "loadError": "Couldn't load the room list.",
+      "empty": "No items homed to this room",
+      "emptyBody": "Items homed to this room will appear here."
+    },
+    "bulkVerify": "Verify all items",
+    "bulkVerifyDone": "All verified",
+    "bulkVerifyError": "Verification failed."
   }
 }
