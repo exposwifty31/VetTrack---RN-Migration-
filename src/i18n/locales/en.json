@@ -446,5 +446,60 @@
       "invalidTime": "Enter a valid time (HH:MM).",
       "invalidReason": "The reason must be 3-500 characters."
     }
+  },
+  "inventory": {
+    "title": "Inventory",
+    "subtitle": "Consumables & crash-cart stock",
+    "empty": "No containers yet.",
+    "emptyBody": "Containers your clinic stocks will appear here.",
+    "offShiftTitle": "Off shift",
+    "offShiftBody": "Inventory is available during an active shift.",
+    "loadError": "Couldn't load inventory.",
+    "onShelf": "On shelf",
+    "target": "Target",
+    "dispense": "Dispense",
+    "restock": "Restock",
+    "decrease": "Decrease quantity",
+    "increase": "Increase quantity"
+  },
+  "dispense": {
+    "title": "Dispense",
+    "itemsTitle": "Items",
+    "noItems": "No stocked items to dispense.",
+    "available": "In stock",
+    "confirm": "Dispense",
+    "confirming": "Dispensing…",
+    "cancel": "Cancel",
+    "close": "Close",
+    "emergencyToggle": "Emergency dispense",
+    "emergencyHint": "Bypasses order matching — a reason is required.",
+    "reasonTitle": "Reason",
+    "reason": {
+      "EMERGENCY_CPR": "CPR / resuscitation",
+      "PROTOCOL_OVERRIDE": "Protocol override",
+      "TECH_ERROR": "Correcting an error"
+    },
+    "success": "Dispensed.",
+    "blocked": "Blocked: these items don't match active orders for this context. A clinician must resolve it.",
+    "insufficientStock": "Not enough stock for one of the items.",
+    "conflict": "This dispense was already submitted.",
+    "error": "Couldn't dispense. Try again.",
+    "loadError": "Couldn't load this container's items."
+  },
+  "restock": {
+    "title": "Restock",
+    "intro": "Count what's on the shelf. Nothing changes until you finish.",
+    "start": "Start restock",
+    "starting": "Starting…",
+    "expected": "Target",
+    "onHand": "On hand",
+    "progress": "{{scanned}}/{{total}} counted",
+    "finish": "Finish restock",
+    "finishing": "Finishing…",
+    "cancelSession": "Discard session",
+    "empty": "No items to restock.",
+    "loadError": "Couldn't load this container's items.",
+    "error": "Something went wrong. Try again.",
+    "scanError": "Couldn't save that count."
   }
 }
