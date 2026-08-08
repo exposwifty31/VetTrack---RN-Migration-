@@ -15,18 +15,39 @@ import { ClerkAuthAdapter } from "./ClerkAuthAdapter";
 
 let sessionSignOut: (() => Promise<void>) | null = null;
 
+// Availability subscribers — so UI can react to sign-in/out registration rather
+// than reading a stale module value once at render (useSyncExternalStore).
+const availabilityListeners = new Set<() => void>();
+
 /**
  * Register (or clear) the active session's sign-out. Called by ClerkTokenBridge
  * under ClerkProvider; `null` on sign-out / when Clerk is absent (dev-bypass).
+ * Notifies availability subscribers only when the active/inactive state flips.
  */
 export function setSessionSignOut(fn: (() => Promise<void>) | null): void {
+  const wasActive = sessionSignOut !== null;
   sessionSignOut = fn;
+  const isActive = fn !== null;
+  if (isActive !== wasActive) {
+    for (const listener of availabilityListeners) listener();
+  }
 }
 
 /**
- * Whether an interactive (Clerk) session is active and can be signed out. Read
- * at render to decide whether to offer the sign-out affordance — in dev-bypass
- * there is no session, so it stays false and the row is hidden.
+ * Subscribe to session availability changes (for `useSyncExternalStore`). Returns
+ * an unsubscribe fn. Pairs with `isAuthSessionActive` as the snapshot.
+ */
+export function subscribeAuthSession(listener: () => void): () => void {
+  availabilityListeners.add(listener);
+  return () => {
+    availabilityListeners.delete(listener);
+  };
+}
+
+/**
+ * Whether an interactive (Clerk) session is active and can be signed out — the
+ * `useSyncExternalStore` snapshot. In dev-bypass there is no session, so it stays
+ * false and the sign-out affordance stays hidden.
  */
 export function isAuthSessionActive(): boolean {
   return sessionSignOut !== null;

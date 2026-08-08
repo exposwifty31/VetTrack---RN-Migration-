@@ -11,7 +11,7 @@
  * auto-mirrors `flex-row`; the Latin-capable display name renders inside an FSI
  * isolate.
  */
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { ActivityIndicator, Alert, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -25,7 +25,11 @@ import {
   isValidDisplayName,
 } from "@/lib/api/account";
 import { applyLocaleChange } from "@/features/account/locale-toggle";
-import { getAuthSession, isAuthSessionActive } from "@/infrastructure/auth/authSession";
+import {
+  getAuthSession,
+  isAuthSessionActive,
+  subscribeAuthSession,
+} from "@/infrastructure/auth/authSession";
 import { type Locale } from "@/i18n/locale-resolver";
 import { isRtlReloadPending } from "@/i18n/rtl";
 import { AURORA_COLORS } from "@/theme/colors";
@@ -36,13 +40,20 @@ function isolate(value: string): string {
 }
 
 export function AccountSection({ onSignedOut }: Readonly<{ onSignedOut: () => void }>) {
+  // Reactive session availability — re-renders when ClerkTokenBridge's effect
+  // registers/clears sign-out (a plain module read would miss that transition).
+  const sessionActive = useSyncExternalStore(
+    subscribeAuthSession,
+    isAuthSessionActive,
+    isAuthSessionActive,
+  );
   return (
     <View className="gap-3">
       <DisplayNameCard />
       <LanguageCard />
       {/* Sign-out is offered only when an interactive session exists (hidden in
           dev-bypass). The port adapter — not this component — knows about Clerk. */}
-      {isAuthSessionActive() ? <SignOutCard onSignedOut={onSignedOut} /> : null}
+      {sessionActive ? <SignOutCard onSignedOut={onSignedOut} /> : null}
     </View>
   );
 }
@@ -183,7 +194,9 @@ function LanguageCard() {
   const [persistFailed, setPersistFailed] = useState(false);
 
   const choose = async (locale: Locale) => {
-    if (locale === active) return;
+    // After a failed persist, i18next already shows `locale`, so `active` equals
+    // it — allow the same-locale press through so the user can retry the write.
+    if (locale === active && !persistFailed) return;
     setPersistFailed(false);
     try {
       const result = await applyLocaleChange(i18n, locale);

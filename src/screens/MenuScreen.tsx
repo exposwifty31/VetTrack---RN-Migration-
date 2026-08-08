@@ -36,8 +36,9 @@ export function MenuScreen({ navigation }: MainTabScreenProps<"Menu">) {
   const insets = useSafeAreaInsets();
   const identity = useIdentity();
 
-  // Students already get "Mine" as a bottom TAB (Slice 4), so the Menu omits the
-  // duplicate; everyone else (and an unresolved role) reaches Mine here.
+  // Custody-scoped roles (students and viewers) already get "Mine" as a bottom
+  // TAB (Slice 4), so the Menu omits the duplicate; unrestricted roles and an
+  // unresolved role reach Mine here.
   const operations = visibleOperationsEntries(identity.data?.effectiveRole);
 
   const go = (entry: MenuEntry) => navigation.navigate(entry.route);
