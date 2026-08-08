@@ -2,7 +2,10 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { resolveContainerScan } from "@/components/inventory/container-scan-resolve";
+import { setPendingDispenseContainer } from "@/components/inventory/pending-container";
 import { useNfcAdvisoryScan } from "@/hooks/useNfcAdvisoryScan";
+import { containersApi } from "@/lib/api/containers";
 
 import type { RootStackScreenProps } from "../navigation/types";
 
@@ -23,10 +26,18 @@ export function ScanScreen({ navigation }: RootStackScreenProps<"Scan">) {
       navigation.navigate("ScanConfirm", { equipmentId: result.equipmentId });
       return;
     }
-    // Advisory fallback: a tag with a payload but no canonical id → hand it to the
-    // list as a search so a human can pick the item (never auto-committed — ADR-006).
+    // Advisory fallback: a tag with a payload but no canonical equipment id.
+    // Try a container lookup first (a consumables container tag → open its
+    // dispense sheet); a 404 or lookup failure falls through to the equipment
+    // text-search seed. Never auto-committed — ADR-006.
     if (result.status === "no_id" && result.payload) {
-      navigation.navigate("EquipmentList", { initialQuery: result.payload });
+      const outcome = await resolveContainerScan(result.payload, containersApi.getByNfcTag);
+      if (outcome.kind === "container") {
+        setPendingDispenseContainer({ id: outcome.container.id, name: outcome.container.name });
+        navigation.navigate("Inventory");
+        return;
+      }
+      navigation.navigate("EquipmentList", { initialQuery: outcome.query });
       return;
     }
     setNote(result.status === "read_failed" ? t("scan.readFailed") : t("scan.noId"));

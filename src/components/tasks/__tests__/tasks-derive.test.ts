@@ -8,6 +8,7 @@ import {
   canStartFromStatus,
   lifecycleErrorKey,
   priorityTone,
+  resolveFormDay,
   sortByStartTime,
   statusLabelKey,
   statusTone,
@@ -154,5 +155,20 @@ describe("sortByStartTime", () => {
     const sorted = sortByStartTime(input);
     expect(sorted.map((x) => x.id)).toEqual(["b", "a", "c"]);
     expect(input.map((x) => x.id)).toEqual(["a", "c", "b"]);
+  });
+});
+
+describe("resolveFormDay", () => {
+  it("anchors a create on today in the mine segment, ignoring a stale selected day", () => {
+    expect(resolveFormDay("mine", "2026-08-08", "2026-08-01")).toBe("2026-08-08");
+  });
+
+  it("uses the selected day in the all segment", () => {
+    expect(resolveFormDay("all", "2026-08-08", "2026-08-01")).toBe("2026-08-01");
+  });
+
+  it("is a no-op when the selected day already equals today", () => {
+    expect(resolveFormDay("all", "2026-08-08", "2026-08-08")).toBe("2026-08-08");
+    expect(resolveFormDay("mine", "2026-08-08", "2026-08-08")).toBe("2026-08-08");
   });
 });

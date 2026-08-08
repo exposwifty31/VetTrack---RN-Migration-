@@ -74,18 +74,18 @@ function GatedAlerts() {
   );
 }
 
-function GatedRooms() {
+function GatedRooms(props: RootStackScreenProps<"Rooms">) {
   return (
     <BootstrapGate>
-      <RoomsScreen />
+      <RoomsScreen {...props} />
     </BootstrapGate>
   );
 }
 
-function GatedRoomDetail() {
+function GatedRoomDetail(props: RootStackScreenProps<"RoomDetail">) {
   return (
     <BootstrapGate>
-      <RoomDetailScreen />
+      <RoomDetailScreen {...props} />
     </BootstrapGate>
   );
 }
