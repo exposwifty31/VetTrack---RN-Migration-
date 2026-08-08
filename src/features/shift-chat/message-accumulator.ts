@@ -15,7 +15,6 @@
  * `safe-storage` mock and never drags Reanimated into jest (the
  * equipment-row-status precedent).
  */
-import { EMPTY_WINDOW_SNAPSHOT } from "@/lib/api/shift-chat";
 import type {
   AckStatus,
   ReactionEmoji,
@@ -118,13 +117,19 @@ function patchMessageById(
   };
 }
 
-/** Insert the caller's just-sent message (dedupe-safe against the next poll). */
+/**
+ * Insert the caller's just-sent message (dedupe-safe against the next poll).
+ * `snapshot` is required: the only caller patches inside the react-query cache
+ * updater, which runs solely when a base snapshot already exists. A `null-window`
+ * snapshot merges normally — its `shiftSessionId` stays as-is — so this never
+ * fabricates an off-window window (the sibling `applyOwnAck`/`applyOwnReaction`
+ * contract).
+ */
 export function applyOwnMessage(
-  snapshot: ShiftChatSnapshot | undefined,
+  snapshot: ShiftChatSnapshot,
   message: ShiftMessage,
 ): ShiftChatSnapshot {
-  const base = snapshot ?? EMPTY_WINDOW_SNAPSHOT;
-  return { ...base, messages: mergeMessages(base.messages, [message]) };
+  return { ...snapshot, messages: mergeMessages(snapshot.messages, [message]) };
 }
 
 /** Set the caller's ack on a broadcast/system message. */

@@ -63,80 +63,106 @@ function PinAction({ label, hint, onPress }: Readonly<{ label: string; hint: str
   );
 }
 
-function MessageBubbleImpl({
+/** system → centered muted pill (falls back to a generic "shift update" label). */
+function SystemMessage({ body }: Readonly<{ body: string | null }>) {
+  const { t } = useTranslation();
+  return (
+    <View className="my-1.5 items-center">
+      <View className="max-w-[85%] rounded-full border border-border bg-surface px-3 py-1.5">
+        <Text className="text-center font-rubik text-[12px] text-muted">
+          {body?.trim() ? body : t("shiftChat.systemUpdate")}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+type BroadcastMessageProps = Readonly<{
+  message: ShiftMessage;
+  meUserId: string | null;
+  acked: boolean;
+  canShowPin: boolean;
+  ackPendingId: string | null;
+  onReact: (messageId: string, emoji: ReactionEmoji) => void;
+  onAck: (messageId: string) => void;
+  onPin: (messageId: string) => void;
+}>;
+
+/** broadcast → full-width surface-raised announcement card with an ack. */
+function BroadcastMessage({
   message,
   meUserId,
-  canPin,
+  acked,
+  canShowPin,
+  ackPendingId,
   onReact,
   onAck,
   onPin,
-  ackPendingId,
-}: MessageBubbleProps) {
+}: BroadcastMessageProps) {
   const { t } = useTranslation();
-
-  if (message.type === "system") {
-    return (
-      <View className="my-1.5 items-center">
-        <View className="max-w-[85%] rounded-full border border-border bg-surface px-3 py-1.5">
-          <Text className="text-center font-rubik text-[12px] text-muted">
-            {message.body?.trim() ? message.body : t("shiftChat.systemUpdate")}
-          </Text>
-        </View>
+  return (
+    <View className="my-1.5 rounded-md border border-border bg-surface-raised p-3">
+      <View className="mb-1 flex-row items-center justify-between">
+        <Text className="font-rubik-bold text-[12px] text-info">{t("shiftChat.broadcast")}</Text>
+        {canShowPin ? (
+          <PinAction
+            label={t("shiftChat.pin")}
+            hint={t("shiftChat.seniorOnly")}
+            onPress={() => onPin(message.id)}
+          />
+        ) : null}
       </View>
-    );
-  }
-
-  const isAckable = message.type === "broadcast";
-  const acked = meUserId != null && message.acks.some((a) => a.userId === meUserId);
-  const canShowPin = canPin && message.pinnedAt == null;
-
-  if (isAckable) {
-    return (
-      <View className="my-1.5 rounded-md border border-border bg-surface-raised p-3">
-        <View className="mb-1 flex-row items-center justify-between">
-          <Text className="font-rubik-bold text-[12px] text-info">{t("shiftChat.broadcast")}</Text>
-          {canShowPin ? (
-            <PinAction
-              label={t("shiftChat.pin")}
-              hint={t("shiftChat.seniorOnly")}
-              onPress={() => onPin(message.id)}
-            />
-          ) : null}
-        </View>
-        <SenderLine name={message.senderName} role={message.senderRole} />
-        <Text className="font-rubik text-[14px] text-foreground">{message.body}</Text>
-        <View className="mt-2 flex-row items-center justify-between">
-          <TimeStamp iso={message.createdAt} />
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel={acked ? t("shiftChat.acked") : t("shiftChat.ack")}
-            accessibilityState={{ disabled: acked }}
-            disabled={acked || ackPendingId === message.id}
-            className={`min-h-[36px] justify-center rounded-full px-4 ${
-              acked ? "bg-surface" : "bg-primary"
+      <SenderLine name={message.senderName} role={message.senderRole} />
+      <Text className="font-rubik text-[14px] text-foreground">{message.body}</Text>
+      <View className="mt-2 flex-row items-center justify-between">
+        <TimeStamp iso={message.createdAt} />
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={acked ? t("shiftChat.acked") : t("shiftChat.ack")}
+          accessibilityState={{ disabled: acked }}
+          disabled={acked || ackPendingId === message.id}
+          className={`min-h-[36px] justify-center rounded-full px-4 ${
+            acked ? "bg-surface" : "bg-primary"
+          }`}
+          onPress={() => onAck(message.id)}
+        >
+          <Text
+            className={`font-rubik-semibold text-[13px] ${
+              acked ? "text-muted" : "text-primary-foreground"
             }`}
-            onPress={() => onAck(message.id)}
           >
-            <Text
-              className={`font-rubik-semibold text-[13px] ${
-                acked ? "text-muted" : "text-primary-foreground"
-              }`}
-            >
-              {acked ? t("shiftChat.acked") : t("shiftChat.ack")}
-            </Text>
-          </PressableScale>
-        </View>
-        <ReactionBar
-          reactions={message.reactions}
-          meUserId={meUserId}
-          onToggle={(emoji) => onReact(message.id, emoji)}
-        />
+            {acked ? t("shiftChat.acked") : t("shiftChat.ack")}
+          </Text>
+        </PressableScale>
       </View>
-    );
-  }
+      <ReactionBar
+        reactions={message.reactions}
+        meUserId={meUserId}
+        onToggle={(emoji) => onReact(message.id, emoji)}
+      />
+    </View>
+  );
+}
 
-  // regular
-  const isOwn = message.senderId != null && message.senderId === meUserId;
+type RegularMessageProps = Readonly<{
+  message: ShiftMessage;
+  meUserId: string | null;
+  isOwn: boolean;
+  canShowPin: boolean;
+  onReact: (messageId: string, emoji: ReactionEmoji) => void;
+  onPin: (messageId: string) => void;
+}>;
+
+/** regular → own (accent-filled, end-aligned) vs other (surface, start). */
+function RegularMessage({
+  message,
+  meUserId,
+  isOwn,
+  canShowPin,
+  onReact,
+  onPin,
+}: RegularMessageProps) {
+  const { t } = useTranslation();
   return (
     <View className={`my-1 max-w-[85%] ${isOwn ? "self-end" : "self-start"}`}>
       <View
@@ -170,6 +196,56 @@ function MessageBubbleImpl({
         onToggle={(emoji) => onReact(message.id, emoji)}
       />
     </View>
+  );
+}
+
+/**
+ * Thin dispatcher over the three row shapes — the render bodies live in focused
+ * sub-components so no single function carries the whole tree's branching. The
+ * action/permission contracts (ack, react, pin, pending, own-vs-other) are
+ * unchanged; only the structure moved.
+ */
+function MessageBubbleImpl({
+  message,
+  meUserId,
+  canPin,
+  onReact,
+  onAck,
+  onPin,
+  ackPendingId,
+}: MessageBubbleProps) {
+  if (message.type === "system") {
+    return <SystemMessage body={message.body} />;
+  }
+
+  const acked = meUserId != null && message.acks.some((a) => a.userId === meUserId);
+  const canShowPin = canPin && message.pinnedAt == null;
+
+  if (message.type === "broadcast") {
+    return (
+      <BroadcastMessage
+        message={message}
+        meUserId={meUserId}
+        acked={acked}
+        canShowPin={canShowPin}
+        ackPendingId={ackPendingId}
+        onReact={onReact}
+        onAck={onAck}
+        onPin={onPin}
+      />
+    );
+  }
+
+  const isOwn = message.senderId != null && message.senderId === meUserId;
+  return (
+    <RegularMessage
+      message={message}
+      meUserId={meUserId}
+      isOwn={isOwn}
+      canShowPin={canShowPin}
+      onReact={onReact}
+      onPin={onPin}
+    />
   );
 }
 

@@ -456,6 +456,9 @@
   },
   "shiftChat": {
     "online": "מחוברים: {{count}}",
+    "online_one": "מחוברים: {{count}}",
+    "online_two": "מחוברים: {{count}}",
+    "online_other": "מחוברים: {{count}}",
     "typing": "{{names}} מקלידים…",
     "pinned": "מוצמד",
     "placeholder": "כתבו הודעה למשמרת…",

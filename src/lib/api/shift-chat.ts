@@ -33,7 +33,7 @@ export { retryUnlessClientError } from "@/lib/api/coded-error";
 /** Canonical shift-chat query-key factory — everything nests under `all`. */
 export const shiftChatKeys = {
   all: ["shiftChat"] as const,
-  messages: () => ["shiftChat", "messages"] as const,
+  messages: () => [...shiftChatKeys.all, "messages"] as const,
 };
 
 /** Fixed server reaction enum (`server/routes/shift-chat.ts` Zod). */

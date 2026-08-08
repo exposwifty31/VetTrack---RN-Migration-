@@ -449,6 +449,8 @@
   },
   "shiftChat": {
     "online": "Online: {{count}}",
+    "online_one": "Online: {{count}}",
+    "online_other": "Online: {{count}}",
     "typing": "{{names}} typing…",
     "pinned": "Pinned",
     "placeholder": "Message your shift…",

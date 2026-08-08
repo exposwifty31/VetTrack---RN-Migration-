@@ -59,6 +59,13 @@ describe("shiftChatKeys", () => {
     expect(shiftChatKeys.all).toEqual(["shiftChat"]);
     expect(shiftChatKeys.messages()).toEqual(["shiftChat", "messages"]);
   });
+
+  it("derives messages() from `all` so the nesting can't drift", () => {
+    // messages() must be prefixed by every segment of `all` (no repeated literal).
+    expect(shiftChatKeys.messages().slice(0, shiftChatKeys.all.length)).toEqual([
+      ...shiftChatKeys.all,
+    ]);
+  });
 });
 
 describe("shiftChatApi.getMessages", () => {

@@ -15,7 +15,8 @@ import { PressableScale } from "@/components/PressableScale";
 const MAX_MESSAGE_LENGTH = 1000; // server Zod max
 
 type ComposerProps = Readonly<{
-  onSend: (body: string) => void;
+  /** Resolves when the send succeeds, rejects on failure — drives clear-vs-retain. */
+  onSend: (body: string) => Promise<void>;
   onTyping: () => void;
   pending: boolean;
   hasError: boolean;
@@ -39,8 +40,13 @@ export function Composer({ onSend, onTyping, pending, hasError }: ComposerProps)
 
   const submit = useCallback(() => {
     if (trimmed.length === 0) return;
-    onSend(trimmed);
-    setText("");
+    // Clear ONLY after the server accepts the message; a failed send keeps the
+    // user's draft (the error surfaces via `hasError`) so it is never lost.
+    onSend(trimmed)
+      .then(() => setText(""))
+      .catch(() => {
+        // Retain the draft on failure — nothing to clear.
+      });
   }, [trimmed, onSend]);
 
   return (

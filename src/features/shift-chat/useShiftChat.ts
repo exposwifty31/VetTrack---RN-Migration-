@@ -47,7 +47,10 @@ export type UseShiftChat = ReturnType<typeof useShiftChat>;
 
 export function useShiftChat() {
   const queryClient = useQueryClient();
-  const key = shiftChatKeys.messages();
+  // `shiftChatKeys.messages()` returns a fresh array each call — memoize it once so
+  // the derived `patchCache`/`refetch` callbacks (and the mutation option objects
+  // that close over them) keep stable identities across renders.
+  const key = useMemo(() => shiftChatKeys.messages(), []);
 
   const identity = useIdentity();
   const meUserId = identity.data?.id ?? null;
@@ -143,10 +146,14 @@ export function useShiftChat() {
     [snapshot?.typing, meName],
   );
 
+  // Resolves once the server accepts the message, rejects on failure — the
+  // composer awaits this so it clears the draft only on success and keeps the
+  // user's text (surfacing `sendError`) when the send fails.
   const send = useCallback(
-    (body: string) => {
+    async (body: string): Promise<void> => {
       const trimmed = body.trim();
-      if (trimmed.length > 0) sendMutation.mutate(trimmed);
+      if (trimmed.length === 0) return;
+      await sendMutation.mutateAsync(trimmed);
     },
     [sendMutation],
   );
