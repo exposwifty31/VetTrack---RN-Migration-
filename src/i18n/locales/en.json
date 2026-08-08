@@ -185,6 +185,8 @@
   "menu": {
     "title": "Menu",
     "endShift": "End shift",
+    "show": "Show",
+    "hide": "Hide",
     "sections": {
       "operations": "Operations",
       "session": "Shift",

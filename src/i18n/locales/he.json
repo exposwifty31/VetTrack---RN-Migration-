@@ -193,6 +193,8 @@
   "menu": {
     "title": "תפריט",
     "endShift": "סיום משמרת",
+    "show": "הצג",
+    "hide": "הסתר",
     "sections": {
       "operations": "תפעול",
       "session": "משמרת",

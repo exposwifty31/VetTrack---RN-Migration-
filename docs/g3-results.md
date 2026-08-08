@@ -29,9 +29,11 @@ Base: `main` @ `d0fbc58` (post PR #34). Recorded 2026-08-09.
 - **Menu front door** — `src/screens/MenuScreen.tsx` rewritten from the G1
   debug-launcher into four grouped sections: **Operations** (Tasks · Rooms ·
   Mine · Alerts · Inventory · Autopilot), **Session** (End shift → Handoff),
-  **Account** (display-name · locale · sign out), **Developer** (`__DEV__`-gated;
-  every old debug screen preserved — SignIn, ApiSmoke, NfcSpike, StorageDebug,
-  RealtimeDebug, I18nDebug, G2Measure). Route map extracted + compile-checked in
+  **Account** (display-name · locale · sign out), **Developer** (collapsible,
+  default-collapsed but **always rendered** so every old debug screen stays
+  reachable on release — SignIn, ApiSmoke, NfcSpike, StorageDebug, RealtimeDebug,
+  I18nDebug, G2Measure; NOT `__DEV__`-gated, because G2Measure must run on the
+  release artifact for the exit-pass). Route map extracted + compile-checked in
   `src/screens/menu/menu-routes.ts` (every entry is a param-free root-stack route).
 - **Account essentials** — `src/features/account/AccountSection.tsx`:
   - Display-name edit via **inline field** (frozen nav forbids registering the
@@ -174,7 +176,9 @@ sufficient** (AGENTS.md). Run on the owner's **Pixel** against production
 
 ### 5.2 G2Measure frame-floor spot-check (checklist item 5)
 
-- [ ] From the release artifact, open **Menu → Developer → G2 Measure**.
+- [ ] From the release artifact, open **Menu**, tap **Developer** (the section is
+      collapsed by default; it is **always rendered**, so G2 Measure is reachable
+      even on a `__DEV__ === false` release build), then **G2 Measure**.
 - [ ] Run the export on **Equipment list** (the required existing list) **and one
       new list screen** (e.g. Tasks or Rooms — the "one new list screen").
 - [ ] Confirm the `MARK` vocabulary/latch contract is intact (export runs, chunked

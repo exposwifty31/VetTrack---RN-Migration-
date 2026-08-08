@@ -5,14 +5,16 @@
  *     Inventory, Autopilot), each a param-free `navigation.navigate`.
  *   • Session — End shift → Handoff.
  *   • Account — display-name edit, locale toggle, sign out (AccountSection).
- *   • Developer — every debug screen from the old Menu, preserved but moved
- *     under a `__DEV__`-gated section so nothing reachable is lost.
+ *   • Developer — every debug screen from the old Menu, preserved under a
+ *     collapsible section (default-collapsed to keep the front door clean, but
+ *     ALWAYS rendered so nothing is lost — critically, G2Measure stays reachable
+ *     on a `__DEV__ === false` release build, which the G3 exit-pass depends on).
  *
  * The route map is compile-checked in `menu/menu-routes.ts` (every entry is a
  * param-free root-stack route). Aurora: opaque grouped `SectionCard`s, zero blur
  * layers, `PressableScale` rows; RN auto-mirrors the row layout in RTL.
  */
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -61,11 +63,45 @@ export function MenuScreen({ navigation }: MainTabScreenProps<"Menu">) {
           <AccountSection onSignedOut={() => navigation.navigate("SignIn")} />
         </View>
 
-        {__DEV__ ? (
-          <MenuGroup title={t("menu.sections.developer")} entries={DEVELOPER_ENTRIES} onSelect={go} />
-        ) : null}
+        <DeveloperGroup onSelect={go} />
       </View>
     </ScrollView>
+  );
+}
+
+/**
+ * Developer tools — collapsed by default (kept out of the daily-driver's way) but
+ * ALWAYS rendered so every debug screen stays reachable, including on a release
+ * build where `__DEV__` is false. G2Measure has no other UI entry point and the
+ * exit-pass runs it on the release artifact, so it must not be `__DEV__`-gated.
+ */
+function DeveloperGroup({ onSelect }: Readonly<{ onSelect: (entry: MenuEntry) => void }>) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <View className="gap-3">
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        className="min-h-[36px] flex-row items-center justify-between"
+        onPress={() => setExpanded((value) => !value)}
+      >
+        <GroupLabel title={t("menu.sections.developer")} />
+        <Text className="font-rubik-semibold text-[12.5px] text-text-tertiary">
+          {expanded ? t("menu.hide") : t("menu.show")}
+        </Text>
+      </PressableScale>
+      {expanded ? (
+        <View className="overflow-hidden rounded-md border border-border bg-surface">
+          {DEVELOPER_ENTRIES.map((entry, index) => (
+            <Fragment key={entry.route}>
+              {index > 0 ? <View className="h-px bg-border" /> : null}
+              <MenuRow label={t(entry.labelKey)} onPress={() => onSelect(entry)} />
+            </Fragment>
+          ))}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
