@@ -503,10 +503,15 @@
     "progress": "נספרו {{scanned}}/{{total}}",
     "finish": "סיים חידוש",
     "finishing": "מסיים…",
-    "cancelSession": "בטל משמרת",
+    "cancelSession": "בטל ספירה",
     "empty": "אין פריטים לחידוש.",
     "loadError": "לא ניתן לטעון את פריטי המכל.",
     "error": "משהו השתבש. נסה שוב.",
-    "scanError": "לא ניתן לשמור את הספירה."
+    "scanError": "לא ניתן לשמור את הספירה.",
+    "partialError": "חלק מהספירות נשמרו אך הספירה לא הושלמה. פתחו שוב לבדיקה.",
+    "confirmDiscardTitle": "לבטל את הספירה?",
+    "confirmDiscardBody": "כל הספירות שהזנת יאבדו.",
+    "confirmDiscardConfirm": "בטל ספירה",
+    "confirmDiscardKeep": "המשך לספור"
   }
 }

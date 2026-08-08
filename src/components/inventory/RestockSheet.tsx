@@ -15,7 +15,8 @@
  * stays branch-light (SonarCloud cognitive-complexity gate).
  */
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
+import { FlashList, type ListRenderItem } from "@shopify/flash-list";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
@@ -32,10 +33,22 @@ import {
 import type { ContainerInventoryLine, ContainerInventoryView } from "@/types/containers";
 
 import { QuantityStepper } from "./QuantityStepper";
+import {
+  commitRestockCounts,
+  restockCommitErrorKey,
+  type RestockErrorKey as RestockCommitErrorKey,
+} from "./restock-commit";
 
 const RESTOCK_MAX = 999;
 
-type RestockErrorKey = "restock.error" | "restock.scanError" | null;
+// Bounded FlashList viewport for the count list (virtualizes instead of eagerly
+// mounting every line). ~1-line row estimate; 2-line labels measure taller
+// (FlashList v2 auto-measures) and simply scroll. Capped at 4 rows so a long
+// container's list stays inside the sheet.
+const RESTOCK_ROW_ESTIMATE = 66;
+const RESTOCK_MAX_VISIBLE_ROWS = 4;
+
+type RestockErrorKey = RestockCommitErrorKey | null;
 
 export type RestockSheetTarget = Readonly<{ id: string; name: string }>;
 
@@ -50,26 +63,6 @@ function effectiveObserved(line: ContainerInventoryLine, counts: Record<string, 
   const itemId = line.itemId;
   if (itemId != null && counts[itemId] !== undefined) return counts[itemId];
   return line.sessionObservedQuantity ?? line.actual;
-}
-
-/**
- * Commit each touched line's observed count to the session, then finish (the
- * sole commit point). A line is skipped when untouched, or when its edit equals
- * the count the server already holds — so a retry never re-scans unchanged rows.
- */
-async function commitRestockCounts(
-  sessionId: string,
-  lines: readonly ContainerInventoryLine[],
-  counts: Record<string, number>,
-): Promise<void> {
-  for (const line of lines) {
-    const itemId = line.itemId as string;
-    const observed = counts[itemId];
-    if (observed === undefined) continue;
-    if (observed === (line.sessionObservedQuantity ?? line.actual)) continue;
-    await restockApi.scan(sessionId, itemId, observed);
-  }
-  await restockApi.finish(sessionId);
 }
 
 /** One countable line: label + expected/on-hand context + the observed stepper. */
@@ -172,6 +165,23 @@ function RestockForm({
   onCancel,
 }: RestockFormProps) {
   const { t } = useTranslation();
+
+  const keyExtractor = useCallback((item: ContainerInventoryLine) => item.itemId as string, []);
+  const renderRow = useCallback<ListRenderItem<ContainerInventoryLine>>(
+    ({ item }) => (
+      <RestockLineRow
+        label={item.label}
+        expected={item.expected}
+        onHand={item.actual}
+        value={effectiveObserved(item, counts)}
+        onChange={(next) => onSetCount(item.itemId as string, next)}
+      />
+    ),
+    [counts, onSetCount],
+  );
+  const listHeight =
+    Math.min(lines.length, RESTOCK_MAX_VISIBLE_ROWS) * RESTOCK_ROW_ESTIMATE;
+
   return (
     <View className="mt-4">
       {progress ? (
@@ -183,25 +193,17 @@ function RestockForm({
         </Text>
       ) : null}
 
-      <ScrollView
-        style={{ maxHeight: 260 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {lines.map((line) => {
-          const itemId = line.itemId as string;
-          return (
-            <RestockLineRow
-              key={itemId}
-              label={line.label}
-              expected={line.expected}
-              onHand={line.actual}
-              value={effectiveObserved(line, counts)}
-              onChange={(next) => onSetCount(itemId, next)}
-            />
-          );
-        })}
-      </ScrollView>
+      <View style={{ height: listHeight }}>
+        <FlashList
+          data={lines}
+          keyExtractor={keyExtractor}
+          renderItem={renderRow}
+          extraData={counts}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+        />
+      </View>
 
       {errorKey ? (
         <Text className="mt-3 font-rubik-semibold text-[14px] text-danger light:text-[#B91C1C]">
@@ -259,12 +261,20 @@ export function RestockSheet({ container, onClose }: RestockSheetProps) {
 
   const finishMutation = useMutation({
     // Commit each touched line's observed count, then finish (the sole commit).
-    mutationFn: (sessionId: string) => commitRestockCounts(sessionId, countableLines, counts),
+    mutationFn: (sessionId: string) =>
+      commitRestockCounts(restockApi, sessionId, countableLines, counts),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: containerKeys.all });
       onClose();
     },
-    onError: () => setErrorKey("restock.scanError"),
+    // A mid-commit failure can leave scans recorded but the session unfinished —
+    // refetch the container view so sessionProgress / observed counts reflect
+    // server truth, and surface a message that distinguishes which step failed
+    // (partial vs plain scan vs generic).
+    onError: (error: unknown) => {
+      invalidateItems();
+      setErrorKey(restockCommitErrorKey(error));
+    },
   });
 
   const cancelMutation = useMutation({
@@ -275,6 +285,27 @@ export function RestockSheet({ container, onClose }: RestockSheetProps) {
     },
     onError: () => setErrorKey("restock.error"),
   });
+
+  // Discarding a session throws away every physical count entered — confirm first
+  // so a single tap can't lose the work.
+  const requestCancel = useCallback(
+    (sessionId: string) => {
+      Alert.alert(
+        t("restock.confirmDiscardTitle"),
+        t("restock.confirmDiscardBody"),
+        [
+          { text: t("restock.confirmDiscardKeep"), style: "cancel" },
+          {
+            text: t("restock.confirmDiscardConfirm"),
+            style: "destructive",
+            onPress: () => cancelMutation.mutate(sessionId),
+          },
+        ],
+        { cancelable: true },
+      );
+    },
+    [t, cancelMutation],
+  );
 
   const setCount = useCallback((itemId: string, next: number) => {
     setCounts((prev) => ({ ...prev, [itemId]: next }));
@@ -326,7 +357,7 @@ export function RestockSheet({ container, onClose }: RestockSheetProps) {
         busy={busy}
         finishing={finishMutation.isPending}
         onFinish={() => finishMutation.mutate(activeSession.id)}
-        onCancel={() => cancelMutation.mutate(activeSession.id)}
+        onCancel={() => requestCancel(activeSession.id)}
       />
     );
   }

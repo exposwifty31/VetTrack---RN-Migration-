@@ -20,6 +20,7 @@
  */
 import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { FlashList, type ListRenderItem } from "@shopify/flash-list";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -114,12 +115,18 @@ export function InventoryScreen() {
   const effectiveRole = identity.data?.effectiveRole ?? identity.data?.role ?? "";
   const canUse = hasRoleAtLeast(effectiveRole, "student");
 
-  // Consume the scan→dispense hand-off exactly once, at mount (lazy init — never
-  // a setState effect). A tap opens the sheet the same way afterward.
-  const [sheet, setSheet] = useState<SheetState>(() => {
-    const pending = consumePendingDispenseContainer();
-    return pending ? { kind: "dispense", container: pending } : null;
-  });
+  const [sheet, setSheet] = useState<SheetState>(null);
+
+  // Consume the scan→dispense hand-off on every focus (not a mount-only read):
+  // `navigate("Inventory")` returns to the retained route, whose mount init would
+  // not re-run — so a scan while Inventory is already mounted opens the sheet
+  // when the screen re-focuses. `consume` is a one-shot read-and-clear.
+  useFocusEffect(
+    useCallback(() => {
+      const pending = consumePendingDispenseContainer();
+      if (pending) setSheet({ kind: "dispense", container: pending });
+    }, []),
+  );
 
   useRealtimeInvalidation({
     auditActionTypes: CONTAINER_AUDIT_ACTION_TYPES,
@@ -165,6 +172,12 @@ export function InventoryScreen() {
   const offShift = !canUse || isOffShiftError(listQuery.error);
   const containers = listQuery.data ?? [];
 
+  // Only open a mutation sheet once inventory access is CONFIRMED. A scanned
+  // pending container seeds `sheet` before the role/list request settles; without
+  // this gate the sheet would render (and fire its own inventory request) for a
+  // user the server will 403, overlaying the required off-shift state.
+  const canRenderSheet = canUse && listQuery.isSuccess;
+
   return (
     <View className="flex-1 bg-background">
       <AuroraBackground />
@@ -184,10 +197,10 @@ export function InventoryScreen() {
         />
       </View>
 
-      {sheet?.kind === "dispense" ? (
+      {canRenderSheet && sheet?.kind === "dispense" ? (
         <DispenseSheet container={sheet.container} onClose={closeSheet} />
       ) : null}
-      {sheet?.kind === "restock" ? (
+      {canRenderSheet && sheet?.kind === "restock" ? (
         <RestockSheet container={sheet.container} onClose={closeSheet} />
       ) : null}
     </View>

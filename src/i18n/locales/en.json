@@ -500,6 +500,11 @@
     "empty": "No items to restock.",
     "loadError": "Couldn't load this container's items.",
     "error": "Something went wrong. Try again.",
-    "scanError": "Couldn't save that count."
+    "scanError": "Couldn't save that count.",
+    "partialError": "Some counts were saved, but the session didn't finish. Reopen to review.",
+    "confirmDiscardTitle": "Discard count?",
+    "confirmDiscardBody": "Every count you entered will be lost.",
+    "confirmDiscardConfirm": "Discard",
+    "confirmDiscardKeep": "Keep counting"
   }
 }

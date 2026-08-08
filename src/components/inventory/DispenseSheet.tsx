@@ -15,7 +15,8 @@
  * composition root stays branch-light (SonarCloud cognitive-complexity gate).
  */
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { FlashList, type ListRenderItem } from "@shopify/flash-list";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import * as Crypto from "expo-crypto";
@@ -57,6 +58,13 @@ const REASON_KEY: Record<BypassReason, ReasonKey> = {
   PROTOCOL_OVERRIDE: "dispense.reason.PROTOCOL_OVERRIDE",
   TECH_ERROR: "dispense.reason.TECH_ERROR",
 };
+
+// Bounded FlashList viewport for the item picker (virtualizes instead of eagerly
+// mounting every dispensable line). ~1-line row estimate; 2-line labels measure
+// taller (FlashList v2 auto-measures) and simply scroll. Capped at 4 rows so a
+// large container's list stays inside the sheet.
+const DISPENSE_ROW_ESTIMATE = 62;
+const DISPENSE_MAX_VISIBLE_ROWS = 4;
 
 export type DispenseSheetTarget = Readonly<{ id: string; name: string }>;
 
@@ -210,29 +218,41 @@ function DispenseForm({
   onClose,
 }: DispenseFormProps) {
   const { t } = useTranslation();
+
+  const keyExtractor = useCallback((line: ContainerInventoryLine) => line.itemId as string, []);
+  const renderRow = useCallback<ListRenderItem<ContainerInventoryLine>>(
+    ({ item }) => {
+      const itemId = item.itemId as string;
+      return (
+        <DispenseItemRow
+          label={item.label}
+          available={item.actual}
+          value={quantities[itemId] ?? 0}
+          onChange={(next) => onSetQty(itemId, next)}
+        />
+      );
+    },
+    [quantities, onSetQty],
+  );
+  const listHeight =
+    Math.min(dispensable.length, DISPENSE_MAX_VISIBLE_ROWS) * DISPENSE_ROW_ESTIMATE;
+
   return (
     <View className="mt-4">
       <Text className="mb-1 font-rubik-semibold text-[13px] text-foreground">
         {t("dispense.itemsTitle")}
       </Text>
-      <ScrollView
-        style={{ maxHeight: 240 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {dispensable.map((line) => {
-          const itemId = line.itemId as string;
-          return (
-            <DispenseItemRow
-              key={itemId}
-              label={line.label}
-              available={line.actual}
-              value={quantities[itemId] ?? 0}
-              onChange={(next) => onSetQty(itemId, next)}
-            />
-          );
-        })}
-      </ScrollView>
+      <View style={{ height: listHeight }}>
+        <FlashList
+          data={dispensable}
+          keyExtractor={keyExtractor}
+          renderItem={renderRow}
+          extraData={quantities}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+        />
+      </View>
 
       <EmergencyToggle isEmergency={isEmergency} onToggle={onToggleEmergency} />
 
