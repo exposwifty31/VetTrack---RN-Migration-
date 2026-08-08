@@ -1,17 +1,19 @@
 /**
- * Tasks — G3 Slice 3a: clinic day view + "mine" segment + day navigation +
- * start/complete lifecycle. (3b — create/edit via BottomSheet + /meta assignee
- * picker — is the declared remainder; this screen keeps ZERO blur layers until
- * that sheet lands.)
+ * Tasks — G3 Slice 3 (3a read/day-nav/lifecycle + 3b create/edit/cancel):
+ * clinic day view + "mine" segment + day navigation + start/complete lifecycle
+ * + the create/edit/cancel form in the Slice-1 `BottomSheet` (the screen's ONE
+ * blur layer — mounted only while the form modal is open).
  *
  * Doctrine wiring:
  *   - Freshness is SSE-only: `useRealtimeInvalidation` on the five verified
- *     task audit actionTypes (+ the best-effort TASK_ broadcast prefix). No
- *     polling, no refetchInterval. The `useTaskDay` AppState listener is clock
- *     state only (day rollover), never a data fetch trigger.
+ *     task audit actionTypes (+ the best-effort TASK_ broadcast prefix) already
+ *     covers task_created/updated/cancelled, so the 3b mutations plain-invalidate
+ *     and let the same channel reconcile. No polling, no refetchInterval. The
+ *     `useTaskDay` AppState listener is clock state only, never a data trigger.
  *   - Off-shift 403 INSUFFICIENT_ROLE renders the dedicated empty state —
- *     never an error surface (G3-PLAN §1.6).
- *   - Rows are opaque; the only motion is PressableScale press feedback.
+ *     never an error surface (G3-PLAN §1.6); the create FAB + row-edit are
+ *     role-gated so an off-shift user (gate-role below the floor) sees neither.
+ *   - List rows are opaque; the only motion is PressableScale press feedback.
  *
  * The screen is a thin composition layer; day/lifecycle control live in
  * feature hooks and the state ladder in `TasksListContent`.
@@ -23,11 +25,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { useIdentity } from "@/app/useIdentity";
+import { PressableScale } from "@/components/PressableScale";
 import { AuroraBackground } from "@/components/home/AuroraBackground";
+import { TaskFormSheet, type TaskFormRequest } from "@/components/tasks/TaskFormSheet";
 import { TaskRow } from "@/components/tasks/TaskRow";
 import { TasksDayNav } from "@/components/tasks/TasksDayNav";
 import { TasksListContent } from "@/components/tasks/TasksListContent";
 import { TasksSegmentControl } from "@/components/tasks/TasksSegmentControl";
+import { canEditTasks } from "@/components/tasks/task-form-derive";
 import { sortByStartTime, type TaskSegment } from "@/components/tasks/tasks-derive";
 import { useTaskDay } from "@/components/tasks/useTaskDay";
 import { useTaskLifecycle } from "@/components/tasks/useTaskLifecycle";
@@ -57,6 +62,13 @@ export function TasksScreen() {
   const [segment, setSegment] = useState<TaskSegment>("all");
   const { today, day, setDay, isToday } = useTaskDay();
   const { actionErrorKey, pendingTaskId, onAction } = useTaskLifecycle();
+
+  // 3b: create/edit sheet. Gated on the task-RBAC create decision (senior+),
+  // so an off-shift or read-only user sees neither the FAB nor a row-edit.
+  const canEdit = canEditTasks(gateRole);
+  const [formRequest, setFormRequest] = useState<TaskFormRequest | null>(null);
+  const onEdit = useCallback((task: Task) => setFormRequest({ mode: "edit", task }), []);
+  const closeForm = useCallback(() => setFormRequest(null), []);
 
   useRealtimeInvalidation({
     typePrefixes: TASK_EVENT_TYPE_PREFIXES,
@@ -89,9 +101,10 @@ export function TasksScreen() {
         gateRole={gateRole}
         isPending={item.id === pendingTaskId}
         onAction={onAction}
+        onEdit={canEdit ? onEdit : undefined}
       />
     ),
-    [meUserId, gateRole, pendingTaskId, onAction],
+    [meUserId, gateRole, pendingTaskId, onAction, canEdit, onEdit],
   );
 
   const { refetch } = activeQuery;
@@ -148,6 +161,28 @@ export function TasksScreen() {
           renderItem={renderItem}
         />
       </View>
+
+      {/* Create entry — a primary FAB, editors only. Logical `end` inset flips */}
+      {/* under RTL. Hidden while the off-shift empty state owns the screen. */}
+      {canEdit && !(activeQuery.isError && isOffShiftError(activeQuery.error)) ? (
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={t("tasks.form.newTitle")}
+          className="absolute bottom-8 end-6 overflow-hidden rounded-full"
+          style={{ boxShadow: "0 6px 18px rgba(76,29,149,0.45)" }}
+          onPress={() => setFormRequest({ mode: "create" })}
+        >
+          <View
+            className="h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-[#7C3AED] to-[#6D28D9]"
+            style={{ boxShadow: "inset 0 1px 1px rgba(255,255,255,0.30)" }}
+          >
+            {/* AA: white on #6D28D9 = 7.10. */}
+            <Text className="font-rubik-bold text-[28px] leading-[30px] text-white">+</Text>
+          </View>
+        </PressableScale>
+      ) : null}
+
+      <TaskFormSheet request={formRequest} day={day} gateRole={gateRole} onClose={closeForm} />
     </View>
   );
 }

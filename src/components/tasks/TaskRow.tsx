@@ -5,7 +5,7 @@
  * Module-scope + memo keeps FlashList recycling cheap.
  */
 import { memo } from "react";
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { formatTime } from "@/lib/datetime";
@@ -16,6 +16,7 @@ import { TaskLifecycleButton } from "./TaskLifecycleButton";
 import { taskLifecycleAction, type TaskLifecycleAction } from "./tasks-derive";
 
 export type TaskActionHandler = (task: Task, action: TaskLifecycleAction) => void;
+export type TaskEditHandler = (task: Task) => void;
 
 export const TaskRow = memo(function TaskRow({
   task,
@@ -23,6 +24,7 @@ export const TaskRow = memo(function TaskRow({
   gateRole,
   isPending,
   onAction,
+  onEdit,
 }: Readonly<{
   task: Task;
   meUserId: string | null;
@@ -30,6 +32,8 @@ export const TaskRow = memo(function TaskRow({
   /** True while THIS task's lifecycle mutation is in flight. */
   isPending: boolean;
   onAction: TaskActionHandler;
+  /** Provided only to editors (task.create) — makes the row open the edit sheet. */
+  onEdit?: TaskEditHandler;
 }>) {
   const { t } = useTranslation();
 
@@ -40,8 +44,20 @@ export const TaskRow = memo(function TaskRow({
   const detailParts = [task.animalId?.trim(), task.ownerId?.trim()].filter(Boolean) as string[];
   const isMine = meUserId != null && task.vetId === meUserId;
 
+  // Editors get a pressable card (opens edit); everyone else a static card. The
+  // nested lifecycle button captures its own press, so Start/Complete still wins.
+  const Card = onEdit ? Pressable : View;
+  const cardProps = onEdit
+    ? {
+        accessibilityRole: "button" as const,
+        accessibilityLabel: task.notes?.trim() || t("tasks.noNotes"),
+        accessibilityHint: t("tasks.form.editHint"),
+        onPress: () => onEdit(task),
+      }
+    : {};
+
   return (
-    <View className="mb-2.5 rounded-[20px] border border-border bg-surface px-4 py-3">
+    <Card className="mb-2.5 rounded-[20px] border border-border bg-surface px-4 py-3" {...cardProps}>
       <View className="flex-row items-start gap-3">
         <Text className="flex-1 font-rubik-semibold text-[15px] text-foreground" numberOfLines={2}>
           {task.notes?.trim() || t("tasks.noNotes")}
@@ -72,6 +88,6 @@ export const TaskRow = memo(function TaskRow({
           onPress={(a) => onAction(task, a)}
         />
       ) : null}
-    </View>
+    </Card>
   );
 });
