@@ -550,5 +550,65 @@
       "placeholder": "הוסיפו הערה",
       "submit": "שמירה"
     }
+  },
+  "inventory": {
+    "title": "מלאי",
+    "subtitle": "מלאי מתכלים ועגלות החייאה",
+    "empty": "אין מכלים עדיין.",
+    "emptyBody": "המכלים שהמרפאה מנהלת יופיעו כאן.",
+    "offShiftTitle": "מחוץ למשמרת",
+    "offShiftBody": "המלאי זמין במהלך משמרת פעילה.",
+    "loadError": "לא ניתן לטעון את המלאי.",
+    "onShelf": "על המדף",
+    "target": "יעד",
+    "dispense": "ניפוק",
+    "restock": "חידוש מלאי",
+    "decrease": "הפחת כמות",
+    "increase": "הוסף כמות"
+  },
+  "dispense": {
+    "title": "ניפוק",
+    "itemsTitle": "פריטים",
+    "noItems": "אין פריטים במלאי לניפוק.",
+    "available": "במלאי",
+    "confirm": "נפק",
+    "confirming": "מנפק…",
+    "cancel": "ביטול",
+    "close": "סגור",
+    "emergencyToggle": "ניפוק חירום",
+    "emergencyHint": "עוקף התאמת הזמנות — נדרשת סיבה.",
+    "reasonTitle": "סיבה",
+    "reason": {
+      "EMERGENCY_CPR": "החייאה",
+      "PROTOCOL_OVERRIDE": "עקיפת פרוטוקול",
+      "TECH_ERROR": "תיקון טעות"
+    },
+    "success": "נופק.",
+    "blocked": "נחסם: הפריטים אינם תואמים להזמנות פעילות בהקשר זה. נדרש טיפול קליני.",
+    "insufficientStock": "אין מספיק מלאי לאחד הפריטים.",
+    "conflict": "הניפוק כבר נשלח.",
+    "error": "לא ניתן לנפק. נסה שוב.",
+    "loadError": "לא ניתן לטעון את פריטי המכל."
+  },
+  "restock": {
+    "title": "חידוש מלאי",
+    "intro": "ספרו את מה שעל המדף. שום דבר לא משתנה עד לסיום.",
+    "start": "התחל חידוש",
+    "starting": "מתחיל…",
+    "expected": "יעד",
+    "onHand": "במלאי",
+    "progress": "נספרו {{scanned}}/{{total}}",
+    "finish": "סיים חידוש",
+    "finishing": "מסיים…",
+    "cancelSession": "בטל ספירה",
+    "empty": "אין פריטים לחידוש.",
+    "loadError": "לא ניתן לטעון את פריטי המכל.",
+    "error": "משהו השתבש. נסה שוב.",
+    "scanError": "לא ניתן לשמור את הספירה.",
+    "partialError": "חלק מהספירות נשמרו אך הספירה לא הושלמה. פתחו שוב לבדיקה.",
+    "confirmDiscardTitle": "לבטל את הספירה?",
+    "confirmDiscardBody": "כל הספירות שהזנת יאבדו.",
+    "confirmDiscardConfirm": "בטל ספירה",
+    "confirmDiscardKeep": "המשך לספור"
   }
 }
