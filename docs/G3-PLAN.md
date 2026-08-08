@@ -10,6 +10,19 @@
 
 **G3 = staff can use the RN app as their daily driver for a full shift.** The Capacitor app remains installed as fallback; the gate verdict is the owner's written daily-driver verdict after real-shift use on his Pixel (same protocol shape as G2: release artifact, `npm ci`, production `https://vettrack.uk`).
 
+### Platform matrix (4 targets)
+
+VetTrack targets **four** platform surfaces. G3 advances only the RN app; the other two ship unchanged. Recorded here per the owner's 2026-08-08 restatement that **Tablet-iOS is a hard requirement currently missing from the gate ladder** — now captured as Slice 13 (pre-G5 gate).
+
+| Target | What ships it | Status in this plan |
+|---|---|---|
+| **Mobile iOS + Android** | this RN app | the whole of G3 |
+| **Tablet iOS (iPad)** | this RN app **+ an iPad layout** | **Slice 13** (pre-G5 gate) — same Apple binary as Mobile-iOS |
+| **Web management console** | the `vettrack` web app (React + Vite) | **unchanged** — never touched by RN work |
+| **TV ward board** | the `/board` kiosk target (in the `vettrack` repo) | **unchanged** — never touched by RN work |
+
+**Store submission = BOTH the Apple App Store AND Google Play** — the RN app's iOS and Android binaries both get submitted. Tablet-iOS is **not** a separate submission: it rides the **same Apple binary** as Mobile-iOS, which is exactly why Apple reviews the iPad layout once `ios.supportsTablet` is declared. The Web console and TV board are not store-submitted.
+
 ### Coverage bar
 
 | Grade | Requirement | Screens |
@@ -254,6 +267,30 @@ npx expo run:ios          # or run:android — booted-device smoke per AGENTS.md
 
 ---
 
+### Slice 13 — Tablet-iOS layout (pre-G5 gate) — **after Slice 12, before any store submission**
+
+> Added 2026-08-08 per owner: Tablet-iOS is one of the four platform targets (see §1 Platform matrix) and a hard submission prerequisite. It is a **pre-G5 gate** item — it needs the daily-driver screens to exist (Slices 2/3/5/7 landed) and must land **before** the G5 store submission — captured here so the gate ladder is complete.
+
+- **Scope:**
+  - **(a) Declare tablet support — already present, verify/keep.** `app.json` `ios.supportsTablet` is **already `true`** (`app.json:10`), so no edit is required; the slice's job is to make the declared support *honest*. **Declaring tablet support is what forces Apple to review the iPad layout** — an unadapted (letterboxed / stretched-phone) iPad build is a classic App Review rejection, which is why this slice is a submission prerequisite, not polish.
+  - **(b) Responsive layout adaptations for the primary daily-driver screens**, each adapted *within its existing screen* — **no new or combined routes** (the Slice-1 route contract stays frozen; phone taps still push, e.g., `EquipmentDetail`; tablet renders that same detail in a right pane). Introduce **one** tablet gate + **one** presentational two-pane primitive, mirroring the Capacitor precedent (read-only reference in the `vettrack` repo: `src/native/tablet/` — `useIsNativeTablet`, `TwoPaneLayout`, `RoomsMasterDetail`, `SelectItemPlaceholder`):
+    - `src/lib/use-is-tablet.ts` — RN analog of `useIsNativeTablet`, keyed on `useWindowDimensions()` short-side ≥ ~600 dp (the repo has no breakpoint hook today — only `AuroraBackground` reads `useWindowDimensions`; this is the one new hook).
+    - `src/components/tablet/TwoPane.tsx` — presentational master-detail (persistent master pane, swappable detail, RTL-correct via logical `start/end` props; opaque Aurora-tokened surfaces) + a `SelectPlaceholder` for the empty detail pane.
+    - **Equipment list → detail** and **Rooms → room detail**: genuine master-detail — on tablet the list stays mounted in the master pane and the selected row renders in the detail pane (the `RoomsMasterDetail` pattern); on phone, unchanged push navigation.
+    - **Tasks**: master-detail — the day / my-tasks list in the master pane, the selected task's detail/edit in the detail pane (the create/edit `BottomSheet` still overlays as the screen's single blur layer).
+    - **Home**: **not** master-detail (a daily-pulse dashboard has no "detail") — its tablet adaptation is a **wider multi-column / bento reflow** (hero + activity feed + chips use the extra width) reusing the existing cards; the single GlassTopBar blur layer (T1) and the `screenInteractive` latch stay untouched.
+  - **(c) iPad-simulator verification is the gate evidence.** Because tablet support is declared, Apple reviews the iPad layout; the gate is a clean run on a booted **iPad simulator** (`expo run:ios` onto an 11"-class iPad + a 12.9"/13" device, **portrait + landscape**), he + en with RTL, screenshots of all four adapted screens in both orientations attached to `docs/g3-results.md`. tsc/lint/jest stay necessary-but-not-sufficient per the AGENTS.md bar.
+  - **(d) No new server work.** Pure client layout; every screen calls the same endpoints its phone slice already wired.
+- **API endpoints:** none — no new server work (item d).
+- **Aurora:** two-pane surfaces opaque, Aurora tokens only; **≤1 blur layer per screen preserved** (Home keeps its T1 GlassTopBar; Tasks keeps its create/edit T2 sheet; the two-pane frame itself adds **zero** blur); danger surfaces never glassed/animated; **no content/layout animation** on pane swaps (frozen motion doctrine — pane changes are instant; press feedback via `PressableScale` only).
+- **i18n keys:** `tablet.*` (`selectEquipment`, `selectRoom`, `selectTask` select-placeholder copy) in BOTH `src/i18n/locales/{he,en}.json`, `parity.test.ts` green, zero hardcoded Hebrew. Reuse existing screen titles / empty-states where they already exist.
+- **Measurement harness:** this slice touches **Home and Equipment list**, so per §5 risk 4 its verification **re-runs a G2Measure export** — closed `MARK` vocabulary and existing latch call sites undisturbed, no frame-floor regression vs the G2.5 evidence on list scroll (two-pane must not regress the pooled UI p95).
+- **Five-React-skills mandate (§1.8):** UI slice — loads `react-native-best-practices` + `react-native-architecture` + `react-native-design` before writing, `argent-react-native-app-workflow` for the iPad-sim run; Skills-compliance section in the PR.
+- **Tests:** `use-is-tablet` breakpoint derivation unit test (short-side threshold, orientation flip); `TwoPane` selection-state logic (pure — no Reanimated in jest, per the `equipment-row-status` precedent); Home column-reflow derivation test if layout logic is extracted; i18n parity.
+- **Size:** M (~500–800) + iPad-sim verification time.
+
+---
+
 ### Parallel track (optional, per gated plan line 450) — Offline read-cache for equipment/rooms
 
 The gated plan places the offline **read**-cache in G3 (in this repo that means an op-sqlite read-through seam in the equipment/rooms fetch path plus the consuming UI cache states — the plan's original Dexie wording described the Capacitor client; the engine decision below supersedes it). It is not required for the daily-driver verdict if the owner accepts online-only reads for G3, but it is sanctioned to build in parallel any time after Slice 1:
@@ -278,6 +315,7 @@ Slice 1 (foundations + ALL route registrations, on current main)
   ├─ Slice 10 (inventory/dispense)
   └─ Slice 11 (autopilot)
           └─ Slice 12 (menu front door + exit pass; needs all surviving slices landed)
+                  └─ Slice 13 (Tablet-iOS layout; pre-G5 gate — after 12, all daily-driver screens landed)
 Parallel: offline read-cache track (after Slice 1)
 ```
 
