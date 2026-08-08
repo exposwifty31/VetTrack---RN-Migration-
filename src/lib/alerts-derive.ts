@@ -98,7 +98,7 @@ export function daysOverdue(eq: AlertEquipmentInput, nowMs: number): number {
   const last = parseMs(eq.lastMaintenanceDate);
   if (last == null) return 0;
   const due = last + eq.maintenanceIntervalDays * DAY_MS;
-  return Math.ceil((nowMs - due) / DAY_MS);
+  return Math.max(0, Math.ceil((nowMs - due) / DAY_MS));
 }
 
 export function isSterilizationDue(eq: AlertEquipmentInput, nowMs: number): boolean {

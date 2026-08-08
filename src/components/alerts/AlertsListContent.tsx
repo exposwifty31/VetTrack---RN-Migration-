@@ -9,7 +9,7 @@
  * 403s; only the ack/resolve mutations gate at senior_technician+ (handled on
  * the screen).
  */
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Text, View } from "react-native";
 import { FlashList, type ListRenderItem } from "@shopify/flash-list";
 import { useTranslation } from "react-i18next";
@@ -73,6 +73,8 @@ export function AlertsListContent({
 }: AlertsListContentProps) {
   const { t } = useTranslation();
 
+  const entries = useMemo(() => (view ? toEntries(view) : []), [view]);
+
   const renderItem = useCallback<ListRenderItem<ListEntry>>(
     ({ item }) => {
       if (item.kind === "header") {
@@ -124,7 +126,7 @@ export function AlertsListContent({
 
   return (
     <FlashList
-      data={toEntries(view)}
+      data={entries}
       renderItem={renderItem}
       keyExtractor={(item) => item.key}
       getItemType={(item) => item.kind}

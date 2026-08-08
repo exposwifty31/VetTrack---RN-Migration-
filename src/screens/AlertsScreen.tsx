@@ -66,7 +66,13 @@ type AlertsNavigation = NativeStackNavigationProp<RootStackParamList, "Alerts">;
 
 async function fetchAlertEquipment(): Promise<EquipmentRow[]> {
   const res = await api.equipment.list({ limit: EQUIPMENT_FLEET_LIMIT });
-  return res.status === 200 ? res.data.items : [];
+  // Throw on a non-200 so React Query marks the query failed and the list shows
+  // its honest error state with retry — never a misleading "All clear" over an
+  // outage.
+  if (res.status !== 200) {
+    throw new Error(`EQUIPMENT_LIST_FAILED_${res.status}`);
+  }
+  return res.data.items;
 }
 
 type AlertActionErrorKey = "alerts.actionError" | "alerts.actionForbidden";
@@ -186,6 +192,8 @@ export function AlertsScreen() {
       <View
         className="flex-1 px-[22px] pt-3"
         pointerEvents={resolvingRow ? "none" : "auto"}
+        accessibilityElementsHidden={resolvingRow !== null}
+        importantForAccessibility={resolvingRow ? "no-hide-descendants" : "auto"}
       >
         {view && view.total > 0 ? (
           <Text className="mb-2.5 font-rubik text-[13px] text-muted">
@@ -213,7 +221,7 @@ export function AlertsScreen() {
       </View>
 
       {resolvingRow ? (
-        <View style={StyleSheet.absoluteFill}>
+        <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
           <BottomSheet onDismiss={closeSheet}>
             <ResolveSheet
               equipmentName={resolvingRow.alert.equipmentName}

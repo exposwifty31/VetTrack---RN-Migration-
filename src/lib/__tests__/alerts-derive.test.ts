@@ -62,6 +62,11 @@ describe("predicates", () => {
       10,
     );
     expect(daysOverdue(eq({ maintenanceIntervalDays: null }), NOW)).toBe(0);
+    // Before the due date the count is clamped to 0 (never negative) — honours
+    // the documented contract for the exported, unguarded caller.
+    expect(daysOverdue(eq({ lastMaintenanceDate: ago(20), maintenanceIntervalDays: 30 }), NOW)).toBe(
+      0,
+    );
   });
 
   it("isSterilizationDue: true when last sterilization is older than 7 days", () => {
