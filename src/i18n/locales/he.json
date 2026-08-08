@@ -453,5 +453,66 @@
       "invalidTime": "יש להזין שעה תקינה (HH:MM).",
       "invalidReason": "הסיבה חייבת להיות באורך 3-500 תווים."
     }
+  },
+  "rooms": {
+    "title": "חדרים",
+    "empty": "אין חדרים",
+    "emptyBody": "חדרים שייווצרו יופיעו כאן.",
+    "totalLabel": "סה״כ",
+    "availableLabel": "זמינים",
+    "inUseLabel": "בשימוש",
+    "issuesLabel": "תקלות",
+    "swept": {
+      "never": "טרם נסרק",
+      "today": "נסרק היום",
+      "yesterday": "נסרק אתמול",
+      "on": "נסרק ב-{{date}}",
+      "by": "על ידי {{name}}"
+    }
+  },
+  "roomDetail": {
+    "loadError": "טעינת החדר נכשלה.",
+    "homedCount": "{{count}} פריטים משויכים",
+    "homedCount_one": "פריט אחד משויך",
+    "homedCount_two": "שני פריטים משויכים",
+    "homedCount_other": "{{count}} פריטים משויכים",
+    "activity": {
+      "title": "פעילות אחרונה",
+      "empty": "אין פעילות אחרונה",
+      "loadError": "טעינת הפעילות נכשלה."
+    },
+    "bucket": {
+      "atHome": "במקום",
+      "checkedOut": "בשימוש",
+      "returnedUnverified": "לא אומת",
+      "returnedAway": "לא במקומו",
+      "misplaced": "לא בעמדה",
+      "missing": "חסר",
+      "unassigned": "לא משויך",
+      "noStation": "אין עמדה"
+    },
+    "sweep": {
+      "title": "תכולת החדר",
+      "start": "התחל סריקה",
+      "confirmAll": "סמן הכול כנוכח",
+      "clearAll": "נקה",
+      "commit": "אשר סריקה",
+      "committing": "מאשר...",
+      "summary": "{{present}} נוכחים · {{missing}} חסרים",
+      "result": "נסרק: {{confirmed}} אושרו · {{missing}} חסרים",
+      "resultSkipped": "{{skipped}} ללא עמדה",
+      "accounted": "בשימוש",
+      "noStation": "אין עמדה",
+      "inUse": "בשימוש · {{who}}",
+      "notFoundHere": "לא נמצא כאן",
+      "notFoundError": "הדיווח נכשל.",
+      "commitError": "אישור הסריקה נכשל.",
+      "loadError": "טעינת רשימת החדר נכשלה.",
+      "empty": "אין פריטים משויכים לחדר",
+      "emptyBody": "פריטים שישויכו לחדר יופיעו כאן."
+    },
+    "bulkVerify": "אמת את כל הפריטים",
+    "bulkVerifyDone": "כל הפריטים אומתו",
+    "bulkVerifyError": "האימות נכשל."
   }
 }
