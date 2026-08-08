@@ -483,5 +483,36 @@
       "invalidTime": "Enter a valid time (HH:MM).",
       "invalidReason": "The reason must be 3-500 characters."
     }
+  },
+  "handoff": {
+    "title": "Shift handover",
+    "generatedAt": "Generated {{when}}",
+    "revision": "Revision",
+    "noneYet": "No handover has been generated yet",
+    "loadError": "Couldn't load the shift handover",
+    "summary": {
+      "title": "Changes this shift",
+      "custody": "Custody",
+      "taskState": "Tasks",
+      "alerts": "Alerts",
+      "dispenses": "Dispenses",
+      "signals": "Observed signals"
+    },
+    "openItems": {
+      "title": "Open items"
+    },
+    "worklist": {
+      "title": "Patient worklist",
+      "notConfigured": "No practice-management system connected",
+      "empty": "No patients on the worklist",
+      "error": "Couldn't fetch the patient worklist ({{code}})",
+      "byTech": "Handled by {{name}}"
+    },
+    "acknowledge": "Acknowledge",
+    "acknowledgedAt": "Acknowledged {{when}}",
+    "acknowledgedState": "Acknowledged",
+    "unconfirm": "Unconfirm",
+    "notAuthorized": "You're not authorized to acknowledge this handover",
+    "actionError": "That didn't go through. Try again"
   }
 }

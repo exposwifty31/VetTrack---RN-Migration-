@@ -491,5 +491,36 @@
       "invalidTime": "יש להזין שעה תקינה (HH:MM).",
       "invalidReason": "הסיבה חייבת להיות באורך 3-500 תווים."
     }
+  },
+  "handoff": {
+    "title": "העברת משמרת",
+    "generatedAt": "נוצר ב-{{when}}",
+    "revision": "גרסה",
+    "noneYet": "עדיין לא נוצר דוח העברת משמרת",
+    "loadError": "טעינת דוח העברת המשמרת נכשלה",
+    "summary": {
+      "title": "שינויים במהלך המשמרת",
+      "custody": "החזקת ציוד",
+      "taskState": "משימות",
+      "alerts": "התראות",
+      "dispenses": "ניפוקים",
+      "signals": "אותות שנצפו"
+    },
+    "openItems": {
+      "title": "פריטים פתוחים"
+    },
+    "worklist": {
+      "title": "רשימת מטופלים",
+      "notConfigured": "לא מחוברת מערכת לניהול המרפאה",
+      "empty": "אין מטופלים ברשימה",
+      "error": "שליפת רשימת המטופלים נכשלה ({{code}})",
+      "byTech": "טופל על ידי {{name}}"
+    },
+    "acknowledge": "אישור קבלה",
+    "acknowledgedAt": "אושר ב-{{when}}",
+    "acknowledgedState": "אושר",
+    "unconfirm": "ביטול אישור",
+    "notAuthorized": "אינך מורשה לאשר את דוח המשמרת הזה",
+    "actionError": "הפעולה נכשלה. יש לנסות שוב"
   }
 }
