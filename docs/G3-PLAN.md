@@ -358,7 +358,7 @@ ADR-009 and the gated plan both note the emergency-alerting gap is an **existing
 8. **`EquipmentTruthResponse` — RESOLVED (critic, 2026-08-07).** Exported at the pinned SHA (`.vendor/vettrack/shared/equipment-truth.ts:19` → `shared/index.ts:15`). Slice 2 builds the truth section.
 9. **No socket.io-client in the RN repo** — the shift-chat `/collab-ws` new-message nudge cannot be wired in G3 without adding the dependency. G3 ships focused-poll-only; the nudge is a follow-up decision (dep add + ephemeral-only doctrine).
 10. **`RealtimeEnvelope` is defined locally** in `realtime.port.ts` — contracts has no realtime envelope type. Promotion = separate vettrack contracts PR (G4 memo item 6).
-11. **Restock scope conflict — MOSTLY RESOLVED (critic, 2026-08-07).** Scout 3's "console/program routes" classification was partially wrong: `server/routes/restock.ts` POST session routes are `requireEffectiveRole("student")` (mobile-eligible; only `GET /sessions` is admin-only), so expect the verification to come back mobile-usable. Slice 10 ships container-level restock first and should expect the session-program verification to come back mobile-usable.
+11. **Restock scope conflict — MOSTLY RESOLVED (critic, 2026-08-07).** Scout 3's "console/program routes" classification was partially wrong: `server/routes/restock.ts` POST session routes are `requireEffectiveRole("student")` (mobile-eligible); only `GET /sessions` is `requireAdmin`. Slice 10 ships container-level restock first and should expect the session-program verification to come back mobile-usable.
 12. **Container NFC tag format** for the scan→dispense entry (`?nfcTagId=`) — verify what the physical tags encode before extending `extractEquipmentId`'s fallback chain (Slice 10).
 
 ---
