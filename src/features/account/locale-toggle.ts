@@ -27,14 +27,23 @@ export function nextLocale(current: Locale): Locale {
 }
 
 export type LocaleChangeResult = Readonly<{
+  /**
+   * Whether the choice was durably persisted. When false the change did NOT
+   * survive to storage; the caller surfaces an error and the native RTL flag is
+   * deliberately left untouched so it can't drift ahead of the stored locale.
+   */
+  persisted: boolean;
   /** True when the layout DIRECTION still needs a reload/restart to apply. */
   reloadPending: boolean;
 }>;
 
 /**
  * Apply a locale choice: flip i18next language (copy re-renders live), persist
- * the choice, and align the native RTL flag. Returns whether a JS reload/restart
- * is still needed for the layout DIRECTION to actually apply. Side-effecting but
+ * the choice, and — only if the write succeeded — align the native RTL flag.
+ * Returns `{persisted, reloadPending}` so the caller can report a failed write
+ * and reuse the pending-reload signal without recomputing it. If persistence
+ * fails we skip `applyRtlDirection` so a restart can't land with the native
+ * direction ahead of the (unchanged) stored locale. Side-effecting but
  * dependency-injected (`i18n` passed in) so it unit-tests without full i18next
  * init.
  */
@@ -43,7 +52,9 @@ export async function applyLocaleChange(
   locale: Locale,
 ): Promise<LocaleChangeResult> {
   await i18n.changeLanguage(locale);
-  persistLocale(locale);
-  applyRtlDirection(locale);
-  return { reloadPending: isRtlReloadPending(locale) };
+  const persisted = persistLocale(locale);
+  if (persisted) {
+    applyRtlDirection(locale);
+  }
+  return { persisted, reloadPending: isRtlReloadPending(locale) };
 }

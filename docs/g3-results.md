@@ -48,9 +48,13 @@ Base: `main` @ `d0fbc58` (post PR #34). Recorded 2026-08-09.
     `src/features/account/locale-toggle.ts`.
   - Sign out via Clerk (`useAuth().signOut`), confirm-gated (`Alert`), rendered
     only under `ClerkProvider` (dev-bypass has no session).
-- **G5 seam (NOT built):** account deletion (`DELETE /api/users/delete-account`,
-  Apple + Google both mandate in-app deletion before store submission) and avatar
-  upload — noted in `src/lib/api/account.ts`; the web deletion page is the interim.
+- **G5 seam (NOT built):** account deletion (`DELETE /api/users/delete-account`)
+  and avatar upload — noted in `src/lib/api/account.ts`. The two stores differ:
+  **Apple** (Guideline 5.1.1(v)) requires an in-app path that **initiates** account
+  deletion; **Google Play** requires a deletion-request path and permits that
+  in-app path to **link out to the existing web deletion resource** (which must
+  also be provided as a Play Console web URL). Both are store-submission
+  prerequisites, not daily-driver blockers — the web deletion page is the interim.
 
 ---
 
@@ -80,7 +84,7 @@ New tests added by this slice (part of the 638):
 `grep -rn "refetchInterval" src/` — the ONLY runtime use is the documented
 shift-chat exception:
 
-```
+```text
 src/features/shift-chat/useShiftChat.ts:81   refetchInterval: (q) => …computeRefetchInterval(…)
 ```
 
@@ -202,7 +206,7 @@ may strip the NFC entitlement like the sim path did). Run every checkbox below
       fallback only.
 - [ ] Record the written **go / no-go** verdict here, **one line per device**:
 
-```
+```text
 Owner daily-driver verdict — Pixel 7 / Android (date, build, verdict, notes):
   … to be filled by the owner …
 
@@ -216,11 +220,11 @@ Owner daily-driver verdict — iPhone 16 Plus / iOS (date, build, verdict, notes
 
 1. **Display-name editor is inline, not a `BottomSheet`.** The nav contract is
    frozen (Slice 1 pre-registered all routes; this slice adds none), so the
-   `transparentModal` route `BottomSheet` documents itself as needing cannot be
-   registered, and hosting a Pan-gesture sheet in an in-tree overlay has a
-   hit-testing footgun. Inline is an explicitly sanctioned option (G3-PLAN §2
-   Slice 12: "BottomSheet … **or an inline field**") and keeps the Menu at **zero
-   blur layers** (≤1 satisfied trivially).
+   `transparentModal` route the `BottomSheet` primitive needs cannot be registered
+   under the frozen navigation contract, and hosting a Pan-gesture sheet in an
+   in-tree overlay has a hit-testing footgun. Inline is an explicitly sanctioned
+   option (G3-PLAN §2 Slice 12: "BottomSheet … **or an inline field**") and keeps
+   the Menu at **zero blur layers** (≤1 satisfied trivially).
 2. **`MeUser` gained `displayName?: string | null`** (`src/types/api.ts`). The
    `/api/users/me` route already returns it; the constraint "don't touch api.ts"
    is about `src/lib/api.ts`, not the types file.

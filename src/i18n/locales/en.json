@@ -204,8 +204,9 @@
     "signOut": "Sign out",
     "signOutConfirmTitle": "Sign out?",
     "signOutConfirmMessage": "You'll need to sign in again to use the app.",
-    "displayNameInvalid": "Enter a display name between 1 and 60 characters.",
-    "updateError": "Couldn't update your display name. Try again."
+    "displayNameInvalid": "Display name can't be empty.",
+    "updateError": "Couldn't update your display name. Try again.",
+    "localeError": "Couldn't save your language. Try again."
   },
   "bootstrap": {
     "reauth": "Session expired. Sign in again to continue.",

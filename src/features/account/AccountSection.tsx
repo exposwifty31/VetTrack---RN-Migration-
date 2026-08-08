@@ -14,7 +14,6 @@
 import { useState } from "react";
 import { ActivityIndicator, Alert, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "@clerk/clerk-expo";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { PressableScale } from "@/components/PressableScale";
@@ -26,12 +25,10 @@ import {
   isValidDisplayName,
 } from "@/lib/api/account";
 import { applyLocaleChange } from "@/features/account/locale-toggle";
+import { getAuthSession, isAuthSessionActive } from "@/infrastructure/auth/authSession";
 import { type Locale } from "@/i18n/locale-resolver";
 import { isRtlReloadPending } from "@/i18n/rtl";
-
-// Same gate App.tsx / SignInScreen use: Clerk hooks throw outside ClerkProvider,
-// which is only mounted when a publishable key is present (dev-bypass has none).
-const CLERK_ENABLED = (process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "") !== "";
+import { AURORA_COLORS } from "@/theme/colors";
 
 /** FSI…PDI isolate so a Latin display name sits correctly in an RTL row. */
 function isolate(value: string): string {
@@ -43,7 +40,9 @@ export function AccountSection({ onSignedOut }: Readonly<{ onSignedOut: () => vo
     <View className="gap-3">
       <DisplayNameCard />
       <LanguageCard />
-      {CLERK_ENABLED ? <SignOutCard onSignedOut={onSignedOut} /> : null}
+      {/* Sign-out is offered only when an interactive session exists (hidden in
+          dev-bypass). The port adapter — not this component — knows about Clerk. */}
+      {isAuthSessionActive() ? <SignOutCard onSignedOut={onSignedOut} /> : null}
     </View>
   );
 }
@@ -120,7 +119,7 @@ function DisplayNameCard() {
         maxLength={DISPLAY_NAME_MAX_LENGTH}
         autoFocus
         placeholder={t("account.displayNamePlaceholder")}
-        placeholderTextColor="#7C7A93"
+        placeholderTextColor={AURORA_COLORS.muted}
         editable={!mutation.isPending}
         returnKeyType="done"
         onSubmitEditing={() => {
@@ -157,7 +156,7 @@ function DisplayNameCard() {
           onPress={() => mutation.mutate(value)}
         >
           {mutation.isPending ? (
-            <ActivityIndicator color="#F3F1FA" />
+            <ActivityIndicator color={AURORA_COLORS.foreground} />
           ) : (
             <Text
               className={
@@ -178,24 +177,41 @@ function DisplayNameCard() {
 function LanguageCard() {
   const { t, i18n } = useTranslation();
   const active: Locale = i18n.language === "en" ? "en" : "he";
-  // Derived every render — no local state. After a change, i18next re-renders
-  // (copy flips live) and this re-evaluates. `forceRTL` only applies on the next
-  // reload, so the layout DIRECTION may still be pending → honest restart hint.
-  const reloadPending = isRtlReloadPending(active);
+  // Seeded from the current direction; updated from the change RESULT so the
+  // returned `reloadPending` (and a failed persist) are consumed, not recomputed.
+  const [reloadPending, setReloadPending] = useState(() => isRtlReloadPending(active));
+  const [persistFailed, setPersistFailed] = useState(false);
 
-  const choose = (locale: Locale) => {
+  const choose = async (locale: Locale) => {
     if (locale === active) return;
-    void applyLocaleChange(i18n, locale);
+    setPersistFailed(false);
+    try {
+      const result = await applyLocaleChange(i18n, locale);
+      setReloadPending(result.reloadPending);
+      if (!result.persisted) setPersistFailed(true);
+    } catch {
+      setPersistFailed(true);
+    }
   };
 
   return (
     <SectionCard>
       <Text className="font-rubik text-[12.5px] text-text-tertiary">{t("account.language")}</Text>
       <View className="mt-2 flex-row gap-2">
-        <LocaleOption label={t("common.hebrew")} selected={active === "he"} onPress={() => choose("he")} />
-        <LocaleOption label={t("common.english")} selected={active === "en"} onPress={() => choose("en")} />
+        <LocaleOption
+          label={t("common.hebrew")}
+          selected={active === "he"}
+          onPress={() => void choose("he")}
+        />
+        <LocaleOption
+          label={t("common.english")}
+          selected={active === "en"}
+          onPress={() => void choose("en")}
+        />
       </View>
-      {reloadPending ? (
+      {persistFailed ? (
+        <Text className="mt-2 font-rubik text-[12.5px] text-danger">{t("account.localeError")}</Text>
+      ) : reloadPending ? (
         <Text className="mt-2 font-rubik text-[12.5px] text-warning">{t("account.restartHint")}</Text>
       ) : null}
     </SectionCard>
@@ -233,13 +249,13 @@ function LocaleOption({
 
 function SignOutCard({ onSignedOut }: Readonly<{ onSignedOut: () => void }>) {
   const { t } = useTranslation();
-  const { signOut } = useAuth();
   const [busy, setBusy] = useState(false);
 
   const run = async () => {
     setBusy(true);
     try {
-      await signOut();
+      // Through the AuthSessionPort — never Clerk directly (hexagonal boundary).
+      await getAuthSession().signOut();
       onSignedOut();
     } catch {
       // A failed sign-out leaves the session intact; re-enable the button so the
@@ -264,7 +280,7 @@ function SignOutCard({ onSignedOut }: Readonly<{ onSignedOut: () => void }>) {
       onPress={confirm}
     >
       {busy ? (
-        <ActivityIndicator color="#F87171" />
+        <ActivityIndicator color={AURORA_COLORS.danger} />
       ) : (
         <Text className="font-rubik-semibold text-[15px] text-danger">{t("account.signOut")}</Text>
       )}

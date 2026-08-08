@@ -10,6 +10,7 @@ import {
   DEVELOPER_ENTRIES,
   OPERATIONS_ENTRIES,
   SESSION_ENTRIES,
+  visibleOperationsEntries,
 } from "../menu-routes";
 
 const routesOf = (entries: readonly { route: string }[]) => entries.map((e) => e.route);
@@ -58,7 +59,23 @@ describe("menu route map", () => {
     }
   });
 
-  it("hides only the Mine entry for custody-scoped roles", () => {
+  it("hides only the Mine entry for custody-scoped roles, keeps everything else", () => {
     expect(CUSTODY_HIDDEN_ROUTE).toBe("MyEquipment");
+
+    for (const role of ["student", "viewer", " Student ", "VIEWER"]) {
+      const visible = routesOf(visibleOperationsEntries(role));
+      // Omits ONLY MyEquipment — every other Operations entry survives, in order.
+      expect(visible).toEqual(["Tasks", "Rooms", "Alerts", "Inventory", "AutopilotQueue"]);
+      expect(visible).not.toContain("MyEquipment");
+      const omitted = routesOf(OPERATIONS_ENTRIES).filter((r) => !visible.includes(r));
+      expect(omitted).toEqual(["MyEquipment"]);
+    }
+  });
+
+  it("keeps the full Operations set (incl. MyEquipment) for unrestricted and unresolved roles", () => {
+    for (const role of ["admin", "vet", "senior_technician", "technician", "vet_tech", "", undefined, null]) {
+      expect(visibleOperationsEntries(role)).toEqual(OPERATIONS_ENTRIES);
+      expect(routesOf(visibleOperationsEntries(role))).toContain("MyEquipment");
+    }
   });
 });

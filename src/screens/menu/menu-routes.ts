@@ -8,9 +8,11 @@
  * screens. Everything here is a `navigation.navigate("<Route>")` with no params.
  *
  * The Developer entries preserve EVERY debug screen reachable from the old
- * debug-launcher Menu — nothing is deleted, only moved under a `__DEV__`-gated
- * section (see MenuScreen).
+ * debug-launcher Menu — nothing is deleted. They render under a section that is
+ * collapsed by default but ALWAYS rendered (NOT `__DEV__`-gated), so G2Measure
+ * stays reachable on a release build for the exit-pass (see MenuScreen).
  */
+import { isCustodyScopedRole } from "@/navigation/main-tab-set";
 import type { RootStackParamList } from "@/navigation/types";
 
 /** Root-stack routes navigable without params — keeps the map compile-checked. */
@@ -57,9 +59,9 @@ export const SESSION_ENTRIES = [
 ] as const satisfies readonly MenuEntry[];
 
 /**
- * Developer — every debug/dev screen from the old Menu, preserved. Kept behind
- * a `__DEV__`-gated section so nothing is lost while staying out of the way in
- * production builds.
+ * Developer — every debug/dev screen from the old Menu, preserved. Rendered under
+ * a collapsed-by-default but ALWAYS-rendered section (not `__DEV__`-gated) so
+ * every screen — G2Measure especially — stays reachable on a release build.
  */
 export const DEVELOPER_ENTRIES = [
   { route: "SignIn", labelKey: "nav.signIn" },
@@ -73,3 +75,17 @@ export const DEVELOPER_ENTRIES = [
 
 /** The custody-scoped-only entry hidden from the Operations list for students. */
 export const CUSTODY_HIDDEN_ROUTE: ParamFreeRoute = "MyEquipment";
+
+/**
+ * The Operations entries visible for a given effective role. Custody-scoped roles
+ * (student/viewer) already get "Mine" as a bottom TAB (Slice 4), so the Menu omits
+ * ONLY that entry for them; every other role — and an unresolved role — keeps the
+ * full set. Pure (no rendering) so the filtering is unit-testable directly.
+ */
+export function visibleOperationsEntries(
+  effectiveRole: string | null | undefined,
+): readonly MenuEntry[] {
+  return isCustodyScopedRole(effectiveRole)
+    ? OPERATIONS_ENTRIES.filter((entry) => entry.route !== CUSTODY_HIDDEN_ROUTE)
+    : OPERATIONS_ENTRIES;
+}

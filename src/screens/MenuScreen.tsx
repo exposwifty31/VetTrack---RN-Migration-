@@ -14,7 +14,7 @@
  * param-free root-stack route). Aurora: opaque grouped `SectionCard`s, zero blur
  * layers, `PressableScale` rows; RN auto-mirrors the row layout in RTL.
  */
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -22,13 +22,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PressableScale } from "@/components/PressableScale";
 import { AccountSection } from "@/features/account/AccountSection";
 import { useIdentity } from "@/app/useIdentity";
-import { isCustodyScopedRole } from "@/navigation/main-tab-set";
+import { useAppStore } from "@/store/useAppStore";
 import type { MainTabScreenProps } from "@/navigation/types";
 import {
-  CUSTODY_HIDDEN_ROUTE,
   DEVELOPER_ENTRIES,
-  OPERATIONS_ENTRIES,
   SESSION_ENTRIES,
+  visibleOperationsEntries,
   type MenuEntry,
 } from "./menu/menu-routes";
 
@@ -37,13 +36,9 @@ export function MenuScreen({ navigation }: MainTabScreenProps<"Menu">) {
   const insets = useSafeAreaInsets();
   const identity = useIdentity();
 
-  // Students already get "Mine" as a bottom TAB (Slice 4) — hide the duplicate
-  // Menu entry for custody-scoped roles; everyone else reaches Mine here. While
-  // identity is unresolved `isCustodyScopedRole(undefined)` is false → show it.
-  const custodyScoped = isCustodyScopedRole(identity.data?.effectiveRole);
-  const operations = custodyScoped
-    ? OPERATIONS_ENTRIES.filter((entry) => entry.route !== CUSTODY_HIDDEN_ROUTE)
-    : OPERATIONS_ENTRIES;
+  // Students already get "Mine" as a bottom TAB (Slice 4), so the Menu omits the
+  // duplicate; everyone else (and an unresolved role) reaches Mine here.
+  const operations = visibleOperationsEntries(identity.data?.effectiveRole);
 
   const go = (entry: MenuEntry) => navigation.navigate(entry.route);
 
@@ -77,14 +72,16 @@ export function MenuScreen({ navigation }: MainTabScreenProps<"Menu">) {
  */
 function DeveloperGroup({ onSelect }: Readonly<{ onSelect: (entry: MenuEntry) => void }>) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
+  // Client UI state lives in the Zustand app store, not local component state.
+  const expanded = useAppStore((state) => state.developerMenuExpanded);
+  const toggle = useAppStore((state) => state.toggleDeveloperMenu);
   return (
     <View className="gap-3">
       <PressableScale
         accessibilityRole="button"
         accessibilityState={{ expanded }}
         className="min-h-[36px] flex-row items-center justify-between"
-        onPress={() => setExpanded((value) => !value)}
+        onPress={toggle}
       >
         <GroupLabel title={t("menu.sections.developer")} />
         <Text className="font-rubik-semibold text-[12.5px] text-text-tertiary">

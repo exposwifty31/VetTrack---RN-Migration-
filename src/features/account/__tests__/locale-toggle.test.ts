@@ -60,6 +60,24 @@ describe("applyLocaleChange", () => {
     expect(changeLanguage).toHaveBeenCalledWith("he");
     expect(mockSet).toHaveBeenCalledWith(LOCALE_STORAGE_KEY, "he", "local");
     expect(forceSpy).toHaveBeenLastCalledWith(true);
+    expect(result.persisted).toBe(true);
+    expect(result.reloadPending).toBe(true);
+  });
+
+  it("on a FAILED persistence write: reports persisted=false and SKIPS the RTL flag (no divergence on restart)", async () => {
+    // safeStorageSetItem returns false → the choice did not durably persist.
+    mockSet.mockReturnValueOnce(false);
+    const { i18n, changeLanguage } = makeI18n();
+
+    const result = await applyLocaleChange(i18n, "he");
+
+    // Copy still flips live, but the native direction is deliberately NOT forced,
+    // so a restart can't land with the RTL flag ahead of the (unchanged) storage.
+    expect(changeLanguage).toHaveBeenCalledWith("he");
+    expect(mockSet).toHaveBeenCalledWith(LOCALE_STORAGE_KEY, "he", "local");
+    expect(forceSpy).not.toHaveBeenCalled();
+    expect(allowSpy).not.toHaveBeenCalled();
+    expect(result.persisted).toBe(false);
     expect(result.reloadPending).toBe(true);
   });
 });

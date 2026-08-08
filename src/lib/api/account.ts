@@ -19,10 +19,11 @@
  * in user may rename themselves) and disables Save until identity resolves.
  *
  * G5: this repo deliberately ships NO account-deletion or avatar-upload call.
- * Both stores (Apple + Google) mandate in-app account deletion
- * (DELETE /api/users/delete-account) before store submission — that lands in the
- * G5 store-submission slice, not the G3 daily-driver gate. The web deletion page
- * already exists as the interim path.
+ * `DELETE /api/users/delete-account` is a store-submission prerequisite: Apple
+ * (Guideline 5.1.1(v)) requires an in-app path that INITIATES deletion, while
+ * Google Play requires a deletion-request path and permits it to LINK OUT to the
+ * existing web deletion resource. That lands in the G5 store-submission slice,
+ * not the G3 daily-driver gate. The web deletion page already exists as the interim.
  */
 import * as Crypto from "expo-crypto";
 

@@ -204,7 +204,7 @@
   },
   "account": {
     "displayName": "שם תצוגה",
-    "displayNamePlaceholder": "הזן שם תצוגה",
+    "displayNamePlaceholder": "יש להזין שם תצוגה",
     "edit": "עריכה",
     "save": "שמירה",
     "language": "שפה",
@@ -212,8 +212,9 @@
     "signOut": "התנתקות",
     "signOutConfirmTitle": "להתנתק?",
     "signOutConfirmMessage": "יהיה עליך להתחבר מחדש כדי להשתמש באפליקציה.",
-    "displayNameInvalid": "יש להזין שם תצוגה באורך 1 עד 60 תווים.",
-    "updateError": "עדכון שם התצוגה נכשל. נסה שוב."
+    "displayNameInvalid": "שם התצוגה אינו יכול להיות ריק.",
+    "updateError": "עדכון שם התצוגה נכשל. יש לנסות שוב.",
+    "localeError": "שמירת השפה נכשלה. יש לנסות שוב."
   },
   "bootstrap": {
     "reauth": "פג תוקף החיבור. התחבר שוב כדי להמשיך.",
