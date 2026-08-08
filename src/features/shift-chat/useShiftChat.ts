@@ -175,7 +175,6 @@ export function useShiftChat() {
     ackPendingId: ackMutation.isPending ? ackMutation.variables ?? null : null,
     react,
     pin: pinMutation.mutate,
-    pinError: pinMutation.error,
     notifyTyping,
   };
 }

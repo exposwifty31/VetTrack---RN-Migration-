@@ -7,10 +7,11 @@
  * press feedback inside each bubble. New messages nudge the list to the end.
  */
 import { useCallback, useEffect, useRef } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { FlashList, type FlashListRef, type ListRenderItem } from "@shopify/flash-list";
 import { useTranslation } from "react-i18next";
 
+import { PressableScale } from "@/components/PressableScale";
 import { ErrorNote } from "@/components/ui/ErrorNote";
 import { ListEmptyState } from "@/components/ui/ListEmptyState";
 import { RowSkeleton } from "@/components/ui/RowSkeleton";
@@ -70,9 +71,19 @@ export function ShiftChatMessages({
   );
 
   if (isOffWindow) {
+    // Dedicated empty state (never an error toast). The quiet retry mirrors the
+    // Slice-3 off-shift pattern and is the recovery path when a shift starts
+    // while the screen is open (the poll is gated off with no window).
     return (
       <View className="flex-1 items-center justify-center">
         <ListEmptyState title={t("shiftChat.offWindow")} body={t("shiftChat.offWindowBody")} />
+        <PressableScale
+          accessibilityRole="button"
+          className="min-h-[44px] items-center justify-center rounded-md border border-border bg-surface px-6 py-2.5"
+          onPress={onRetry}
+        >
+          <Text className="font-rubik-semibold text-[14px] text-muted">{t("common.retry")}</Text>
+        </PressableScale>
       </View>
     );
   }
