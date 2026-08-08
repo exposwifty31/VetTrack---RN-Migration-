@@ -453,5 +453,33 @@
       "invalidTime": "יש להזין שעה תקינה (HH:MM).",
       "invalidReason": "הסיבה חייבת להיות באורך 3-500 תווים."
     }
+  },
+  "autopilot": {
+    "empty": "אין הצעות לבדיקה",
+    "proposedBy": "הוצע על ידי האוטופיילוט",
+    "rationale": "עובדות מצוטטות",
+    "decisionError": "לא הצלחנו להחיל את ההחלטה. נסו שוב.",
+    "alreadyDecided": "ההצעה כבר הוכרעה.",
+    "actions": {
+      "approve": "אישור",
+      "reject": "דחייה",
+      "edit": "עריכה"
+    },
+    "kind": {
+      "shiftHandoverDraft": "מסירת משמרת",
+      "coordinatorReassign": "החלפת רכז/ת",
+      "restockPo": "הזמנת חידוש מלאי",
+      "crashCartDrift": "בדיקת עגלת חירום"
+    },
+    "rejectSheet": {
+      "title": "דחיית הצעה",
+      "placeholder": "מדוע אתם דוחים?",
+      "submit": "דחייה"
+    },
+    "editSheet": {
+      "title": "עריכת הצעה",
+      "placeholder": "הוסיפו הערה",
+      "submit": "שמירה"
+    }
   }
 }
