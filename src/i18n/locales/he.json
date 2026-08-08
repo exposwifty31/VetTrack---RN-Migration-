@@ -406,7 +406,8 @@
     },
     "priority": {
       "critical": "קריטי",
-      "high": "גבוה"
+      "high": "גבוה",
+      "normal": "רגיל"
     },
     "taskType": {
       "maintenance": "תחזוקה",
@@ -418,7 +419,44 @@
       "invalidTransition": "סטטוס המשימה השתנה - רעננו ונסו שוב.",
       "notAssigned": "למשימה אין גורם מוקצה.",
       "alreadyApplied": "הפעולה כבר בוצעה.",
-      "offShift": "הפעולה זמינה רק במהלך משמרת פעילה."
+      "offShift": "הפעולה זמינה רק במהלך משמרת פעילה.",
+      "invalidForm": "בדקו את פרטי המשימה ונסו שוב.",
+      "invalidTime": "בחרו חלון זמן תקין.",
+      "conflict": "הזמן חופף למשימה אחרת של הגורם המוקצה.",
+      "outsideShift": "הזמן נמצא מחוץ למשמרת של הגורם המוקצה.",
+      "assigneeInvalid": "הגורם המוקצה אינו זמין במרפאה זו.",
+      "notFound": "המשימה כבר לא קיימת - רעננו את הרשימה."
+    },
+    "form": {
+      "newTitle": "משימה חדשה",
+      "editTitle": "עריכת משימה",
+      "editHint": "פותח את עורך המשימה",
+      "notes": "תיאור",
+      "notesPlaceholder": "מה צריך לעשות?",
+      "startTime": "שעת התחלה",
+      "duration": "משך",
+      "priority": "עדיפות",
+      "assignee": "גורם מוקצה",
+      "unassigned": "לא מוקצה",
+      "durationHm": "{{h}}ש׳ {{m}}ד׳",
+      "durationH": "{{h}}ש׳",
+      "durationM": "{{m}}ד׳",
+      "stepDownHour": "-1 שעה",
+      "stepDown": "-15 דק'",
+      "stepUp": "+15 דק'",
+      "stepUpHour": "+1 שעה",
+      "stepDownA11y": "15 דקות מוקדם יותר",
+      "stepUpA11y": "15 דקות מאוחר יותר",
+      "stepDownHourA11y": "שעה אחת מוקדם יותר",
+      "stepUpHourA11y": "שעה אחת מאוחר יותר",
+      "durationDownA11y": "15 דקות פחות",
+      "durationUpA11y": "15 דקות יותר",
+      "cancelTask": "ביטול משימה",
+      "cancelConfirm": "לבטל את המשימה? לא ניתן לשחזר.",
+      "confirmCancelTask": "אישור ביטול",
+      "keepTask": "השאירו את המשימה",
+      "cancelReason": "סיבת הביטול",
+      "cancelReasonPlaceholder": "סיבה (רשות)"
     }
   },
   "shiftAdjustments": {
