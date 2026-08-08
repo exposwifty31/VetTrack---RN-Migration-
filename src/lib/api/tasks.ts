@@ -22,7 +22,12 @@
 import * as Crypto from "expo-crypto";
 
 import { authFetch } from "@/lib/auth-fetch";
-import type { Task } from "@/types/tasks";
+import type {
+  Task,
+  TaskCreateInput,
+  TaskMeta,
+  TaskUpdateInput,
+} from "@/types/tasks";
 
 /** Canonical tasks query-key factory — everything nests under `all`. */
 export const taskKeys = {
@@ -30,6 +35,7 @@ export const taskKeys = {
   day: (day: string) => ["tasks", "day", day] as const,
   mine: () => ["tasks", "mine"] as const,
   dashboard: () => ["tasks", "dashboard"] as const,
+  meta: (day: string) => ["tasks", "meta", day] as const,
 };
 
 /**
@@ -114,6 +120,22 @@ function lifecycleHeaders(): Record<string, string> {
 }
 
 /**
+ * Headers for a body-carrying mutation (create/update): the idempotency pair
+ * PLUS `Content-Type: application/json`. `authFetch` does NOT set the content
+ * type — omit it and Express leaves `req.body` unparsed → 400 VALIDATION_FAILED
+ * (the shift-adjustments create idiom). One fresh idempotency key per attempt;
+ * a future offline-replay layer must preserve the attempt's key.
+ */
+function jsonMutationHeaders(): Record<string, string> {
+  const requestId = Crypto.randomUUID();
+  return {
+    "Content-Type": "application/json",
+    "Idempotency-Key": requestId,
+    "x-request-id": requestId,
+  };
+}
+
+/**
  * GET /api/tasks/dashboard counts (G3 Slice 5 additive — the home tasks chip).
  * The full payload (server/services/task-recall.service.ts
  * `TaskDashboardPayload`) also carries today/overdue/upcoming/myTasks item
@@ -166,5 +188,61 @@ export const tasksApi = {
       { method: "POST", headers: lifecycleHeaders() },
     );
     return body.task;
+  },
+
+  /**
+   * GET /api/appointments/meta?day=YYYY-MM-DD — vets/technicians (+ that day's
+   * roster shifts) for the assignee picker. technician+ floor & task.read RBAC;
+   * an off-shift caller gets 403 INSUFFICIENT_ROLE like the lists.
+   */
+  getMeta: async (day: string): Promise<TaskMeta> =>
+    requestTasksJson<TaskMeta>(`/api/appointments/meta?day=${encodeURIComponent(day)}`),
+
+  /**
+   * POST /api/appointments — create a task. 201 `{appointment}`. technician+
+   * floor + task.create RBAC (+ task.assign when `vetId` is set); idempotency
+   * scope `appointments:create` via the `Idempotency-Key` header.
+   */
+  create: async (input: TaskCreateInput): Promise<Task> => {
+    const body = await requestTasksJson<{ appointment: Task }>("/api/appointments", {
+      method: "POST",
+      headers: jsonMutationHeaders(),
+      body: JSON.stringify(input),
+    });
+    return body.appointment;
+  },
+
+  /**
+   * PATCH /api/appointments/:id — partial edit (server requires ≥1 field; send
+   * only the diff). task.create RBAC (+ task.reassign when `vetId` is present,
+   * task.cancel when moving to `cancelled`); scope `appointments:update`.
+   */
+  update: async (taskId: string, input: TaskUpdateInput): Promise<Task> => {
+    const body = await requestTasksJson<{ appointment: Task }>(
+      `/api/appointments/${encodeURIComponent(taskId)}`,
+      { method: "PATCH", headers: jsonMutationHeaders(), body: JSON.stringify(input) },
+    );
+    return body.appointment;
+  },
+
+  /**
+   * DELETE /api/appointments/:id — cancel with an optional `{reason}`. task.cancel
+   * RBAC. No idempotency middleware server-side, but the JSON body still needs
+   * `Content-Type` or the reason is dropped; `x-request-id` for tracing.
+   */
+  cancel: async (taskId: string, reason?: string): Promise<Task> => {
+    const trimmed = reason?.trim();
+    const init: RequestInit = trimmed
+      ? {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json", "x-request-id": Crypto.randomUUID() },
+          body: JSON.stringify({ reason: trimmed }),
+        }
+      : { method: "DELETE", headers: { "x-request-id": Crypto.randomUUID() } };
+    const body = await requestTasksJson<{ appointment: Task }>(
+      `/api/appointments/${encodeURIComponent(taskId)}`,
+      init,
+    );
+    return body.appointment;
   },
 };

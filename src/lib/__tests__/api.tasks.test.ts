@@ -47,10 +47,134 @@ afterEach(() => {
 });
 
 describe("taskKeys", () => {
-  it("nests day and mine keys under the canonical root", () => {
+  it("nests day, mine, and meta keys under the canonical root", () => {
     expect(taskKeys.all).toEqual(["tasks"]);
     expect(taskKeys.day("2026-08-07")).toEqual(["tasks", "day", "2026-08-07"]);
     expect(taskKeys.mine()).toEqual(["tasks", "mine"]);
+    expect(taskKeys.meta("2026-08-07")).toEqual(["tasks", "meta", "2026-08-07"]);
+  });
+});
+
+describe("tasksApi.getMeta", () => {
+  const META = {
+    day: "2026-08-07",
+    vets: [{ id: "v1", name: "Dana", displayName: null, role: "vet", shifts: [] }],
+    technicians: [],
+  };
+
+  it("builds and URL-encodes the ?day= param and returns the raw meta", async () => {
+    mockAuthFetch.mockResolvedValue(makeResponse(200, META));
+
+    const meta = await tasksApi.getMeta("2026-08-07");
+
+    expect(mockAuthFetch).toHaveBeenCalledWith(
+      "/api/appointments/meta?day=2026-08-07",
+      undefined,
+    );
+    expect(meta).toEqual(META);
+  });
+
+  it("surfaces the off-shift 403 as a coded error", async () => {
+    mockAuthFetch.mockResolvedValue(makeResponse(403, { code: "INSUFFICIENT_ROLE" }));
+    await expect(tasksApi.getMeta("2026-08-07")).rejects.toMatchObject({
+      status: 403,
+      code: "INSUFFICIENT_ROLE",
+    });
+  });
+});
+
+describe("tasksApi.create", () => {
+  it("POSTs the body with Content-Type + Idempotency-Key + x-request-id and unwraps {appointment}", async () => {
+    mockAuthFetch.mockResolvedValue(makeResponse(201, { appointment: TASK }));
+    const input = {
+      startTime: "2026-08-07T06:00:00.000Z",
+      endTime: "2026-08-07T07:00:00.000Z",
+      priority: "normal" as const,
+      notes: "check the pump",
+      vetId: "user-1",
+    };
+
+    const created = await tasksApi.create(input);
+
+    const [path, init] = mockAuthFetch.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe("/api/appointments");
+    expect(init.method).toBe("POST");
+    const headers = init.headers as Record<string, string>;
+    // Content-Type is REQUIRED — without it Express leaves the body unparsed.
+    expect(headers["Content-Type"]).toBe("application/json");
+    expect(headers["Idempotency-Key"]).toBe("test-idempotency-uuid");
+    expect(headers["x-request-id"]).toBe("test-idempotency-uuid");
+    expect(JSON.parse(init.body as string)).toEqual(input);
+    expect(created).toEqual(TASK);
+  });
+
+  it("surfaces a 409 APPOINTMENT_CONFLICT as a coded error", async () => {
+    mockAuthFetch.mockResolvedValue(
+      makeResponse(409, { code: "APPOINTMENT_CONFLICT", reason: "APPOINTMENT_CONFLICT" }),
+    );
+    await expect(
+      tasksApi.create({ startTime: "a", endTime: "b" }),
+    ).rejects.toMatchObject({ status: 409, code: "APPOINTMENT_CONFLICT" });
+  });
+});
+
+describe("tasksApi.update", () => {
+  it("PATCHes the path-encoded id with the diff body + the JSON/idempotency headers", async () => {
+    mockAuthFetch.mockResolvedValue(
+      makeResponse(200, { appointment: { ...TASK, notes: "edited" } }),
+    );
+
+    const updated = await tasksApi.update("a/b?c", { notes: "edited" });
+
+    const [path, init] = mockAuthFetch.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe("/api/appointments/a%2Fb%3Fc");
+    expect(init.method).toBe("PATCH");
+    const headers = init.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBe("application/json");
+    expect(headers["Idempotency-Key"]).toBe("test-idempotency-uuid");
+    expect(JSON.parse(init.body as string)).toEqual({ notes: "edited" });
+    expect(updated.notes).toBe("edited");
+  });
+});
+
+describe("tasksApi.cancel", () => {
+  it("DELETEs with a JSON {reason} body + Content-Type when a reason is given", async () => {
+    mockAuthFetch.mockResolvedValue(
+      makeResponse(200, { appointment: { ...TASK, status: "cancelled" } }),
+    );
+
+    const cancelled = await tasksApi.cancel("task-1", "  broken beyond repair  ");
+
+    const [path, init] = mockAuthFetch.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe("/api/appointments/task-1");
+    expect(init.method).toBe("DELETE");
+    const headers = init.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBe("application/json");
+    expect(headers["x-request-id"]).toBe("test-idempotency-uuid");
+    // reason trimmed before send.
+    expect(JSON.parse(init.body as string)).toEqual({ reason: "broken beyond repair" });
+    expect(cancelled.status).toBe("cancelled");
+  });
+
+  it("omits the body (and Content-Type) when no reason is given", async () => {
+    mockAuthFetch.mockResolvedValue(
+      makeResponse(200, { appointment: { ...TASK, status: "cancelled" } }),
+    );
+
+    await tasksApi.cancel("a/b?c");
+
+    const [path, init] = mockAuthFetch.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe("/api/appointments/a%2Fb%3Fc");
+    expect(init.method).toBe("DELETE");
+    expect(init.body).toBeUndefined();
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
+  });
+
+  it("treats a whitespace-only reason as no reason", async () => {
+    mockAuthFetch.mockResolvedValue(makeResponse(200, { appointment: TASK }));
+    await tasksApi.cancel("task-1", "   ");
+    const [, init] = mockAuthFetch.mock.calls[0] as [string, RequestInit];
+    expect(init.body).toBeUndefined();
   });
 });
 

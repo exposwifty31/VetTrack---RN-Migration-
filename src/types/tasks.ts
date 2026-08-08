@@ -55,3 +55,58 @@ export type Task = {
   createdAt?: string | null;
   updatedAt?: string | null;
 };
+
+/**
+ * Scheduling metadata for the create/edit assignee picker (Slice 3b) — the
+ * shape of `GET /api/appointments/meta?day=`, verified against the route's
+ * response builder (server/routes/appointments.ts `router.get("/meta")`):
+ * `{ day, vets, technicians }`, each staff row carrying that day's roster
+ * shifts so the picker can surface who is actually on shift.
+ */
+export type TaskMetaShift = {
+  id: string;
+  employeeName: string;
+  /** Roster clock strings (HH:MM:SS) — not ISO. */
+  startTime: string;
+  endTime: string;
+  role: string | null;
+};
+
+export type TaskMetaStaff = {
+  id: string;
+  /** Both nullable in `vt_users`; the picker falls back id-ward. */
+  name: string | null;
+  displayName: string | null;
+  role: string;
+  shifts: TaskMetaShift[];
+};
+
+export type TaskMeta = {
+  day: string;
+  vets: TaskMetaStaff[];
+  technicians: TaskMetaStaff[];
+};
+
+/**
+ * Create/update request bodies — the assignable subset of the server's
+ * appointment schema (server/routes/appointments.ts `createAppointmentSchema` /
+ * `updateAppointmentSchema`). `startTime`/`endTime` MUST be timezone-qualified
+ * ISO strings (the service's `toUtcDate` rejects offset-less input with
+ * `TIMEZONE_REQUIRED`). `vetId` is the assignee; `animalId`/`ownerId` are the
+ * repurposed free-text device/location columns.
+ */
+export type TaskCreateInput = {
+  startTime: string;
+  endTime: string;
+  notes?: string | null;
+  vetId?: string | null;
+  animalId?: string | null;
+  ownerId?: string | null;
+  priority?: TaskPriority;
+  taskType?: TaskType | null;
+  status?: TaskStatus;
+  appointmentType?: string | null;
+};
+
+/** PATCH body — every field optional; the server requires ≥1 (send only the diff). */
+export type TaskUpdateInput = Partial<TaskCreateInput>;
