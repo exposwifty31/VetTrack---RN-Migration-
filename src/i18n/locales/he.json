@@ -17,6 +17,44 @@
     "offShift": "מחוץ למשמרת",
     "comingSoon": "בקרוב"
   },
+  "alerts": {
+    "summary": "{{total}} פתוחות · {{urgent}} דחופות",
+    "empty": "הכול תקין",
+    "emptyBody": "אין התראות ציוד פעילות.",
+    "loadError": "טעינת ההתראות נכשלה. נסה שוב.",
+    "actionError": "עדכון ההתראה נכשל. נסה שוב.",
+    "actionForbidden": "מחוץ למשמרת — פעולות התראה אינן זמינות.",
+    "acknowledge": "אני מטפל בזה",
+    "handling": "בטיפול",
+    "resolve": "סימון כטופל",
+    "resolved": "טופל",
+    "reopenHint": "עדיין מסומן — עשוי להיפתח מחדש אם התקלה נמשכת.",
+    "section": {
+      "urgent": "דחוף",
+      "maintenance": "תחזוקה"
+    },
+    "type": {
+      "issue": "תקלה פעילה",
+      "overdue": "באיחור",
+      "sterilizationDue": "נדרש עיקור",
+      "inactive": "לא פעיל"
+    },
+    "detail": {
+      "issue": "תקלה פעילה — טרם טופלה",
+      "overdue": "{{count}} ימים באיחור",
+      "overdue_one": "יום אחד באיחור",
+      "overdue_two": "יומיים באיחור",
+      "overdue_other": "{{count}} ימים באיחור",
+      "sterilizationDue": "לא עוקר מעל 7 ימים",
+      "inactive": "אין סריקה מעל 14 ימים"
+    },
+    "resolveSheet": {
+      "title": "סימון התראה כטופלת",
+      "body": "הפעולה מפסיקה את התזכורת לפריט זה. ההתראה עשויה להיפתח מחדש אם התקלה נמשכת.",
+      "notePlaceholder": "הוספת הערה (רשות)",
+      "confirm": "סימון כטופל"
+    }
+  },
   "nav": {
     "home": "בית",
     "signIn": "התחברות",
