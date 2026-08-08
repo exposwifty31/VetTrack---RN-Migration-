@@ -137,6 +137,19 @@ describe("coded-error surfacing + isHandoverForbiddenError", () => {
     expect(isHandoverForbiddenError(err)).toBe(false);
   });
 
+  it("does not treat a 403 with a different code as the roster-forbidden case", async () => {
+    // A coded 403 that is NOT the roster authority denial must not borrow the
+    // handover-specific inline note — only `errors.authority.denied` qualifies.
+    mockAuthFetch.mockResolvedValue(
+      makeResponse(403, { error: "forbidden", code: "errors.forbidden" }),
+    );
+
+    const err = await shiftHandoverApi.acknowledge("hand-1").catch((e: unknown) => e);
+
+    expect(err).toMatchObject({ status: 403, code: "errors.forbidden" });
+    expect(isHandoverForbiddenError(err)).toBe(false);
+  });
+
   it("does not treat a non-coded error as forbidden", () => {
     expect(isHandoverForbiddenError(new Error("network down"))).toBe(false);
     expect(isHandoverForbiddenError(null)).toBe(false);

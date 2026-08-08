@@ -110,11 +110,16 @@ export type HandoverArtifact = Readonly<{
  * be pre-gated — the read succeeds for any clinic user, the artifact carries no
  * "may I ack" flag, and authorization is roster- not role-based (so
  * `hasRoleAtLeast` does not apply). The screen maps it reactively to an inline
- * note. Keying on status is robust: `/api/shift-handover/:id/acknowledge` emits
- * exactly one 403 (authority.denied); the code is asserted in the module test.
+ * note. We match on BOTH status 403 AND the exact code (`errors.authority.denied`)
+ * so an unrelated coded 403 can never borrow the roster-specific copy; the
+ * acknowledge route emits exactly this code, asserted in the module test.
  */
 export function isHandoverForbiddenError(error: unknown): boolean {
-  return error instanceof ApiCodedError && error.status === 403;
+  return (
+    error instanceof ApiCodedError &&
+    error.status === 403 &&
+    error.code === "errors.authority.denied"
+  );
 }
 
 /** One fresh trace id per mutation attempt (the established scan/adjustment idiom). */
