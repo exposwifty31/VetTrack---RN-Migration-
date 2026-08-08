@@ -436,7 +436,8 @@
     },
     "priority": {
       "critical": "Critical",
-      "high": "High"
+      "high": "High",
+      "normal": "Normal"
     },
     "taskType": {
       "maintenance": "Maintenance",
@@ -448,7 +449,44 @@
       "invalidTransition": "The task status changed - refresh and try again.",
       "notAssigned": "This task has no one assigned.",
       "alreadyApplied": "This action was already applied.",
-      "offShift": "This action is available only during an active shift."
+      "offShift": "This action is available only during an active shift.",
+      "invalidForm": "Check the task details and try again.",
+      "invalidTime": "Enter a valid time window.",
+      "conflict": "That time overlaps another task for this assignee.",
+      "outsideShift": "That time is outside the assignee's shift.",
+      "assigneeInvalid": "That assignee isn't available in this clinic.",
+      "notFound": "This task no longer exists - refresh the list."
+    },
+    "form": {
+      "newTitle": "New task",
+      "editTitle": "Edit task",
+      "editHint": "Opens the task editor",
+      "notes": "Description",
+      "notesPlaceholder": "What needs doing?",
+      "startTime": "Start time",
+      "duration": "Duration",
+      "priority": "Priority",
+      "assignee": "Assignee",
+      "unassigned": "Unassigned",
+      "durationHm": "{{h}}h {{m}}m",
+      "durationH": "{{h}}h",
+      "durationM": "{{m}}m",
+      "stepDownHour": "-1h",
+      "stepDown": "-15m",
+      "stepUp": "+15m",
+      "stepUpHour": "+1h",
+      "stepDownA11y": "15 minutes earlier",
+      "stepUpA11y": "15 minutes later",
+      "stepDownHourA11y": "One hour earlier",
+      "stepUpHourA11y": "One hour later",
+      "durationDownA11y": "15 minutes shorter",
+      "durationUpA11y": "15 minutes longer",
+      "cancelTask": "Cancel task",
+      "cancelConfirm": "Cancel this task? This can't be undone.",
+      "confirmCancelTask": "Confirm cancellation",
+      "keepTask": "Keep task",
+      "cancelReason": "Cancellation reason",
+      "cancelReasonPlaceholder": "Reason (optional)"
     }
   },
   "shiftAdjustments": {
