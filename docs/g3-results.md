@@ -15,12 +15,12 @@ Base: `main` @ `d0fbc58` (post PR #34). Recorded 2026-08-09.
 
 | # | Checklist item | Kind | Status |
 |---|---|---|---|
-| 1 | All Grade-A flows demoed end-to-end on device (he + en, RTL screenshots) | on-device | ⏳ **owner gate** (protocol §5) |
+| 1 | All Grade-A flows demoed end-to-end on device (he + en, RTL screenshots) | on-device (Pixel + iPhone) | ⏳ **owner gate** (protocol §5) |
 | 2 | Grade-B minimum bar met; slips have written owner sign-off | code + gate | ✅ all 7 B-screens present (§4); no slips |
 | 3 | `grep -rn "refetchInterval" src/` → only shift-chat; `setInterval` audited | automatable | ✅ done (§3.2) |
 | 4 | `parity.test.ts` + full jest + typecheck + lint green | automatable | ✅ done (§3.1) |
-| 5 | G2Measure export on release artifact — harness intact, no frame-floor regression on Equipment list + one new list screen | on-device | ⏳ **owner gate** (protocol §5) |
-| 6 | Owner daily-driver verdict recorded (the gate) | on-device | ⏳ **owner gate** (protocol §5) |
+| 5 | G2Measure export on release artifact — harness intact, no frame-floor regression on Equipment list + one new list screen | on-device (Pixel + iPhone) | ⏳ **owner gate** (protocol §5) |
+| 6 | Owner daily-driver verdict recorded (the gate) | on-device (Pixel + iPhone) | ⏳ **owner gate** (protocol §5) |
 
 ---
 
@@ -151,8 +151,17 @@ owner sign-off required for slips.
 ## 5. Owner on-device gate protocol (NOT done by the agent)
 
 These are the gate. tsc/lint/jest/export above are necessary but **not
-sufficient** (AGENTS.md). Run on the owner's **Pixel** against production
-`https://vettrack.uk`, from a release artifact (`npm ci`), per the G2 protocol.
+sufficient** (AGENTS.md). Run on **BOTH of the owner's devices — Pixel 7
+(Android) AND iPhone 16 Plus (iOS)** — against production `https://vettrack.uk`,
+from a release artifact (`npm ci`), per the G2 protocol.
+
+**Why both:** G3's success feeds two-store submission (Apple App Store + Google
+Play), so both platform targets are gated. G2 was Pixel-only because that was
+that gate's single declared device; G3/G4/G5 device verification is
+dual-platform. The iOS run needs a real RN iOS build (CNG prebuild + Xcode
+signing; the NFC-entitlement caveat from slice-8 applies — the measurement build
+may strip the NFC entitlement like the sim path did). Run every checkbox below
+**once per device**; note device + build per capture.
 
 ### 5.1 he + en RTL screenshot sweep (checklist item 1)
 
@@ -188,12 +197,16 @@ sufficient** (AGENTS.md). Run on the owner's **Pixel** against production
 
 ### 5.3 Daily-driver verdict (checklist item 6 — THE gate)
 
-- [ ] Use the RN app as the **daily driver for a full shift** on the Pixel
-      (Capacitor app installed as fallback only).
-- [ ] Record the written **go / no-go** verdict here:
+- [ ] Use the RN app as the **daily driver for a full shift** on **each** device —
+      Pixel 7 (Android) and iPhone 16 Plus (iOS) — Capacitor app installed as
+      fallback only.
+- [ ] Record the written **go / no-go** verdict here, **one line per device**:
 
 ```
-Owner daily-driver verdict (date, device, build, verdict, notes):
+Owner daily-driver verdict — Pixel 7 / Android (date, build, verdict, notes):
+  … to be filled by the owner …
+
+Owner daily-driver verdict — iPhone 16 Plus / iOS (date, build, verdict, notes):
   … to be filled by the owner …
 ```
 
