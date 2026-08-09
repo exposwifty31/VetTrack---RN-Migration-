@@ -349,6 +349,7 @@ Verified by inspection on this branch:
   $ echo $?
   0     # no committed changes in the measurement harness
   ```
+
 - Closed `MARK` vocabulary unchanged (`scan_tap`, `scan_visual_ack`,
   `scan_server_confirmed`, `screenInteractive`).
 - `MARK.screenInteractive` latch call sites unchanged: `EquipmentListScreen.tsx`
