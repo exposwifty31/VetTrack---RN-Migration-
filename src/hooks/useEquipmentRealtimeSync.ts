@@ -6,22 +6,33 @@
  * NEVER polls (no timers, no query-refetch intervals). It only `subscribe()`s to
  * `getDefaultRealtimePort()` and invalidates the canonical `['equipment']` key.
  *
- * SHARED: five surfaces mount this at once (Home, Equipment list, Equipment
- * detail, My equipment, Alerts — and the iPad two-pane shows list + detail
- * together), so the subscription itself lives in `equipment-realtime-registry`:
- * N mounts hold ONE port listener and produce ONE invalidation per event. The
- * invalidation rules are documented there and are unchanged.
+ * It is the `EQUIPMENT_` case of `useRealtimeInvalidation` — named separately
+ * because five surfaces mount it by name (Home, Equipment list, Equipment detail,
+ * My equipment, Alerts) and the canonical key is not a caller's choice. Sharing,
+ * refcounting and the invalidation rules live in `realtime-invalidation-registry`:
+ * N mounts hold ONE port listener and produce ONE invalidation per event.
  *
  * `(rn-architecture)`: gate the side-effect in an effect, subscribe to the shared
  * port, mount inside the equipment screen (not App.tsx).
  */
-import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { equipmentKeys } from "@/lib/api";
 
-import { retainEquipmentRealtimeSync } from "./equipment-realtime-registry";
+import {
+  useRealtimeInvalidation,
+  type UseRealtimeInvalidationOptions,
+} from "./useRealtimeInvalidation";
+
+/**
+ * One `EQUIPMENT_` prefix covers custody/dock/readiness/staging/waitlist/RFID,
+ * and every sub-resource key nests under `equipmentKeys.all`.
+ *
+ * Module scope so all five call sites serialize to the same registry key.
+ */
+const EQUIPMENT_SPEC: UseRealtimeInvalidationOptions = {
+  typePrefixes: ["EQUIPMENT_"],
+  queryKeys: [equipmentKeys.all],
+};
 
 export function useEquipmentRealtimeSync(): void {
-  const queryClient = useQueryClient();
-
-  useEffect(() => retainEquipmentRealtimeSync(queryClient), [queryClient]);
+  useRealtimeInvalidation(EQUIPMENT_SPEC);
 }
