@@ -171,4 +171,50 @@ describe("useEquipmentRealtimeSync", () => {
     await view.unmount();
     expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
+
+  it("still shares ONE listener across two QueryClients, invalidating each exactly once", async () => {
+    // The registry refcounts PER QueryClient, so this is the branch that keeps
+    // `Map<QueryClient, number>` honest: one client's mount must never stand in
+    // for the other's, and neither may be invalidated twice.
+    const clientA = new QueryClient();
+    const clientB = new QueryClient();
+    const invalidateA = jest.spyOn(clientA, "invalidateQueries").mockResolvedValue();
+    const invalidateB = jest.spyOn(clientB, "invalidateQueries").mockResolvedValue();
+
+    const view = await render(
+      <>
+        <QueryClientProvider client={clientA}>
+          <Consumer />
+          <Consumer />
+        </QueryClientProvider>
+        <QueryClientProvider client={clientB}>
+          <Consumer />
+        </QueryClientProvider>
+      </>,
+    );
+
+    expect(listeners).toHaveLength(1);
+    emit({
+      kind: "event",
+      envelope: { type: "EQUIPMENT_CUSTODY_STATE_CHANGED", payload: {}, timestamp: "t" },
+    });
+    expect(invalidateA).toHaveBeenCalledTimes(1);
+    expect(invalidateA).toHaveBeenCalledWith({ queryKey: ["equipment"] });
+    expect(invalidateB).toHaveBeenCalledTimes(1);
+    expect(invalidateB).toHaveBeenCalledWith({ queryKey: ["equipment"] });
+
+    // Dropping client B must not disturb client A's holders.
+    await view.rerender(
+      <>
+        <QueryClientProvider client={clientA}>
+          <Consumer />
+          <Consumer />
+        </QueryClientProvider>
+      </>,
+    );
+    expect(unsubscribe).not.toHaveBeenCalled();
+    emit({ kind: "reset", reason: "last_event_pruned" });
+    expect(invalidateA).toHaveBeenCalledTimes(2);
+    expect(invalidateB).toHaveBeenCalledTimes(1);
+  });
 });
