@@ -8,13 +8,20 @@ import { useUniwind } from "uniwind";
 import { BootstrapGate } from "@/app/BootstrapGate";
 import { PressableScale } from "@/components/PressableScale";
 import { EquipmentRow, type RowPressHandler } from "@/components/equipment/EquipmentRow";
+import {
+  EquipmentDetailContent,
+  type OpenScanConfirm,
+} from "@/components/equipment/detail/EquipmentDetailContent";
 import { AuroraBackground } from "@/components/home/AuroraBackground";
 import { FORWARD_ARROW } from "@/components/home/glyphs";
 import { SearchIcon } from "@/components/home/icons";
+import { SelectPlaceholder, TwoPane } from "@/components/tablet/TwoPane";
+import { resolveSelectedItem } from "@/components/tablet/two-pane-layout";
 import { useDualFrameSampler } from "@/hooks/useDualFrameSampler";
 import { useEquipmentRealtimeSync } from "@/hooks/useEquipmentRealtimeSync";
 import { api, equipmentKeys, type EquipmentListParams } from "@/lib/api";
 import { mark, MARK } from "@/lib/instrumentation/perf";
+import { useIsTablet } from "@/lib/use-is-tablet";
 import type { EquipmentListPage } from "@/types/api";
 
 import type { RootStackScreenProps } from "../navigation/types";
@@ -97,14 +104,29 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
     }
   }, [listQuery.isSuccess]);
 
+  // Slice 13: on a tablet the list stays mounted in the master pane and a row
+  // press SELECTS (the detail pane renders EquipmentDetail's content). On a
+  // phone the Slice-1 behaviour is untouched — the row still pushes ScanConfirm.
+  const isTablet = useIsTablet();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const onOpenScanConfirm = useCallback<OpenScanConfirm>(
+    (params) => navigation.navigate("ScanConfirm", params),
+    [navigation],
+  );
+
   const onRowPress = useCallback<RowPressHandler>(
     (item) => {
-      navigation.navigate("ScanConfirm", {
+      if (isTablet) {
+        setSelectedId(item.id);
+        return;
+      }
+      onOpenScanConfirm({
         equipmentId: item.id,
         prefill: { name: item.name, status: item.status },
       });
     },
-    [navigation],
+    [isTablet, onOpenScanConfirm],
   );
 
   // O1/O2 scroll segment: sample frames (JS rAF + UI useFrameCallback) while the
@@ -114,11 +136,13 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
   const { start: startScrollSampling, stop: stopScrollSampling } = useDualFrameSampler();
 
   const items = listQuery.data?.items ?? [];
+  // Selection is DERIVED from the live list, never trusted from state alone: a
+  // new search (or a realtime update that drops the row) collapses the detail
+  // pane back to its placeholder instead of stranding an invisible row.
+  const selected = resolveSelectedItem(items, selectedId);
 
-  return (
-    <View className="flex-1 bg-background">
-      <AuroraBackground />
-      <View className="flex-1 px-[22px] pt-3">
+  const masterPane = (
+    <View className="flex-1 px-[22px] pt-3">
         {/* Aurora search field — opaque surface, radius-md, muted placeholder, ≥44pt. */}
         <View className="mb-2.5 min-h-[48px] flex-row items-center gap-2.5 rounded-[20px] border border-border bg-surface px-4">
           <SearchIcon color={light ? "#5B5680" : "#A6A0C3"} size={18} />
@@ -191,7 +215,38 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
             contentContainerStyle={{ paddingBottom: 16 }}
           />
         )}
-      </View>
+    </View>
+  );
+
+  return (
+    <View className="flex-1 bg-background">
+      <AuroraBackground />
+      {isTablet ? (
+        <TwoPane
+          master={masterPane}
+          detail={
+            selected ? (
+              <EquipmentDetailContent
+                // Remount on selection change so the detail pane's local clock
+                // state never leaks between two different units.
+                key={selected.id}
+                equipmentId={selected.id}
+                onOpenScanConfirm={onOpenScanConfirm}
+              />
+            ) : null
+          }
+          placeholder={
+            <SelectPlaceholder
+              title={t("tablet.selectEquipment")}
+              body={t("tablet.selectEquipmentBody")}
+            />
+          }
+          masterLabel={t("equipment.listTitle")}
+          detailLabel={t("nav.equipmentDetail")}
+        />
+      ) : (
+        masterPane
+      )}
     </View>
   );
 }

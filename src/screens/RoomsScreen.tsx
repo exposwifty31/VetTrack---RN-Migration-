@@ -14,19 +14,23 @@
  *
  * Identity is resolved by the route's BootstrapGate (GatedRooms) before mount.
  */
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
 import { FlashList, type ListRenderItem } from "@shopify/flash-list";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { AuroraBackground } from "@/components/home/AuroraBackground";
+import { RoomDetailContent } from "@/components/rooms/RoomDetailContent";
 import { RoomListRow } from "@/components/rooms/RoomListRow";
+import { SelectPlaceholder, TwoPane } from "@/components/tablet/TwoPane";
+import { resolveSelectedItem } from "@/components/tablet/two-pane-layout";
 import { ErrorNote } from "@/components/ui/ErrorNote";
 import { ListEmptyState } from "@/components/ui/ListEmptyState";
 import { RowSkeleton } from "@/components/ui/RowSkeleton";
 import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { retryUnlessClientError } from "@/lib/api/coded-error";
+import { useIsTablet } from "@/lib/use-is-tablet";
 import {
   ROOM_AUDIT_ACTION_TYPES,
   ROOM_EVENT_TYPE_PREFIXES,
@@ -56,22 +60,34 @@ export function RoomsScreen({ navigation }: RootStackScreenProps<"Rooms">) {
   // has data (the FlashList branch below), so it is always a valid instant.
   const nowMs = listQuery.dataUpdatedAt;
 
+  // Slice 13: on a tablet the list stays mounted in the master pane and a row
+  // press SELECTS (the detail pane renders RoomDetail's content). On a phone the
+  // Slice-7 behaviour is untouched — the row still pushes the RoomDetail route.
+  const isTablet = useIsTablet();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
   const onRowPress = useCallback(
     (roomId: string) => {
+      if (isTablet) {
+        setSelectedId(roomId);
+        return;
+      }
       navigation.navigate("RoomDetail", { roomId });
     },
-    [navigation],
+    [isTablet, navigation],
   );
+
+  // Selection is DERIVED from the live list: a realtime invalidation that drops
+  // a room collapses the detail pane back to its placeholder.
+  const selected = resolveSelectedItem(listQuery.data ?? [], selectedId);
 
   const renderItem = useCallback<ListRenderItem<Room>>(
     ({ item }) => <RoomListRow room={item} nowMs={nowMs} onPress={onRowPress} />,
     [nowMs, onRowPress],
   );
 
-  return (
-    <View className="flex-1 bg-background">
-      <AuroraBackground />
-      <View className="flex-1 px-[22px] pt-3">
+  const masterPane = (
+    <View className="flex-1 px-[22px] pt-3">
         <Text className="mb-3 font-rubik-bold text-[20px] text-foreground">
           {t("rooms.title")}
         </Text>
@@ -97,7 +113,29 @@ export function RoomsScreen({ navigation }: RootStackScreenProps<"Rooms">) {
             contentContainerStyle={{ paddingBottom: 16 }}
           />
         )}
-      </View>
+    </View>
+  );
+
+  return (
+    <View className="flex-1 bg-background">
+      <AuroraBackground />
+      {isTablet ? (
+        <TwoPane
+          master={masterPane}
+          detail={
+            // Remount on selection change so the sweep flow's local state never
+            // leaks between two different rooms.
+            selected ? <RoomDetailContent key={selected.id} roomId={selected.id} /> : null
+          }
+          placeholder={
+            <SelectPlaceholder title={t("tablet.selectRoom")} body={t("tablet.selectRoomBody")} />
+          }
+          masterLabel={t("rooms.title")}
+          detailLabel={t("nav.roomDetail")}
+        />
+      ) : (
+        masterPane
+      )}
     </View>
   );
 }

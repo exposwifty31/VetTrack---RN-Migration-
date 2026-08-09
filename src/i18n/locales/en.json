@@ -442,6 +442,10 @@
     "offShiftTitle": "You're off shift",
     "offShiftBody": "Tasks are available during an active shift. They'll be here when your shift starts.",
     "noNotes": "No description",
+    "detail": {
+      "device": "Device",
+      "location": "Location"
+    },
     "mine": "Mine",
     "start": "Start",
     "complete": "Complete",
@@ -744,5 +748,13 @@
     "acked": "Acknowledged",
     "pin": "Pin",
     "seniorOnly": "Seniors and above can pin messages."
+  },
+  "tablet": {
+    "selectEquipment": "Select a unit",
+    "selectEquipmentBody": "Pick a unit from the list to see its details here.",
+    "selectRoom": "Select a room",
+    "selectRoomBody": "Pick a room from the list to sweep it and see its activity.",
+    "selectTask": "Select a task",
+    "selectTaskBody": "Pick a task from the list to see its details here."
   }
 }

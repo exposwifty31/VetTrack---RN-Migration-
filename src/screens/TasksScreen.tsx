@@ -27,6 +27,9 @@ import { useTranslation } from "react-i18next";
 import { useIdentity } from "@/app/useIdentity";
 import { PressableScale } from "@/components/PressableScale";
 import { AuroraBackground } from "@/components/home/AuroraBackground";
+import { SelectPlaceholder, TwoPane } from "@/components/tablet/TwoPane";
+import { resolveSelectedItem } from "@/components/tablet/two-pane-layout";
+import { TaskDetailPane } from "@/components/tasks/TaskDetailPane";
 import { TaskFormSheet, type TaskFormRequest } from "@/components/tasks/TaskFormSheet";
 import { TaskRow } from "@/components/tasks/TaskRow";
 import { TasksDayNav } from "@/components/tasks/TasksDayNav";
@@ -47,6 +50,7 @@ import {
 } from "@/lib/api/tasks";
 import { addIsoDays } from "@/lib/datetime";
 import { resolveTaskGateRole } from "@/lib/task-permissions";
+import { useIsTablet } from "@/lib/use-is-tablet";
 import type { Task } from "@/types/tasks";
 
 export function TasksScreen() {
@@ -93,6 +97,14 @@ export function TasksScreen() {
   const activeQuery = segment === "all" ? dayQuery : mineQuery;
   const tasks = useMemo(() => sortByStartTime(activeQuery.data ?? []), [activeQuery.data]);
 
+  // Slice 13: on a tablet the list stays mounted in the master pane and a row
+  // press SELECTS (the detail pane shows the full task + the same lifecycle and
+  // edit affordances). On a phone the Slice-3 behaviour is untouched — an
+  // editor's row press still opens the edit sheet directly.
+  const isTablet = useIsTablet();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const onSelect = useCallback((task: Task) => setSelectedId(task.id), []);
+
   const renderItem = useCallback<ListRenderItem<Task>>(
     ({ item }) => (
       <TaskRow
@@ -102,10 +114,16 @@ export function TasksScreen() {
         isPending={item.id === pendingTaskId}
         onAction={onAction}
         onEdit={canEdit ? onEdit : undefined}
+        onSelect={isTablet ? onSelect : undefined}
       />
     ),
-    [meUserId, gateRole, pendingTaskId, onAction, canEdit, onEdit],
+    [meUserId, gateRole, pendingTaskId, onAction, canEdit, onEdit, isTablet, onSelect],
   );
+
+  // Selection is DERIVED from the live list: changing day or segment, or a
+  // realtime invalidation that drops the task, collapses the detail pane back
+  // to its placeholder instead of stranding a task the user can no longer see.
+  const selected = resolveSelectedItem(tasks, selectedId);
 
   const { refetch } = activeQuery;
   const onRetry = useCallback(() => {
@@ -124,10 +142,8 @@ export function TasksScreen() {
     setDay(today);
   }, [setDay, today]);
 
-  return (
-    <View className="flex-1 bg-background">
-      <AuroraBackground />
-      <View className="flex-1 px-[22px] pt-3">
+  const masterPane = (
+    <View className="flex-1 px-[22px] pt-3">
         <TasksSegmentControl segment={segment} onChange={setSegment} />
 
         {segment === "all" ? (
@@ -160,7 +176,36 @@ export function TasksScreen() {
           onRetry={onRetry}
           renderItem={renderItem}
         />
-      </View>
+    </View>
+  );
+
+  return (
+    <View className="flex-1 bg-background">
+      <AuroraBackground />
+      {isTablet ? (
+        <TwoPane
+          master={masterPane}
+          detail={
+            selected ? (
+              <TaskDetailPane
+                task={selected}
+                meUserId={meUserId}
+                gateRole={gateRole}
+                isPending={selected.id === pendingTaskId}
+                onAction={onAction}
+                onEdit={canEdit ? onEdit : undefined}
+              />
+            ) : null
+          }
+          placeholder={
+            <SelectPlaceholder title={t("tablet.selectTask")} body={t("tablet.selectTaskBody")} />
+          }
+          masterLabel={t("nav.tasks")}
+          detailLabel={t("tablet.selectTask")}
+        />
+      ) : (
+        masterPane
+      )}
 
       {/* Create entry — a primary FAB, editors only. Logical `end` inset flips */}
       {/* under RTL. Hidden while the off-shift empty state owns the screen. */}

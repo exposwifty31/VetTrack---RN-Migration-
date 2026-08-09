@@ -25,6 +25,7 @@ export const TaskRow = memo(function TaskRow({
   isPending,
   onAction,
   onEdit,
+  onSelect,
 }: Readonly<{
   task: Task;
   meUserId: string | null;
@@ -34,6 +35,12 @@ export const TaskRow = memo(function TaskRow({
   onAction: TaskActionHandler;
   /** Provided only to editors (task.create) — makes the row open the edit sheet. */
   onEdit?: TaskEditHandler;
+  /**
+   * Tablet only (Slice 13): the row lives in a master pane, so a press SELECTS
+   * into the detail pane instead of opening the edit sheet. Takes precedence
+   * over `onEdit`, and applies to everyone — reading a task is not role-gated.
+   */
+  onSelect?: TaskEditHandler;
 }>) {
   const { t } = useTranslation();
 
@@ -44,15 +51,18 @@ export const TaskRow = memo(function TaskRow({
   const detailParts = [task.animalId?.trim(), task.ownerId?.trim()].filter(Boolean) as string[];
   const isMine = meUserId != null && task.vetId === meUserId;
 
-  // Editors get a pressable card (opens edit); everyone else a static card. The
-  // nested lifecycle button captures its own press, so Start/Complete still wins.
-  const Card = onEdit ? Pressable : View;
-  const cardProps = onEdit
+  // On a tablet the press selects; otherwise editors get a pressable card that
+  // opens the edit sheet and everyone else a static card. The nested lifecycle
+  // button captures its own press, so Start/Complete still wins either way.
+  const press = onSelect ?? onEdit;
+  const Card = press ? Pressable : View;
+  const cardProps = press
     ? {
         accessibilityRole: "button" as const,
         accessibilityLabel: task.notes?.trim() || t("tasks.noNotes"),
-        accessibilityHint: t("tasks.form.editHint"),
-        onPress: () => onEdit(task),
+        // The editor hint would lie on the select path (it opens a pane, not the form).
+        ...(onSelect ? {} : { accessibilityHint: t("tasks.form.editHint") }),
+        onPress: () => press(task),
       }
     : {};
 
