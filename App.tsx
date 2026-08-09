@@ -22,10 +22,16 @@ import { Uniwind } from "uniwind";
 import { ClerkTokenBridge } from "./src/infrastructure/auth/ClerkTokenBridge";
 import { RealtimeBridge } from "./src/infrastructure/realtime/RealtimeBridge";
 import { i18n } from "./src/i18n";
+import { installDevAuthSeam } from "./src/lib/dev-auth";
 import { queryClient } from "./src/lib/query-client";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 
 Uniwind.setTheme("dark");
+
+// Dev-only, opt-in, and refused when a Clerk key is configured — see
+// src/lib/dev-auth.ts for the five guard rails. Module scope so the identity
+// bootstrap query already sees the fallback token on its first run.
+installDevAuthSeam();
 
 // Keep the native splash up while App renders no tree (font resolution below).
 // Must run at module scope, before the first render. Failure is non-fatal —
