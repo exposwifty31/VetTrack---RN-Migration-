@@ -24,7 +24,8 @@
  * budget).
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { View } from "react-native";
+import type { ReactNode } from "react";
+import { View, useWindowDimensions } from "react-native";
 import type { ListRenderItem } from "@shopify/flash-list";
 import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -41,6 +42,7 @@ import { AttentionCard } from "@/components/home/AttentionCard";
 import { ExceptionsCard } from "@/components/home/ExceptionsCard";
 import { GlassTopBar, TOP_BAR_HEIGHT } from "@/components/home/GlassTopBar";
 import { GreetingHeader } from "@/components/home/GreetingHeader";
+import { resolveHomeColumns } from "@/components/home/home-bento-layout";
 import { HomeChipsRow } from "@/components/home/HomeChipsRow";
 import {
   clockTimeFromIso,
@@ -55,6 +57,7 @@ import { ShiftHeroCard } from "@/components/home/ShiftHeroCard";
 import { useEquipmentRealtimeSync } from "@/hooks/useEquipmentRealtimeSync";
 import { api, equipmentKeys } from "@/lib/api";
 import { retryUnlessClientError } from "@/lib/api/coded-error";
+import { useIsTablet } from "@/lib/use-is-tablet";
 import { homeApi, homeKeys, type ActivityItem, type ActivityPage } from "@/lib/api/home";
 import { nudgeKeys, nudgesApi } from "@/lib/api/nudges";
 import {
@@ -88,6 +91,39 @@ let markedHomeInteractive = false;
  * numbers can claim the whole fleet.
  */
 const FLEET_PAGE_LIMIT = 1000;
+
+/**
+ * Pairs two dashboard cards side by side in Home's two-column tablet reflow,
+ * and falls back to the phone's vertical stack at one column.
+ *
+ * Module scope on purpose (rn-best-practices): declared inside `HomeScreen`
+ * this would be a new component type every render, remounting both cards —
+ * and the shift hero owns sheet-driven state.
+ *
+ * No gap/margin here: each card root carries its own `px-[22px]`, so the
+ * column gutter is the two cards' facing insets. `flex-row` is already flipped
+ * by `I18nManager` under RTL, so `start` is the logical leading column.
+ */
+function BentoRow({
+  columns,
+  start,
+  end,
+}: Readonly<{ columns: 1 | 2; start: ReactNode; end: ReactNode }>) {
+  if (columns === 1) {
+    return (
+      <>
+        {start}
+        {end}
+      </>
+    );
+  }
+  return (
+    <View className="flex-row items-stretch">
+      <View className="flex-1">{start}</View>
+      <View className="flex-1">{end}</View>
+    </View>
+  );
+}
 
 export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
   const insets = useSafeAreaInsets();
@@ -214,13 +250,19 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
     undefined;
   const initial = displayName ? displayName[0].toUpperCase() : undefined;
 
+  // Slice 13: Home is the one adapted screen that is not master/detail — on a
+  // wide-enough tablet its cards reflow into two columns instead of one very
+  // wide stack. The blur budget is untouched: GlassTopBar stays the only blur
+  // layer, and the reflow adds no animation.
+  const isTablet = useIsTablet();
+  const { width: windowWidth } = useWindowDimensions();
+  const columns = resolveHomeColumns(windowWidth, isTablet);
+
   // All fixed dashboard content rides the list header (single scroller: the
   // FlashList below owns scrolling; only activity rows are list items).
-  const listHeader = (
-    <View>
-      <GreetingHeader name={displayName} />
-      <ScanHero onPress={() => navigation.navigate("Scan")} />
-      <ShiftHeroCard
+  const scanHero = <ScanHero onPress={() => navigation.navigate("Scan")} />;
+  const shiftHero = (
+    <ShiftHeroCard
         state={heroState}
         streak={dashboard?.streak ?? null}
         scansToday={dashboard?.scansToday ?? null}
@@ -229,23 +271,32 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
         cancelInFlight={cancelAdjustment.isPending}
         loadFailed={dashboardQuery.isError}
         onRetry={() => void dashboardQuery.refetch()}
-        onRequestAdjustment={setSheetKind}
-        onCancelAdjustment={(id) => cancelAdjustment.mutate(id)}
-      />
+      onRequestAdjustment={setSheetKind}
+      onCancelAdjustment={(id) => cancelAdjustment.mutate(id)}
+    />
+  );
+  const readinessCard = <ReadinessCard readiness={readiness} />;
+  const attentionCard = (
+    <AttentionCard
+      items={attentionItems}
+      loadFailed={fleetQuery.isError}
+      onHeaderPress={() => navigation.navigate("Alerts")}
+      onItemPress={(item) =>
+        navigation.navigate("EquipmentList", { initialQuery: item.equipmentName })
+      }
+    />
+  );
+
+  const listHeader = (
+    <View>
+      <GreetingHeader name={displayName} />
+      <BentoRow columns={columns} start={scanHero} end={shiftHero} />
       <HomeChipsRow
         tasksCounts={tasksDashboardQuery.data?.counts ?? null}
         nudgesCount={nudgesQuery.data?.length ?? null}
         onTasksPress={() => navigation.navigate("Tasks")}
       />
-      <ReadinessCard readiness={readiness} />
-      <AttentionCard
-        items={attentionItems}
-        loadFailed={fleetQuery.isError}
-        onHeaderPress={() => navigation.navigate("Alerts")}
-        onItemPress={(item) =>
-          navigation.navigate("EquipmentList", { initialQuery: item.equipmentName })
-        }
-      />
+      <BentoRow columns={columns} start={readinessCard} end={attentionCard} />
       {exceptions.length > 0 ? (
         <ExceptionsCard
           count={exceptions.length}

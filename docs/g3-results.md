@@ -9,6 +9,10 @@ and are captured as an explicit protocol below — **not** claimed as done.
 Environment: Expo SDK 57 · RN 0.86.2 · New Architecture · CNG prebuild · npm.
 Base: `main` @ `d0fbc58` (post PR #34). Recorded 2026-08-09.
 
+> **§1–§6 record Slice 12.** Slice 13 (Tablet-iOS / iPad layout) is recorded
+> separately in **§7** with its own gate run — the numbers in §3.1 are Slice 12's
+> and are deliberately left as recorded.
+
 ---
 
 ## 1. Exit checklist (G3-PLAN §1) — status
@@ -234,3 +238,89 @@ Owner daily-driver verdict — iPhone 16 Plus / iOS (date, build, verdict, notes
 4. **Mine menu entry hidden for custody-scoped roles** (`isCustodyScopedRole`):
    students already get the Mine **tab** (Slice 4); the Menu entry serves everyone
    else, avoiding a duplicate for students.
+
+---
+
+## 7. Slice 13 — Tablet-iOS (iPad) layout
+
+Base: `main` @ `492b891` (post PR #40). Recorded 2026-08-09. Scope per
+`docs/G3-PLAN.md` §2 Slice 13: four screens gain an iPad layout, **no new routes**.
+
+### 7.1 Gate item 0 — iPad orientation plist (fail-closed)
+
+Asserted against the CNG-generated `ios/VetTrack/Info.plist` (`plutil`):
+
+| Key | Required | Observed | |
+|---|---|---|---|
+| `UISupportedInterfaceOrientations` (iPhone base) | the two portrait values | `[Portrait, PortraitUpsideDown]` | ✅ |
+| `UISupportedInterfaceOrientations~ipad` | all four | `[Portrait, PortraitUpsideDown, LandscapeLeft, LandscapeRight]` | ✅ |
+| `UIRequiresFullScreen` | unset/false (Split View allowed) | `false` | ✅ |
+
+`app.json` keeps `orientation: "portrait"` + `ios.supportsTablet: true`. The plist
+above is the proof that this pair is already correct: `@expo/config-plugins`
+writes the `~ipad` key itself, so **iPad rotates all four ways while iPhone stays
+portrait**. Changing `orientation` to `"default"` would unlock iPhone landscape —
+a surface no RN screen was designed for — and is **not** warranted.
+
+### 7.2 Automatable gates (run 2026-08-09 on this branch)
+
+| Gate | Command | Result |
+|---|---|---|
+| Typecheck | `npm run typecheck` | ✅ **0 errors** |
+| Lint | `npm run lint` (`eslint . --max-warnings=0`) | ✅ **0 errors, 0 warnings** |
+| Tests | `npm test` (jest) | ✅ **72 suites / 667 tests passed** (69 suites at `492b891` + the 3 new pure-logic suites) |
+| Parity | `parity.test.ts` (within the suite) | ✅ he⇄en key sets identical |
+| iOS export | `npx expo export --platform ios` | ✅ clean — `index.ts` bundled, 2156 modules, iOS hbc 5.9 MB, 20 assets |
+
+New pure-logic suites: `src/lib/__tests__/use-is-tablet.test.ts` (short-side ≥ 600
+threshold, rotation stability), `src/components/tablet/__tests__/two-pane-layout.test.ts`
+(master width clamp + derived selection), `src/components/home/__tests__/home-bento-layout.test.ts`
+(column reflow incl. 50/50 Split View → 1 column).
+
+### 7.3 iPad simulator render evidence
+
+Built via CNG (`npx expo run:ios`) and installed on two booted simulators,
+iOS 26.4: **iPad Pro 11-inch (M5)** and **iPad Pro 13-inch (M5)**.
+
+| Screen | Device | Orientation | Locale | Evidence |
+|---|---|---|---|---|
+| Home (bento reflow) | iPad Pro 11" | portrait | he (RTL) | [home-ipad11-portrait-he.png](g3-slice13-ipad/home-ipad11-portrait-he.png) |
+| Home (bento reflow) | iPad Pro 13" | portrait | he (RTL) | [home-ipad13-portrait-he.png](g3-slice13-ipad/home-ipad13-portrait-he.png) |
+
+What the Home captures prove, and it is the load-bearing half of the reflow:
+`resolveHomeColumns` returns 2, `BentoRow` pairs the cards side by side, and
+**RTL is correct** — the `start` slot (scan hero, readiness) renders on the
+**right**, `I18nManager` flipping `flex-row` without a `row-reverse` double-flip.
+
+### 7.4 Open gate — populated master/detail screenshots (owner)
+
+**Not claimed as done.** The remaining matrix (Equipment / Rooms / Tasks
+two-pane, landscape, and the `en` LTR pass) is **blocked on an authenticated
+session**, not on the layout:
+
+- `authFetch` (`src/lib/auth-fetch.ts:145`) throws `AUTH_INVALID` **before any
+  network dispatch** when no valid Clerk JWT is present. The RN client has **no
+  dev-bypass seam** — `setStoredBearerToken` has no production call site.
+- Consequence on a bare simulator: every list is empty/errored, so a two-pane
+  capture would show the frame and the `SelectPlaceholder` but never a populated
+  detail pane — i.e. it would not evidence the thing the gate exists to check.
+- This joins the existing **on-device owner gate** (§1 items 1/5/6, protocol §5),
+  where a real signed-in session exists on Pixel 7 / iPhone 16 Plus.
+
+### 7.5 Measurement harness — integrity verified, comparison deferred
+
+Verified by inspection on this branch:
+
+- `src/screens/G2MeasureScreen.tsx` present; `git diff` against
+  `src/lib/instrumentation/` and `G2MeasureScreen.tsx` is **empty** (untouched).
+- Closed `MARK` vocabulary unchanged (`scan_tap`, `scan_visual_ack`,
+  `scan_server_confirmed`, `screenInteractive`).
+- `MARK.screenInteractive` latch call sites unchanged: `EquipmentListScreen.tsx`
+  and `HomeScreen.tsx` (the Home latch still guards on a successful `mark()`).
+
+**No pooled-p95 number is reported here, deliberately.** The G2.5 baseline
+(pooled UI p95 11.07 ms, floor 11.11, 1/1962 drops) is a **physical Pixel**
+release-artifact measurement; this slice's only run is a **dev-mode iPad
+simulator** build, where renders are ~3× inflated. Comparing the two would be a
+fabricated result, not evidence. The frame-floor comparison therefore stays on
+the on-device exit pass (§1 item 5, protocol §5.2).
