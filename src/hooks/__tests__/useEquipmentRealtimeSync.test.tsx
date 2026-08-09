@@ -15,7 +15,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import type { RealtimeEvent, RealtimePort } from "@/core/ports/realtime.port";
 
-import { __resetEquipmentRealtimeRegistryForTests } from "../equipment-realtime-registry";
+import { __resetRealtimeInvalidationRegistryForTests } from "../realtime-invalidation-registry";
 import { useEquipmentRealtimeSync } from "../useEquipmentRealtimeSync";
 
 /**
@@ -64,7 +64,7 @@ describe("useEquipmentRealtimeSync", () => {
     // The registry is module state. A holder leaked from an earlier test would
     // suppress the next `subscribe()`, leaving `listeners` empty and turning every
     // `not.toHaveBeenCalled()` below into a vacuous pass.
-    __resetEquipmentRealtimeRegistryForTests();
+    __resetRealtimeInvalidationRegistryForTests();
     listeners.length = 0;
     unsubscribe.mockClear();
     openSpy.mockClear();
@@ -174,7 +174,7 @@ describe("useEquipmentRealtimeSync", () => {
 
   it("still shares ONE listener across two QueryClients, invalidating each exactly once", async () => {
     // The registry refcounts PER QueryClient, so this is the branch that keeps
-    // `Map<QueryClient, number>` honest: one client's mount must never stand in
+    // the per-client map honest: one client's mount must never stand in
     // for the other's, and neither may be invalidated twice.
     const clientA = new QueryClient();
     const clientB = new QueryClient();
