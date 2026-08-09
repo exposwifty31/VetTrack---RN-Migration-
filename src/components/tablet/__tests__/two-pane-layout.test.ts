@@ -44,6 +44,12 @@ describe("resolveMasterWidth", () => {
     expect(resolveMasterWidth(1366, 0)).toBe(MASTER_MAX_WIDTH);
     expect(resolveMasterWidth(1366, Number.NaN)).toBe(MASTER_MAX_WIDTH);
   });
+
+  test("an explicit cap below the minimum still wins, so maxWidth is a real cap", () => {
+    expect(resolveMasterWidth(744, 100)).toBe(100);
+    // ...including when there is no room to apply the ratio at all.
+    expect(resolveMasterWidth(0, 100)).toBe(100);
+  });
 });
 
 describe("resolveSelectedItem", () => {

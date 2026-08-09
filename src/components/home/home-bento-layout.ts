@@ -9,11 +9,22 @@
  */
 
 /**
- * Narrowest a bento column may get before two columns stop being an
- * improvement. Below this the cards' own content (the shift hero's stat row,
- * the readiness gauges) starts wrapping, so one full-width column reads better.
+ * Horizontal inset every Home card paints itself (`px-[22px]` on both sides).
+ * Stated explicitly because it comes off the column before the card's content
+ * box: a 340pt column renders a 296pt card.
  */
-export const HOME_BENTO_MIN_COLUMN_WIDTH = 340;
+export const HOME_CARD_INSET = 44;
+
+/**
+ * Narrowest CARD CONTENT box — i.e. after `HOME_CARD_INSET` — that still reads
+ * as an improvement over one full-width column. Below this the cards' own
+ * content (the shift hero's stat row, the readiness gauges) starts wrapping.
+ */
+export const HOME_BENTO_MIN_CARD_CONTENT_WIDTH = 296;
+
+/** Narrowest bento COLUMN, insets included. Kept for callers/tests. */
+export const HOME_BENTO_MIN_COLUMN_WIDTH =
+  HOME_BENTO_MIN_CARD_CONTENT_WIDTH + HOME_CARD_INSET;
 
 /**
  * How many columns Home's card grid should use.
@@ -27,5 +38,7 @@ export function resolveHomeColumns(availableWidth: number, isTablet: boolean): 1
   if (!isTablet || !Number.isFinite(availableWidth)) return 1;
   // No gap term: every Home card carries its own `px-[22px]`, so the column
   // gutter is formed by the two cards' facing insets rather than by the row.
+  // The inset is charged to each column via HOME_BENTO_MIN_COLUMN_WIDTH, so the
+  // threshold is stated against the card's real content box, not the column.
   return availableWidth >= HOME_BENTO_MIN_COLUMN_WIDTH * 2 ? 2 : 1;
 }

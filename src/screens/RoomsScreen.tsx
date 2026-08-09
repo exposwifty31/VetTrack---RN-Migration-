@@ -130,8 +130,6 @@ export function RoomsScreen({ navigation }: RootStackScreenProps<"Rooms">) {
           placeholder={
             <SelectPlaceholder title={t("tablet.selectRoom")} body={t("tablet.selectRoomBody")} />
           }
-          masterLabel={t("rooms.title")}
-          detailLabel={t("nav.roomDetail")}
         />
       ) : (
         masterPane

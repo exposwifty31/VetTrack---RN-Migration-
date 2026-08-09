@@ -200,8 +200,6 @@ export function TasksScreen() {
           placeholder={
             <SelectPlaceholder title={t("tablet.selectTask")} body={t("tablet.selectTaskBody")} />
           }
-          masterLabel={t("nav.tasks")}
-          detailLabel={t("tablet.selectTask")}
         />
       ) : (
         masterPane

@@ -241,8 +241,6 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
               body={t("tablet.selectEquipmentBody")}
             />
           }
-          masterLabel={t("equipment.listTitle")}
-          detailLabel={t("nav.equipmentDetail")}
         />
       ) : (
         masterPane

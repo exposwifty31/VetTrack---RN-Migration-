@@ -341,8 +341,14 @@ call site). PR #42 adds one; §7.3 was captured with it.
 
 Verified by inspection on this branch:
 
-- `src/screens/G2MeasureScreen.tsx` present; `git diff` against
-  `src/lib/instrumentation/` and `G2MeasureScreen.tsx` is **empty** (untouched).
+- `src/screens/G2MeasureScreen.tsx` present, and the harness is untouched across
+  the whole branch — asserted over the commit range, not just the working tree:
+
+  ```console
+  $ git diff --quiet 492b891...HEAD -- src/lib/instrumentation src/screens/G2MeasureScreen.tsx
+  $ echo $?
+  0     # no committed changes in the measurement harness
+  ```
 - Closed `MARK` vocabulary unchanged (`scan_tap`, `scan_visual_ack`,
   `scan_server_confirmed`, `screenInteractive`).
 - `MARK.screenInteractive` latch call sites unchanged: `EquipmentListScreen.tsx`
