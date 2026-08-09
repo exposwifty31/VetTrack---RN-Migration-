@@ -33,42 +33,34 @@ type TwoPaneProps = Readonly<{
   /** Rendered in the detail pane while `detail` is null. */
   placeholder?: ReactNode;
   /** Upper bound for the master pane width (default 380). */
-  masterWidth?: number;
-  /** Accessibility label for the master pane region. */
-  masterLabel: string;
-  /** Accessibility label for the detail pane region. */
-  detailLabel: string;
+  masterMaxWidth?: number;
 }>;
 
 export function TwoPane({
   master,
   detail,
   placeholder,
-  masterWidth = MASTER_MAX_WIDTH,
-  masterLabel,
-  detailLabel,
+  masterMaxWidth = MASTER_MAX_WIDTH,
 }: TwoPaneProps) {
   const { width } = useWindowDimensions();
-  const paneWidth = resolveMasterWidth(width, masterWidth);
+  const paneWidth = resolveMasterWidth(width, masterMaxWidth);
 
+  // No pane-level accessibilityLabel: an `accessibilityLabel` only speaks on an
+  // accessibility ELEMENT, and making these containers `accessible` would
+  // collapse a whole scrolling pane into one node — strictly worse for a screen
+  // reader than the panes' own labelled children. Each pane's content already
+  // carries its own labels.
   return (
     // minHeight 0 lets each pane's scroller shrink inside the row instead of
     // growing the frame past the screen.
     <View className="flex-1 flex-row" style={{ minHeight: 0 }}>
       <View
-        accessibilityRole="none"
-        accessibilityLabel={masterLabel}
         className="border-border"
         style={{ width: paneWidth, flexShrink: 0, borderEndWidth: StyleSheet.hairlineWidth }}
       >
         {master}
       </View>
-      <View
-        accessibilityRole="none"
-        accessibilityLabel={detailLabel}
-        className="flex-1"
-        style={{ minHeight: 0 }}
-      >
+      <View className="flex-1" style={{ minHeight: 0 }}>
         {detail ?? placeholder ?? null}
       </View>
     </View>

@@ -282,37 +282,74 @@ threshold, rotation stability), `src/components/tablet/__tests__/two-pane-layout
 Built via CNG (`npx expo run:ios`) and installed on two booted simulators,
 iOS 26.4: **iPad Pro 11-inch (M5)** and **iPad Pro 13-inch (M5)**.
 
+All captures are against a **live local API** (`pnpm dev:api` on the legacy repo
+in dev-bypass), so the panes hold real records rather than empty states.
+
 | Screen | Device | Orientation | Locale | Evidence |
 |---|---|---|---|---|
 | Home (bento reflow) | iPad Pro 11" | portrait | he (RTL) | [home-ipad11-portrait-he.png](g3-slice13-ipad/home-ipad11-portrait-he.png) |
 | Home (bento reflow) | iPad Pro 13" | portrait | he (RTL) | [home-ipad13-portrait-he.png](g3-slice13-ipad/home-ipad13-portrait-he.png) |
+| Equipment (two-pane, detail populated) | iPad Pro 11" | portrait | he (RTL) | [equipment-ipad11-portrait-he.png](g3-slice13-ipad/equipment-ipad11-portrait-he.png) |
+| Equipment (two-pane, detail populated) | iPad Pro 13" | portrait | he (RTL) | [equipment-ipad13-portrait-he.png](g3-slice13-ipad/equipment-ipad13-portrait-he.png) |
 
-What the Home captures prove, and it is the load-bearing half of the reflow:
-`resolveHomeColumns` returns 2, `BentoRow` pairs the cards side by side, and
-**RTL is correct** — the `start` slot (scan hero, readiness) renders on the
-**right**, `I18nManager` flipping `flex-row` without a `row-reverse` double-flip.
+What these prove:
 
-### 7.4 Open gate — populated master/detail screenshots (owner)
+- **Home reflow.** `resolveHomeColumns` returns 2 and `BentoRow` pairs the cards
+  side by side (shift hero ⟷ scan hero, attention ⟷ readiness), with the
+  activity feed still a single full-width FlashList below.
+- **Two-pane master/detail.** The Equipment list stays mounted in the master pane
+  while the selected unit renders the full `EquipmentDetailContent` in the detail
+  pane — the same body the phone route pushes. Before a selection the detail pane
+  shows `SelectPlaceholder` with the new `tablet.selectEquipment` copy.
+- **`resolveMasterWidth`, both branches, one per device.** On the 11" (834 pt) the
+  ratio applies: 834 × 0.42 ≈ **350 pt**, under the cap. On the 13" (1032 pt) the
+  ratio would give 433 pt, so the master is **clamped to `MASTER_MAX_WIDTH` = 380**.
+  The two screenshots show exactly that difference.
+- **RTL is correct.** The `start` slot renders on the **right** in both the bento
+  rows and the two-pane frame — `I18nManager` flips `flex-row` on its own, with no
+  `row-reverse` double-flip.
 
-**Not claimed as done.** The remaining matrix (Equipment / Rooms / Tasks
-two-pane, landscape, and the `en` LTR pass) is **blocked on an authenticated
-session**, not on the layout:
+**Capture harness (not part of this branch).** The RN client fails closed without
+a Clerk session, so these screens cannot render on a bare simulator at all. The
+run applied the dev-only seam from PR #42 (`EXPO_PUBLIC_DEV_AUTH=1`) as a local,
+uncommitted change plus a local `.env`. Neither is in this branch — `git status`
+on the capture worktree was returned to clean afterwards.
 
-- `authFetch` (`src/lib/auth-fetch.ts:145`) throws `AUTH_INVALID` **before any
-  network dispatch** when no valid Clerk JWT is present. The RN client has **no
-  dev-bypass seam** — `setStoredBearerToken` has no production call site.
-- Consequence on a bare simulator: every list is empty/errored, so a two-pane
-  capture would show the frame and the `SelectPlaceholder` but never a populated
-  detail pane — i.e. it would not evidence the thing the gate exists to check.
-- This joins the existing **on-device owner gate** (§1 items 1/5/6, protocol §5),
-  where a real signed-in session exists on Pixel 7 / iPhone 16 Plus.
+### 7.4 Still open — landscape and the `en` LTR pass
+
+The populated master/detail half of the gate is **closed** (§7.3). What is **not**
+claimed:
+
+| Item | Status | Why |
+|---|---|---|
+| Rooms / Tasks two-pane captures | not captured | Same primitive, same wiring, same `resolveSelectedItem` path as Equipment, which is captured. Covered at the layout-math level by `two-pane-layout.test.ts`. |
+| Landscape captures (both devices) | **blocked** | Neither the simulator-control tool nor `xcrun simctl` exposes a rotate verb, and the AppleScript fallback is refused (`osascript is not allowed to send keystrokes`, needs Accessibility). Widths are covered by unit tests at 1194 / 1366; the 13" portrait (1032 pt) already exercises the `MASTER_MAX_WIDTH` clamp that landscape would. |
+| `en` LTR pass | not captured | The locale toggle needs an app reload to re-run `I18nManager`; deferred with landscape rather than run half-way. |
+
+All three join the existing **on-device owner gate** (§1 items 1/5/6, protocol §5)
+on Pixel 7 / iPhone 16 Plus, where a real signed-in session and physical rotation
+both exist.
+
+**Root cause of the original block, now fixed upstream.** `authFetch`
+(`src/lib/auth-fetch.ts:145`) throws `AUTH_INVALID` **before any network
+dispatch** without a valid Clerk JWT, and `BootstrapGate` then blocks the whole
+app below Home — so Equipment / Rooms / Tasks rendered the re-auth screen, not an
+empty list. The client had no dev seam (`setStoredBearerToken` had no production
+call site). PR #42 adds one; §7.3 was captured with it.
 
 ### 7.5 Measurement harness — integrity verified, comparison deferred
 
 Verified by inspection on this branch:
 
-- `src/screens/G2MeasureScreen.tsx` present; `git diff` against
-  `src/lib/instrumentation/` and `G2MeasureScreen.tsx` is **empty** (untouched).
+- `src/screens/G2MeasureScreen.tsx` present, and the harness is untouched across
+  the whole branch — asserted over the commit range, not just the working tree:
+
+  ```console
+  $ git diff --quiet 492b891...HEAD -- src/lib/instrumentation src/screens/G2MeasureScreen.tsx
+  $ echo $?
+  0     # no committed changes in the measurement harness
+  ```
+
 - Closed `MARK` vocabulary unchanged (`scan_tap`, `scan_visual_ack`,
   `scan_server_confirmed`, `screenInteractive`).
 - `MARK.screenInteractive` latch call sites unchanged: `EquipmentListScreen.tsx`

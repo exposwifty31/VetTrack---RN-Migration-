@@ -22,11 +22,16 @@ export function resolveMasterWidth(
   availableWidth: number,
   maxWidth: number = MASTER_MAX_WIDTH,
 ): number {
-  if (!Number.isFinite(availableWidth) || availableWidth <= 0) return MASTER_MIN_WIDTH;
   const cap = Number.isFinite(maxWidth) && maxWidth > 0 ? maxWidth : MASTER_MAX_WIDTH;
+  if (!Number.isFinite(availableWidth) || availableWidth <= 0) {
+    return Math.min(MASTER_MIN_WIDTH, cap);
+  }
   const proportional = availableWidth * MASTER_WIDTH_RATIO;
-  const bounded = Math.max(MASTER_MIN_WIDTH, Math.min(proportional, cap));
-  return Math.min(bounded, availableWidth);
+  // `cap` is applied LAST so an explicit maxWidth always wins — including one
+  // below MASTER_MIN_WIDTH. Clamping the floor first would silently return 260
+  // for a caller that asked for 100, which is not a cap at all.
+  const floored = Math.max(MASTER_MIN_WIDTH, proportional);
+  return Math.min(floored, cap, availableWidth);
 }
 
 /**
