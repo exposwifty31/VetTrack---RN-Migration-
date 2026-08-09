@@ -64,7 +64,7 @@ describe("DEV_PLACEHOLDER_BEARER", () => {
     expect(placeholderSatisfiesJwtShapeGate()).toBe(true);
   });
 
-  it("carries no identity claims when read through the app's own JWT decoder", () => {
+  it("names itself a placeholder rather than identifying a principal, read through the app's own JWT decoder", () => {
     expect(decodeJwtPayload(DEV_PLACEHOLDER_BEARER)).toEqual({
       sub: "dev-bypass-placeholder",
       note: "not-a-credential",

@@ -28,11 +28,12 @@
  *      active in a build that has a real auth path.
  *   4. It writes the FALLBACK slot only. `resolveToken()` prefers the Clerk
  *      getter, so a real signed-in session always wins.
- *   5. The server still authenticates. The placeholder carries `alg: "none"`
- *      and no claims, so a Clerk-backed server rejects it with 401 exactly like
- *      any other garbage. It is only useful against a server already running in
- *      dev-bypass, which trusts no token at all — so the seam grants no
- *      authority that the server was withholding.
+ *   5. The server still authenticates. The placeholder declares `alg: "none"`
+ *      and its two claims (`sub`, `note`) name it as a placeholder rather than
+ *      identifying any principal, so a Clerk-backed server rejects it with 401
+ *      exactly like any other garbage. It is only useful against a server
+ *      already running in dev-bypass, which trusts no token at all — so the
+ *      seam grants no authority that the server was withholding.
  *
  * In one line: it stops the CLIENT from short-circuiting, and lets the SERVER
  * make the decision it was always going to make.
