@@ -3,13 +3,13 @@
  * viewer. Pure + framework-free (the `alerts-derive` precedent): no i18n, no
  * RN, no `Date.now()` — `nowMs` is threaded so fixtures stay deterministic.
  */
-import type { ActiveCodeBlueResponse } from "@/types/code-blue";
+import type { ActiveCodeBlueResponse, CodeBlueLogCategory } from "@/types/code-blue";
 
 export type CodeBlueLogEntryView = Readonly<{
   id: string;
   elapsedMs: number;
   label: string;
-  category: "equipment" | "note";
+  category: CodeBlueLogCategory;
   loggedByName: string;
 }>;
 

@@ -52,11 +52,12 @@ export type CodeBluePresenceRow = Readonly<{
   lastSeenAt: string;
 }>;
 
+/** Nullability lives at each use site (the field/param type), not baked into the alias. */
 export type CodeBlueCartStatus = Readonly<{
   lastCheckedAt: string;
   allPassed: boolean;
   performedByName: string;
-}> | null;
+}>;
 
 /**
  * GET /api/code-blue/sessions/active response body. `linkedEquipment` shape is
@@ -67,6 +68,6 @@ export type ActiveCodeBlueResponse = Readonly<{
   session: CodeBlueSession | null;
   logEntries: readonly CodeBlueLogEntry[];
   presence: readonly CodeBluePresenceRow[];
-  cartStatus: CodeBlueCartStatus;
+  cartStatus: CodeBlueCartStatus | null;
   linkedEquipment: readonly unknown[];
 }>;

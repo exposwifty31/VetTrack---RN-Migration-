@@ -191,7 +191,7 @@
     "presence": "In the room",
     "noPresence": "No one checked in yet",
     "cartChecked": "Crash cart checked",
-    "cartNotChecked": "Crash cart not checked in the last 24h",
+    "cartNotChecked": "No recent crash cart check",
     "cartAllPassed": "All items passed",
     "cartIssues": "Issues found",
     "loadError": "Couldn't load Code Blue status"
@@ -224,8 +224,7 @@
   },
   "bootstrap": {
     "reauth": "Session expired. Sign in again to continue.",
-    "retry": "Try again",
-    "signIn": "Sign in"
+    "retry": "Try again"
   },
   "equipment": {
     "listTitle": "Equipment",

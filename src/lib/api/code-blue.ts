@@ -21,10 +21,10 @@
 import { requestJson } from "@/lib/api/coded-error";
 import type { ActiveCodeBlueResponse } from "@/types/code-blue";
 
-/** Canonical Code Blue query-key factory. */
+/** Canonical Code Blue query-key factory — `active()` derives from `all` (single source of truth). */
 export const codeBlueKeys = {
   all: ["code-blue"] as const,
-  active: () => ["code-blue", "active"] as const,
+  active: () => [...codeBlueKeys.all, "active"] as const,
 };
 
 /**

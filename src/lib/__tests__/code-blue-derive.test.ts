@@ -57,6 +57,24 @@ describe("deriveCodeBlueView", () => {
     });
   });
 
+  it("clamps elapsedMs to 0 under clock skew (startedAt after nowMs)", () => {
+    const view = deriveCodeBlueView(
+      response({ session: session({ startedAt: "2026-08-10T12:05:00.000Z" }) }),
+      NOW,
+    );
+    if (view.kind !== "active") throw new Error("expected active view");
+    expect(view.elapsedMs).toBe(0);
+  });
+
+  it("falls back to elapsedMs 0 when startedAt is unparsable", () => {
+    const view = deriveCodeBlueView(
+      response({ session: session({ startedAt: "not-a-date" }) }),
+      NOW,
+    );
+    if (view.kind !== "active") throw new Error("expected active view");
+    expect(view.elapsedMs).toBe(0);
+  });
+
   it("sorts log entries ascending by elapsedMs even when the input is out of order", () => {
     const view = deriveCodeBlueView(
       response({

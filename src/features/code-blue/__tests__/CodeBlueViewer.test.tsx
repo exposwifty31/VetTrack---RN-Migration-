@@ -1,14 +1,16 @@
 /**
  * Wiring test for the G4-1 read-only viewer: proves the query -> derive ->
- * render path end to end for each state, and that the SSE sync hook is
- * actually mounted (not dead code). Mutation affordances are asserted ABSENT
- * — this slice is read-only by doctrine.
+ * render path end to end for each state, that the SSE sync hook is actually
+ * mounted (not dead code), and that the elapsed clock ticks locally instead
+ * of freezing between fetches (CodeRabbit PR #47). Mutation affordances are
+ * asserted ABSENT — this slice is read-only by doctrine.
  */
-import { render, screen, fireEvent } from "@testing-library/react-native";
+import { act, render, screen, fireEvent } from "@testing-library/react-native";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { CodeBlueViewer } from "../CodeBlueViewer";
 import { useCodeBlueRealtimeSync } from "@/hooks/useCodeBlueRealtimeSync";
+import { codeBlueApi, codeBlueKeys } from "@/lib/api/code-blue";
 import type { ActiveCodeBlueResponse } from "@/types/code-blue";
 
 jest.mock("react-i18next", () => ({
@@ -23,6 +25,41 @@ jest.mock("@tanstack/react-query", () => ({
 jest.mock("@/hooks/useCodeBlueRealtimeSync", () => ({
   useCodeBlueRealtimeSync: jest.fn(),
 }));
+
+// FlashList virtualizes via native layout measurement, which the RN test
+// renderer never fires — so `data` never reaches `renderItem` unmocked (the
+// `AutopilotQueueScreen.test.tsx` precedent). Render header/footer/empty +
+// every item directly, matching that mock's shape.
+type FlashListItem = { id?: string };
+jest.mock("@shopify/flash-list", () => {
+  const React = jest.requireActual<typeof import("react")>("react");
+  return {
+    FlashList: ({
+      data,
+      renderItem,
+      ListHeaderComponent,
+      ListFooterComponent,
+      ListEmptyComponent,
+    }: {
+      data: readonly FlashListItem[];
+      renderItem: (info: { item: FlashListItem; index: number }) => ReturnType<typeof React.createElement>;
+      ListHeaderComponent?: ReturnType<typeof React.createElement>;
+      ListFooterComponent?: ReturnType<typeof React.createElement>;
+      ListEmptyComponent?: ReturnType<typeof React.createElement>;
+    }) =>
+      React.createElement(
+        React.Fragment,
+        null,
+        ListHeaderComponent,
+        data.length === 0
+          ? ListEmptyComponent
+          : data.map((item, index) =>
+              React.createElement(React.Fragment, { key: item.id ?? index }, renderItem({ item, index })),
+            ),
+        ListFooterComponent,
+      ),
+  };
+});
 
 function mockQuery(overrides: Partial<UseQueryResult<ActiveCodeBlueResponse, Error>>) {
   jest.mocked(useQuery).mockReturnValue({
@@ -98,6 +135,17 @@ describe("CodeBlueViewer", () => {
     expect(useCodeBlueRealtimeSync).toHaveBeenCalledTimes(1);
   });
 
+  it("queries the canonical active key with the read-only fetcher", async () => {
+    mockQuery({ data: NO_ACTIVE });
+    await render(<CodeBlueViewer />);
+    expect(jest.mocked(useQuery)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: codeBlueKeys.active(),
+        queryFn: codeBlueApi.active,
+      }),
+    );
+  });
+
   it("shows a loading state while the query is pending", async () => {
     mockQuery({ isPending: true });
     await render(<CodeBlueViewer />);
@@ -123,7 +171,6 @@ describe("CodeBlueViewer", () => {
     mockQuery({ data: ACTIVE });
     await render(<CodeBlueViewer />);
     expect(screen.getAllByText("Dr. Cohen").length).toBeGreaterThan(0); // manager/startedBy/presence
-    expect(screen.getByText("03:00")).toBeTruthy(); // elapsed: dataUpdatedAt - startedAt
     expect(screen.getByText("Defibrillator")).toBeTruthy(); // log entry
     expect(screen.getByText("codeBlue.cartAllPassed")).toBeTruthy();
   });
@@ -135,5 +182,31 @@ describe("CodeBlueViewer", () => {
     // errored) retry affordance — the only interactive element on this
     // screen in the active/empty states is nothing at all.
     expect(screen.queryAllByRole("button")).toHaveLength(0);
+  });
+
+  describe("elapsed clock", () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date("2026-08-10T12:00:00.000Z"));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it("ticks locally from the session start time instead of freezing between fetches", async () => {
+      mockQuery({ data: ACTIVE }); // startedAt 11:57:00 -> 03:00 immediately on mount
+      await render(<CodeBlueViewer />);
+      expect(screen.getByText("03:00")).toBeTruthy();
+
+      // No new fetch lands (dataUpdatedAt never changes) — only wall-clock time
+      // passes. A frozen clock (the bug CodeRabbit flagged) would still read
+      // 03:00 here; the fix must show 03:05.
+      await act(async () => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(screen.queryByText("03:00")).toBeNull();
+      expect(screen.getByText("03:05")).toBeTruthy();
+    });
   });
 });
