@@ -147,6 +147,18 @@ describe("CodeBlueActions", () => {
       });
     });
 
+    it("a vet with no resolvable name never fires Start with an empty managerUserName (server rejects it)", async () => {
+      mockIdentity({ id: "user-1", role: "vet", name: null, displayName: null });
+      mockSessionQuery({ data: NO_ACTIVE });
+      const startMutate = jest.fn();
+      mockMutations({ start: { mutate: startMutate } });
+
+      await render(<CodeBlueActions />);
+      fireEvent.press(screen.getByText("codeBlue.actions.start"));
+
+      expect(startMutate).not.toHaveBeenCalled();
+    });
+
     it("a non-vet clinical role sees an explanation instead of a Start button", async () => {
       mockIdentity({ id: "user-2", role: "senior_technician", name: "Tech Levi" });
       mockSessionQuery({ data: NO_ACTIVE });

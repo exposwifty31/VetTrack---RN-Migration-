@@ -111,6 +111,10 @@ export function CodeBlueActions() {
 
   if (!session) {
     const eligible = canStartCodeBlue(currentRole);
+    // The server's startSessionSchema requires managerUserName.min(1) — never
+    // fire Start with an empty name (would 400); the button simply stays
+    // disabled rather than round-tripping a request that can't succeed.
+    const managerUserName = (identity.data?.displayName ?? identity.data?.name ?? "").trim();
     const startErrorKey = mutations.start.isError
       ? codeBlueMutationErrorKey(mutations.start.error)
       : null;
@@ -120,13 +124,10 @@ export function CodeBlueActions() {
         {eligible ? (
           <ActionButton
             label={mutations.start.isPending ? t("codeBlue.actions.starting") : t("codeBlue.actions.start")}
-            disabled={mutations.start.isPending}
+            disabled={mutations.start.isPending || !managerUserName}
             onPress={() => {
-              if (!currentUserId) return;
-              mutations.start.mutate({
-                managerUserId: currentUserId,
-                managerUserName: identity.data?.displayName ?? identity.data?.name ?? "",
-              });
+              if (!currentUserId || !managerUserName) return;
+              mutations.start.mutate({ managerUserId: currentUserId, managerUserName });
             }}
           />
         ) : (

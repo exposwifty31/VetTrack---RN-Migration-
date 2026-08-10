@@ -15,9 +15,14 @@
  *     `authFetch` -> the emergency-block classifier. A network-level failure
  *     on any of these four endpoints throws `EmergencyOfflineError` instead
  *     of the raw network error (see `emergency-block.ts`); this hook does
- *     NOT catch it, so it propagates to `.error` untouched. No `retry`
- *     override is set, so react-query's own default retry never turns an
- *     offline attempt into a queued/replayed one.
+ *     NOT catch it, so it propagates to `.error` untouched.
+ *   - Every mutation below sets `retry: 0` explicitly. The production
+ *     `QueryClient` (`src/lib/query-client.ts`) does not override
+ *     `defaultOptions.mutations` today, so react-query v5's own default (0)
+ *     already means "never retried" — this makes it a mutation-level
+ *     doctrine anchor rather than an implicit default, so an offline attempt
+ *     stays a single call even if a future app-wide default ever adds
+ *     mutation retries.
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -29,11 +34,13 @@ export function useCodeBlueMutations() {
   const invalidateActive = () => queryClient.invalidateQueries({ queryKey: codeBlueKeys.active() });
 
   const start = useMutation({
+    retry: 0,
     mutationFn: (payload: StartCodeBlueRequest) => codeBlueApi.start(payload),
     onSuccess: invalidateActive,
   });
 
   const addLogEntry = useMutation({
+    retry: 0,
     mutationFn: ({ sessionId, payload }: { sessionId: string; payload: LogEntryRequest }) =>
       codeBlueApi.addLogEntry(sessionId, payload),
     onSuccess: invalidateActive,
@@ -49,12 +56,14 @@ export function useCodeBlueMutations() {
    * guessed one.
    */
   const end = useMutation({
+    retry: 0,
     mutationFn: ({ sessionId, payload }: { sessionId: string; payload: EndSessionRequest }) =>
       codeBlueApi.end(sessionId, payload),
     onSuccess: invalidateActive,
   });
 
   const presence = useMutation({
+    retry: 0,
     mutationFn: (sessionId: string) => codeBlueApi.presence(sessionId),
     onSuccess: invalidateActive,
   });

@@ -156,6 +156,41 @@ describe("useCodeBlueMutations — end is server-confirmed, never optimistic", (
   });
 });
 
+describe("useCodeBlueMutations — explicit retry:0 doctrine anchor", () => {
+  /**
+   * The production `QueryClient` (`src/lib/query-client.ts`) does not set
+   * `defaultOptions.mutations.retry` today, so react-query's own v5 default
+   * (0) already gives "never retried". This anchors that guarantee at the
+   * MUTATION level so it survives even if a future app-wide default ever
+   * adds mutation retries: a hostile queryClient default (`retry: 3`) is
+   * used here, and per-mutation `retry: 0` must still win.
+   */
+  async function setupHostile() {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: 3, retryDelay: 1 },
+      },
+    });
+    const view = await renderHook(() => useCodeBlueMutations(), { wrapper: makeWrapper(queryClient) });
+    return { queryClient, view };
+  }
+
+  it("start: a single network failure is never retried even under a hostile queryClient default", async () => {
+    jest.mocked(codeBlueApi.start).mockRejectedValue(new Error("boom"));
+    const { view } = await setupHostile();
+
+    await act(async () => {
+      view.result.current.start.mutate({ managerUserId: "u1", managerUserName: "Dr. Cohen" });
+    });
+    await waitFor(() => expect(view.result.current.start.isError).toBe(true));
+    // Give a would-be retry's delay a chance to fire before asserting.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(codeBlueApi.start).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("useCodeBlueMutations — happy path wiring", () => {
   it("start calls codeBlueApi.start with the given payload", async () => {
     jest.mocked(codeBlueApi.start).mockResolvedValue({ id: "s-1", startedAt: "2026-08-10T12:00:00.000Z" });
