@@ -80,7 +80,44 @@ describe("authFetch offline-queue wiring", () => {
       endpoint: "/api/equipment/eq-1/checkout",
       method: "POST",
       status: "pending",
+      userId: "user_1", // identity captured before dispatch is stamped on the queued item
     });
+  });
+
+  it("CodeRabbit PR #51 security fix: an identity change DURING the in-flight request does not relabel the queued item's owner", async () => {
+    // Simulates the exact race the finding describes: the request was dispatched
+    // as user_1, but by the time the network failure is observed (this fetch's
+    // rejection), the app has already moved to a different identity (e.g. a fast
+    // sign-out/switch). The enqueued item must still be stamped "user_1" — the
+    // identity captured BEFORE dispatch — never re-derived from "whatever is
+    // current now" at catch-time.
+    mockFetch.mockImplementation(() => {
+      setCurrentUserId("user_2");
+      return Promise.reject(NETWORK_ERROR());
+    });
+
+    await authFetch("/api/equipment/eq-1/checkout", {
+      method: "POST",
+      body: "{}",
+    }).catch(() => {});
+
+    const snapshot = getOfflineQueueSnapshot();
+    expect(snapshot).toHaveLength(1);
+    expect(snapshot[0].userId).toBe("user_1"); // NOT "user_2"
+  });
+
+  it("preserves a caller-supplied Idempotency-Key header verbatim across enqueue (CodeRabbit PR #51 — duplicate-mutation guard)", async () => {
+    mockFetch.mockRejectedValue(NETWORK_ERROR());
+
+    await authFetch("/api/containers/c-1/dispense", {
+      method: "POST",
+      body: "{}",
+      headers: { "Idempotency-Key": "caller-minted-key-abc" },
+    }).catch(() => {});
+
+    const snapshot = getOfflineQueueSnapshot();
+    expect(snapshot).toHaveLength(1);
+    expect(snapshot[0].idempotencyKey).toBe("caller-minted-key-abc");
   });
 
   it("offline + emergency mutation: throws EmergencyOfflineError and is NEVER enqueued", async () => {

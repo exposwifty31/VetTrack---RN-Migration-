@@ -104,6 +104,17 @@ export async function resolveBearerToken(): Promise<string | null> {
   return resolveToken();
 }
 
+function extractIdempotencyKey(headers: RequestInit["headers"]): string | undefined {
+  if (!headers) return undefined;
+  if (headers instanceof Headers) return headers.get("Idempotency-Key") ?? undefined;
+  if (Array.isArray(headers)) {
+    return headers.find(([k]) => k.toLowerCase() === "idempotency-key")?.[1];
+  }
+  const record = headers as Record<string, string>;
+  const key = Object.keys(record).find((k) => k.toLowerCase() === "idempotency-key");
+  return key ? record[key] : undefined;
+}
+
 /**
  * Network dispatch with the frozen no-offline-emergency-queueing doctrine: a
  * network-level rejection on a Code Blue mutation becomes a loud
@@ -117,11 +128,20 @@ export async function resolveBearerToken(): Promise<string | null> {
  * this function throws: the caller still sees the original network error,
  * byte-identical to the pre-G4-6 contract (`auth-fetch.emergency.test.ts`).
  * Capturing the write for later replay is not the same as reporting success.
+ *
+ * `capturedUserId` is the identity `authFetch` resolved BEFORE dispatching —
+ * NOT re-derived here. This closes a race CodeRabbit flagged on PR #51: if
+ * `getCurrentUserId()` were read fresh in this `catch` handler (which runs
+ * AFTER the network call has already completed/failed), a sign-out or
+ * account switch that happened WHILE the request was in flight could stamp
+ * the wrong owner on the queued item. The identity captured at dispatch time
+ * is the only one that can be correct, regardless of what changes later.
  */
 async function dispatchFetch(
   resolvedUrl: string,
   path: string,
   init: RequestInit,
+  capturedUserId: string | null,
 ): Promise<Response> {
   try {
     return await fetch(resolvedUrl, init);
@@ -133,6 +153,8 @@ async function dispatchFetch(
         endpoint: path,
         method: init.method ?? "GET",
         body: typeof init.body === "string" ? init.body : "",
+        userId: capturedUserId,
+        idempotencyKey: extractIdempotencyKey(init.headers),
       });
     }
     throw err;
@@ -174,12 +196,12 @@ export async function authFetch(path: string, options: RequestInit = {}): Promis
       headers.set("Content-Type", "application/json");
     }
 
-    const res = await dispatchFetch(resolvedUrl, path, { ...options, headers });
+    const res = await dispatchFetch(resolvedUrl, path, { ...options, headers }, userId ?? null);
     if (res.status === 401) {
       throw new AuthFetchError("UNAUTHORIZED", 401);
     }
     return res;
   }
 
-  return dispatchFetch(resolvedUrl, path, options);
+  return dispatchFetch(resolvedUrl, path, options, null);
 }

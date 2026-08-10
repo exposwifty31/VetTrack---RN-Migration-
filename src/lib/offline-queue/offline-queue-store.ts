@@ -63,14 +63,56 @@ function deserialize(raw: SerializedPendingSync): PendingSync {
   };
 }
 
-/** Reads the persisted queue. Corrupt/missing data fails safe to an empty queue. */
+const REQUIRED_STRING_FIELDS = [
+  "type",
+  "endpoint",
+  "method",
+  "body",
+  "status",
+  "clientMutationId",
+  "idempotencyKey",
+  "createdAt",
+  "updatedAt",
+] as const;
+
+function isValidDateString(value: unknown): boolean {
+  return typeof value === "string" && !Number.isNaN(new Date(value).getTime());
+}
+
+/**
+ * Structural + semantic validation for one persisted row (CodeRabbit PR #51:
+ * a structurally-valid JSON *value* can still be an invalid queue *entry* —
+ * e.g. a missing/garbage `createdAt` produces an Invalid Date, which then
+ * throws from `toISOString()` on the NEXT `writeQueue()` call, poisoning
+ * every future enqueue/replay, not just the malformed row). Invalid rows are
+ * discarded individually — a corrupt sibling never takes down the rest of
+ * the (possibly multi-user) queue.
+ */
+function isValidSerializedPendingSync(raw: unknown): raw is SerializedPendingSync {
+  if (typeof raw !== "object" || raw === null) return false;
+  const row = raw as Record<string, unknown>;
+  for (const field of REQUIRED_STRING_FIELDS) {
+    if (typeof row[field] !== "string") return false;
+  }
+  if (!isValidDateString(row.createdAt) || !isValidDateString(row.updatedAt)) return false;
+  if (typeof row.clientTimestamp !== "number" || Number.isNaN(row.clientTimestamp)) return false;
+  if (typeof row.retries !== "number" || Number.isNaN(row.retries)) return false;
+  if (typeof row.schemaVersion !== "number" || Number.isNaN(row.schemaVersion)) return false;
+  return true;
+}
+
+/**
+ * Reads the persisted queue. Corrupt/missing top-level data fails safe to an
+ * empty queue; individual malformed rows within otherwise-valid JSON are
+ * dropped (not the whole queue) — see `isValidSerializedPendingSync`.
+ */
 export function readQueue(): PendingSync[] {
   const raw = getSafeStorage().safeStorageGetItem(QUEUE_STORAGE_KEY, "local");
   if (!raw) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return (parsed as SerializedPendingSync[]).map(deserialize);
+    return parsed.filter(isValidSerializedPendingSync).map(deserialize);
   } catch {
     return [];
   }

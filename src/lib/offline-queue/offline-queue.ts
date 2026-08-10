@@ -31,8 +31,7 @@ import {
 } from "@vettrack/contracts";
 
 import { resolveApiUrl } from "@/lib/api-origin";
-import { getCurrentUserId } from "@/lib/auth-store";
-import { classifyEmergencyEndpoint, isNetworkFailure } from "@/lib/emergency-block";
+import { classifyEmergencyEndpoint } from "@/lib/emergency-block";
 
 import { readQueue, writeQueue } from "./offline-queue-store";
 
@@ -53,6 +52,7 @@ export type OfflineQueueEvent =
   | { kind: "item_success"; item: PendingSync }
   | { kind: "item_retry"; item: PendingSync }
   | { kind: "item_permanent_failure"; item: PendingSync }
+  | { kind: "item_owner_mismatch"; item: PendingSync }
   | { kind: "circuit_open"; until: number }
   | { kind: "replay_end" };
 
@@ -91,6 +91,29 @@ export interface EnqueueOfflineWriteInput {
   /** Override the derived PendingSyncType when the caller knows the domain intent. */
   type?: PendingSyncType;
   equipmentName?: string;
+  /**
+   * The identity that ISSUED the request. MUST be captured by the caller
+   * BEFORE the request was dispatched (see `auth-fetch.ts`'s `authFetch`,
+   * which reads `getCurrentUserId()` up front) — never re-derived here at
+   * enqueue time, which runs in a `catch` handler after the dispatch has
+   * already completed and could observe a DIFFERENT identity if the user
+   * signed out/switched accounts while the request was in flight
+   * (CodeRabbit PR #51 security finding). `undefined`/`null` means "no
+   * identity was captured" (should not happen for a real authenticated
+   * write) and such items are permanently held — never auto-replayed under
+   * any identity — by `replayOfflineQueue`'s ownership check below.
+   */
+  userId?: string | null;
+  /**
+   * Caller-supplied idempotency key (if the original request set one — see
+   * `Idempotency-Key` on dispense/task-lifecycle endpoints). Preserved
+   * VERBATIM across replay instead of minting a fresh one: if the original
+   * request actually reached the server before the client observed the
+   * network failure, replaying with a NEW key would execute it again as a
+   * distinct operation (e.g. double stock decrement) — CodeRabbit PR #51.
+   * A fresh key is minted only when the caller didn't supply one.
+   */
+  idempotencyKey?: string;
 }
 
 /**
@@ -117,11 +140,11 @@ export function enqueueOfflineWrite(input: EnqueueOfflineWriteInput): PendingSyn
     status: "pending",
     clientTimestamp: now,
     clientMutationId: Crypto.randomUUID(),
-    idempotencyKey: Crypto.randomUUID(),
+    idempotencyKey: input.idempotencyKey ?? Crypto.randomUUID(),
     schemaVersion: PENDING_SYNC_SCHEMA_VERSION,
     updatedAt: nowDate,
     structuredError: null,
-    userId: getCurrentUserId() ?? undefined,
+    userId: input.userId ?? undefined,
     equipmentName: input.equipmentName,
   };
 
@@ -199,11 +222,8 @@ async function attemptItem(
       };
     }
     // 401 and 5xx fall through to the transient/retry path below.
-  } catch (err) {
-    // Any dispatch failure (network-down, DNS, timeout) is transient here —
-    // this is the replay path, not the live emergency-classifier path, so
-    // isNetworkFailure() is used only for documentation intent, not gating.
-    void isNetworkFailure(err);
+  } catch {
+    // Any dispatch failure (network-down, DNS, timeout) is transient during replay.
   }
 
   const retries = item.retries + 1;
@@ -226,12 +246,90 @@ let circuitOpenUntil = 0;
 
 export interface ReplayDeps {
   resolveToken?: () => Promise<string | null>;
+  /**
+   * The CURRENTLY authenticated identity. Read fresh on every item (not
+   * once per pass) so a sign-out/account-switch mid-pass stops binding
+   * further items to the old identity from the very next iteration —
+   * CodeRabbit PR #51's shared-device security gate. When omitted (or
+   * returns `null`), replay holds every owned item — fail-closed, never
+   * "no identity check means send anyway".
+   */
+  getCurrentUserId?: () => string | null;
+}
+
+type ReplayLoopState = { consecutiveTransientFailures: number };
+
+/**
+ * Persist + emit for one item's replay outcome (extracted from
+ * `replayOfflineQueue` to keep its cognitive complexity under the repo's
+ * SonarCloud limit — CodeRabbit PR #51 nit). Returns whether this outcome
+ * should stop the whole pass (circuit breaker tripped).
+ */
+function handleReplayOutcome(
+  current: PendingSync,
+  result: { outcome: AttemptOutcome; patch: Partial<PendingSync> },
+  state: ReplayLoopState,
+): boolean {
+  const patched = { ...current, ...result.patch };
+
+  if (result.outcome === "success") {
+    state.consecutiveTransientFailures = 0;
+    removeByClientMutationId(current.clientMutationId);
+    emit({ kind: "item_success", item: patched });
+    return false;
+  }
+  if (result.outcome === "dead" || result.outcome === "client_error") {
+    // Both are permanent give-ups (exhausted retries vs. a terminal 4xx) —
+    // subscribers must hear about either, not just the retry-exhaustion
+    // path (CodeRabbit PR #51: terminal 4xx was silently missing the event).
+    state.consecutiveTransientFailures = 0;
+    applyPatch(current.clientMutationId, result.patch);
+    emit({ kind: "item_permanent_failure", item: patched });
+    return false;
+  }
+  if (result.outcome === "conflict") {
+    state.consecutiveTransientFailures = 0;
+    applyPatch(current.clientMutationId, result.patch);
+    return false;
+  }
+
+  // retry_pending — transient.
+  applyPatch(current.clientMutationId, result.patch);
+  state.consecutiveTransientFailures++;
+  emit({ kind: "item_retry", item: patched });
+  if (state.consecutiveTransientFailures >= CIRCUIT_THRESHOLD) {
+    circuitOpenUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
+    emit({ kind: "circuit_open", until: circuitOpenUntil });
+    return true;
+  }
+  return false;
 }
 
 /**
- * Replay every `pending` item, oldest first. One pass per call — the caller
- * (OfflineQueueBridge) decides WHEN to call this (foreground/auth signals),
- * never a timer inside this module.
+ * Replay every `pending` item OWNED BY THE CURRENTLY AUTHENTICATED USER,
+ * oldest first. One pass per call — the caller (OfflineQueueBridge) decides
+ * WHEN to call this (foreground/auth signals), never a timer inside this
+ * module.
+ *
+ * Ownership gate (CodeRabbit PR #51 — shared clinic device security fix):
+ * user A can queue a write offline, sign out, and user B can sign in on the
+ * SAME device before the queue replays. Without a check, A's persisted
+ * mutation would be sent with B's bearer token — a cross-user, effectively
+ * cross-tenant write. Policy (deliberately fail-closed, deliberately
+ * "hold", never "drop"):
+ *   - `current.userId === activeUserId` → replay normally.
+ *   - `current.userId` set but DIFFERENT from the active identity → HELD.
+ *     Not attempted, not dead-lettered, not removed — it stays `pending`
+ *     and will replay automatically once its owner is active again. A
+ *     dropped write is a lost clinical/operational record; a held one
+ *     merely waits.
+ *   - `current.userId` missing (`null`/`undefined` — should not occur for
+ *     any item enqueued after this fix, since `authFetch` always captures
+ *     an identity before dispatch) → HELD under every identity,
+ *     indefinitely. There is no safe automatic action for an item nobody
+ *     can be proven to own; migrating or purging such legacy rows is a
+ *     deliberate, separate decision, not an implicit replay.
+ * Every hold emits `item_owner_mismatch` so it is observable, not silent.
  */
 export async function replayOfflineQueue(deps: ReplayDeps = {}): Promise<void> {
   if (replaying) return;
@@ -250,14 +348,21 @@ export async function replayOfflineQueue(deps: ReplayDeps = {}): Promise<void> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (token) headers.Authorization = `Bearer ${token}`;
 
-    let consecutiveTransientFailures = 0;
+    const state: ReplayLoopState = { consecutiveTransientFailures: 0 };
 
     for (const snapshot of pending) {
       if (Date.now() < circuitOpenUntil) break;
 
       // Re-read fresh right before acting — see module doc.
       const current = findByClientMutationId(snapshot.clientMutationId);
-      if (!current || current.status !== "pending") continue;
+      if (current?.status !== "pending") continue;
+
+      // Fresh per-item identity read — see ReplayDeps.getCurrentUserId doc.
+      const activeUserId = deps.getCurrentUserId ? deps.getCurrentUserId() : null;
+      if (!current.userId || current.userId !== activeUserId) {
+        emit({ kind: "item_owner_mismatch", item: current });
+        continue;
+      }
 
       const itemHeaders = {
         ...headers,
@@ -265,29 +370,8 @@ export async function replayOfflineQueue(deps: ReplayDeps = {}): Promise<void> {
         "X-Client-Mutation-Id": current.clientMutationId,
       };
       const result = await attemptItem(current, itemHeaders);
-      const patched = { ...current, ...result.patch };
-
-      if (result.outcome === "success") {
-        consecutiveTransientFailures = 0;
-        removeByClientMutationId(current.clientMutationId);
-        emit({ kind: "item_success", item: patched });
-      } else if (result.outcome === "dead") {
-        consecutiveTransientFailures = 0;
-        applyPatch(current.clientMutationId, result.patch);
-        emit({ kind: "item_permanent_failure", item: patched });
-      } else if (result.outcome === "conflict" || result.outcome === "client_error") {
-        consecutiveTransientFailures = 0;
-        applyPatch(current.clientMutationId, result.patch);
-      } else {
-        applyPatch(current.clientMutationId, result.patch);
-        consecutiveTransientFailures++;
-        emit({ kind: "item_retry", item: patched });
-        if (consecutiveTransientFailures >= CIRCUIT_THRESHOLD) {
-          circuitOpenUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
-          emit({ kind: "circuit_open", until: circuitOpenUntil });
-          break;
-        }
-      }
+      const circuitTripped = handleReplayOutcome(current, result, state);
+      if (circuitTripped) break;
     }
 
     emit({ kind: "replay_end" });

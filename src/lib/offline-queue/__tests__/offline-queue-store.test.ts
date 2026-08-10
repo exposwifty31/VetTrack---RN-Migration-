@@ -87,4 +87,44 @@ describe("offline-queue-store", () => {
     mockMemoryStore.set(QUEUE_STORAGE_KEY, "{not valid json");
     expect(readQueue()).toEqual([]);
   });
+
+  it("discards a structurally-valid-JSON entry with an invalid createdAt, keeping its siblings (CodeRabbit PR #51)", () => {
+    const good = makeItem({ clientMutationId: "good" });
+    const badCreatedAt = { ...makeItem({ clientMutationId: "bad-date" }), createdAt: "not-a-date" };
+    mockMemoryStore.set(
+      QUEUE_STORAGE_KEY,
+      JSON.stringify([
+        { ...good, createdAt: good.createdAt.toISOString(), updatedAt: good.updatedAt.toISOString() },
+        badCreatedAt,
+      ]),
+    );
+
+    const reread = readQueue();
+
+    expect(reread.map((i) => i.clientMutationId)).toEqual(["good"]);
+  });
+
+  it("discards an entry missing required fields (e.g. no endpoint/method) rather than poisoning the queue", () => {
+    const good = makeItem({ clientMutationId: "good" });
+    mockMemoryStore.set(
+      QUEUE_STORAGE_KEY,
+      JSON.stringify([
+        { ...good, createdAt: good.createdAt.toISOString(), updatedAt: good.updatedAt.toISOString() },
+        { clientMutationId: "malformed", status: "pending" }, // missing endpoint, method, body, etc.
+      ]),
+    );
+
+    expect(readQueue().map((i) => i.clientMutationId)).toEqual(["good"]);
+  });
+
+  it("a queue read back after discarding an invalid entry can be safely re-serialized (no toISOString() throw)", () => {
+    mockMemoryStore.set(
+      QUEUE_STORAGE_KEY,
+      JSON.stringify([{ ...makeItem(), createdAt: "garbage", updatedAt: "garbage" }]),
+    );
+
+    const reread = readQueue();
+    expect(() => writeQueue([...reread, makeItem({ clientMutationId: "new" })])).not.toThrow();
+    expect(readQueue().map((i) => i.clientMutationId)).toEqual(["new"]);
+  });
 });
