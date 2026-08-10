@@ -94,6 +94,19 @@ describe("useCodeBlueRealtimeSync", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: codeBlueKeys.active() });
   });
 
+  it.each(["code_blue_started", "code_blue_ended"] as const)(
+    "invalidates on a %s audit_log event (belt-and-suspenders alongside the domain event)",
+    async (actionType) => {
+      const { invalidateSpy } = await setup();
+      emit({
+        kind: "event",
+        envelope: { type: "audit_log", payload: { actionType }, timestamp: "t" },
+      });
+      expect(invalidateSpy).toHaveBeenCalledTimes(1);
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: codeBlueKeys.active() });
+    },
+  );
+
   it("invalidates on reset (pruned-cursor resync)", async () => {
     const { invalidateSpy } = await setup();
     emit({ kind: "reset", reason: "last_event_pruned" });
