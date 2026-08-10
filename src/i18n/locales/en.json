@@ -178,9 +178,23 @@
       "badgeStale": "Needs confirm"
     }
   },
-  "emergency": {
-    "comingSoon": "Coming soon",
-    "subtitle": "Emergency capabilities arrive in the next migration phase. In an emergency, use the existing app."
+  "codeBlue": {
+    "title": "Code Blue",
+    "noActiveSession": "No active Code Blue",
+    "noActiveSessionBody": "Nothing in progress right now. This screen updates automatically the moment one starts.",
+    "readOnlyNotice": "Read-only for now — starting or logging a Code Blue still happens in the existing app.",
+    "manager": "Manager",
+    "startedBy": "Started by",
+    "elapsed": "Elapsed",
+    "logEntries": "Log",
+    "noLogEntries": "No log entries yet",
+    "presence": "In the room",
+    "noPresence": "No one checked in yet",
+    "cartChecked": "Crash cart checked",
+    "cartNotChecked": "No recent crash cart check",
+    "cartAllPassed": "All items passed",
+    "cartIssues": "Issues found",
+    "loadError": "Couldn't load Code Blue status"
   },
   "menu": {
     "title": "Menu",
