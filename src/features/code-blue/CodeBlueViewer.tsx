@@ -64,7 +64,7 @@ function SessionHeader({ view }: Readonly<{ view: ActiveView }>) {
     <View className="gap-3 rounded-2xl bg-danger-solid p-4">
       <View className="flex-row items-center justify-between">
         <Text className="font-rubik-bold text-[18px] text-white">{t("codeBlue.title")}</Text>
-        <Text className="font-rubik-bold text-[20px] text-white">
+        <Text testID="code-blue-elapsed" className="font-rubik-bold text-[20px] text-white">
           {formatElapsedMs(elapsedMs)}
         </Text>
       </View>

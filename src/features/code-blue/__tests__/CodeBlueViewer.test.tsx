@@ -216,8 +216,8 @@ describe("CodeBlueViewer", () => {
       };
       mockQuery({ data: invalid });
       await render(<CodeBlueViewer />);
-      // Header elapsed clamps to 00:00 (the log entry's elapsedMs:0 also renders 00:00).
-      expect(screen.getAllByText("00:00").length).toBeGreaterThan(0);
+      // Scope to the header elapsed value (the log entry's elapsedMs:0 also renders 00:00).
+      expect(screen.getByTestId("code-blue-elapsed").props.children).toBe("00:00");
       expect(screen.queryByText("NaN:NaN")).toBeNull();
     });
   });
