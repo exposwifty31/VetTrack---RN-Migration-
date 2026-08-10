@@ -116,7 +116,8 @@ export async function resolveBearerToken(): Promise<string | null> {
 
 export interface AuthSnapshot {
   userId: string | null;
-  token: string | null;
+  /** Never empty — see `resolveAuthSnapshot`: a token-less result is `null`, not a snapshot with a falsy token. */
+  token: string;
   /** The identity-revision this snapshot was captured at — informational for callers. */
   revision: number;
 }
@@ -146,13 +147,19 @@ export interface AuthSnapshot {
  *
  * Callers MUST treat `null` as "nothing is safe to send right now" — never
  * fall back to a partial/mixed read of the current live state.
+ *
+ * A snapshot with no token is likewise NOT a valid snapshot (CodeRabbit PR
+ * #51 round 3 major finding): a token-less result would let a caller
+ * "match" on `userId` alone and go on to send a request — or replay a
+ * queued write — with no `Authorization` header at all. Absent-token gets
+ * the exact same fail-closed treatment as an identity mismatch: `null`.
  */
 export async function resolveAuthSnapshot(): Promise<AuthSnapshot | null> {
   const revisionBefore = getIdentityRevision();
   const userIdBefore = getCurrentUserId();
   const token = await resolveToken();
-  if (getIdentityRevision() !== revisionBefore) {
-    return null; // identity moved during token resolution — snapshot invalid
+  if (!token || getIdentityRevision() !== revisionBefore) {
+    return null; // no token, or identity moved during token resolution
   }
   return { userId: userIdBefore, token, revision: revisionBefore };
 }

@@ -17,7 +17,7 @@
  * integration proving no item is ever dispatched with a token from a
  * different identity than its own owner.
  */
-import { act, render } from "@testing-library/react-native";
+import { act, render, waitFor } from "@testing-library/react-native";
 import { AppState, type AppStateStatus } from "react-native";
 
 import type { AuthChange } from "@/lib/auth-fetch";
@@ -294,17 +294,15 @@ describe("OfflineQueueBridge", () => {
         />,
       );
       try {
-        // Let the mount-triggered replay's promise chain fully settle
-        // (multiple microtask hops: snapshot resolve → fetch → outcome
-        // persistence, twice).
-        await act(async () => {
-          await Promise.resolve();
-          await Promise.resolve();
-          await Promise.resolve();
-          await Promise.resolve();
+        // CodeRabbit PR #51 round 3 nit: a fixed number of microtask flushes
+        // does not GUARANTEE persistence has caught up with the fetch calls
+        // before the queue assertion runs — wait on the actual state
+        // (fetch call count, then queue removal) instead of a fixed count
+        // of `Promise.resolve()` hops.
+        await waitFor(() => {
+          expect(mockFetch).toHaveBeenCalledTimes(2);
         });
 
-        expect(mockFetch).toHaveBeenCalledTimes(2);
         const calls = mockFetch.mock.calls as [string, RequestInit][];
         const aCall = calls.find(([url]) => url.includes("eq-a"));
         const bCall = calls.find(([url]) => url.includes("eq-b"));
@@ -317,7 +315,10 @@ describe("OfflineQueueBridge", () => {
         // never the other identity's.
         expect(aHeaders.Authorization).toBe("Bearer token-for-user-a");
         expect(bHeaders.Authorization).toBe("Bearer token-for-user-b");
-        expect(getOfflineQueueSnapshot()).toHaveLength(0); // both synced under their own identity
+
+        await waitFor(() => {
+          expect(getOfflineQueueSnapshot()).toHaveLength(0); // both synced under their own identity
+        });
       } finally {
         await view.unmount();
         AppState.currentState = originalState;

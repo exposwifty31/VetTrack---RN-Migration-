@@ -346,6 +346,16 @@ function handleReplayOutcome(
  *     indefinitely. There is no safe automatic action for an item nobody
  *     can be proven to own; migrating or purging such legacy rows is a
  *     deliberate, separate decision, not an implicit replay.
+ *   - `auth.token` absent/empty even with a MATCHING `userId` → HELD
+ *     (CodeRabbit PR #51 round 3 major finding). The identity may be
+ *     correct but not yet have a usable bearer token (e.g. Clerk hasn't
+ *     resolved one yet). Sending anyway would dispatch with no
+ *     Authorization header; a resulting 401 would exhaust the retry budget
+ *     and dead-letter a write that was only ever unsendable because auth
+ *     wasn't ready — and a dead item never gets picked up again (replay
+ *     only re-attempts `pending` rows). A hold costs nothing: the very
+ *     next foreground/auth-"ready" trigger tries again with (hopefully) a
+ *     token, and this branch never increments `retries`.
  * Every hold emits `item_owner_mismatch` so it is observable, not silent.
  */
 export async function replayOfflineQueue(deps: ReplayDeps = {}): Promise<void> {
@@ -373,9 +383,10 @@ export async function replayOfflineQueue(deps: ReplayDeps = {}): Promise<void> {
       // Fresh, ATOMIC per-item {userId, token} — see ReplayDeps doc. Never
       // decompose this into a separately-resolved token + separately-read
       // userId; both fields of `auth` are guaranteed to be from the same
-      // identity generation, or `auth` is null.
+      // identity generation, or `auth` is null. `auth.token` is REQUIRED,
+      // not merely preferred — see the ownership-gate doc above.
       const auth = deps.resolveAuthSnapshot ? await deps.resolveAuthSnapshot() : null;
-      if (!auth || !current.userId || current.userId !== auth.userId) {
+      if (!auth || !auth.token || !current.userId || current.userId !== auth.userId) {
         emit({ kind: "item_owner_mismatch", item: current });
         continue;
       }
@@ -384,8 +395,8 @@ export async function replayOfflineQueue(deps: ReplayDeps = {}): Promise<void> {
         "Content-Type": "application/json",
         "Idempotency-Key": current.idempotencyKey,
         "X-Client-Mutation-Id": current.clientMutationId,
+        Authorization: `Bearer ${auth.token}`,
       };
-      if (auth.token) itemHeaders.Authorization = `Bearer ${auth.token}`;
 
       const result = await attemptItem(current, itemHeaders);
       const circuitTripped = handleReplayOutcome(current, result, state);

@@ -174,4 +174,25 @@ describe("offline-queue-store", () => {
     expect(report).not.toBeNull();
     expect(report?.reason).toBe("unparsable_queue");
   });
+
+  it("reports valid-but-non-array top-level JSON (e.g. '{}') distinctly (CodeRabbit PR #51 round 3 nit)", () => {
+    mockMemoryStore.set(QUEUE_STORAGE_KEY, "{}");
+
+    const result = readQueue();
+
+    expect(result).toEqual([]);
+    const report = getLastDiscardedOfflineQueueRowsReport();
+    expect(report).not.toBeNull();
+    expect(report?.reason).toBe("top_level_invalid");
+  });
+
+  it("reports a persisted 'null' the same way — a fully-unusable queue is never invisible to diagnostics", () => {
+    mockMemoryStore.set(QUEUE_STORAGE_KEY, "null");
+
+    readQueue();
+
+    const report = getLastDiscardedOfflineQueueRowsReport();
+    expect(report).not.toBeNull();
+    expect(report?.reason).toBe("top_level_invalid");
+  });
 });

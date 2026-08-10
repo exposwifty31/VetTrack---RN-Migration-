@@ -33,6 +33,28 @@ describe("resolveAuthSnapshot — atomic identity+token binding", () => {
     expect(snapshot).toMatchObject({ userId: "user_1", token: "token-a" });
   });
 
+  it("MAJOR (CodeRabbit PR #51 round 3): returns null when the token is absent, even with a valid/matching userId", async () => {
+    // A snapshot with a real userId but no token is NOT a valid snapshot —
+    // it must never be handed to a caller that could go on to send a
+    // request (or replay a queued write) with no Authorization header.
+    // Same fail-closed treatment as an identity mismatch.
+    setCurrentUserId("user_1");
+    setClerkTokenGetter(async () => null); // signed in, but no token available yet
+
+    const snapshot = await resolveAuthSnapshot();
+
+    expect(snapshot).toBeNull();
+  });
+
+  it("returns null when the token resolves to an empty/whitespace string", async () => {
+    setCurrentUserId("user_1");
+    setClerkTokenGetter(async () => "   ");
+
+    const snapshot = await resolveAuthSnapshot();
+
+    expect(snapshot).toBeNull();
+  });
+
   it("CRITICAL: returns null when the identity changes WHILE the token is being resolved (TOCTOU window)", async () => {
     setCurrentUserId("user_1");
     setClerkTokenGetter(async () => {

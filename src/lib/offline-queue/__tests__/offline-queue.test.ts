@@ -86,7 +86,10 @@ const NETWORK_ERROR = () => new TypeError("Network request failed");
 const USER_A = "user-a";
 const USER_B = "user-b";
 
-function authSnapshot(userId: string | null, token: string | null = null): ReplayAuthSnapshot {
+// Default token is a real, present string — most tests are about FIFO/retry/
+// circuit-breaker/ownership behavior, not about token presence itself. The
+// dedicated "token absent" tests below pass `token: null` explicitly.
+function authSnapshot(userId: string | null, token: string | null = "test-token"): ReplayAuthSnapshot {
   return { userId, token };
 }
 
@@ -102,7 +105,7 @@ function enqueue(overrides: Partial<EnqueueOfflineWriteInput> = {}): PendingSync
   });
 }
 
-/** Test default: replay runs as USER_A, no token, unless overridden. */
+/** Test default: replay runs as USER_A with a present token, unless overridden. */
 function replay(deps: ReplayDeps = {}): Promise<void> {
   return replayOfflineQueue({
     resolveAuthSnapshot: async () => authSnapshot(USER_A),
@@ -349,6 +352,64 @@ describe("replayOfflineQueue — cross-user isolation (CodeRabbit PR #51 securit
     expect((firstInit.headers as Record<string, string>).Authorization).toBe("Bearer token-for-user-a");
     expect((secondInit.headers as Record<string, string>).Authorization).toBe("Bearer token-for-user-b");
     expect(getOfflineQueueSnapshot()).toHaveLength(0);
+  });
+});
+
+describe("replayOfflineQueue — token-absent hold (CodeRabbit PR #51 round 3)", () => {
+  it("MAJOR: a matching owner with NO token is HELD — never sent token-less, never dead-lettered — then replays once the token is available", async () => {
+    enqueue({ userId: USER_A });
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    const events: OfflineQueueEvent[] = [];
+    const unsubscribe = subscribeOfflineQueueEvent((e) => events.push(e));
+
+    // Authenticated as the correct owner (userId MATCHES) but no token is
+    // available yet — e.g. Clerk hasn't resolved one, or the dev-bypass
+    // token hasn't installed. This must be treated the same as an identity
+    // mismatch: held, not attempted, not dead-lettered.
+    await replay({ resolveAuthSnapshot: async () => ({ userId: USER_A, token: null }) });
+
+    expect(mockFetch).not.toHaveBeenCalled(); // never sent without a token
+    const held = getOfflineQueueSnapshot();
+    expect(held).toHaveLength(1);
+    expect(held[0].status).toBe("pending"); // held, not dead-lettered
+    expect(held[0].retries).toBe(0); // a hold is not a failed attempt
+
+    unsubscribe();
+    expect(events.some((e) => e.kind === "item_owner_mismatch")).toBe(true); // observable, not silent
+
+    // Token becomes available (e.g. auth "ready" fires with a real token) —
+    // the held item replays cleanly, exactly as if nothing had gone wrong.
+    await replay({ resolveAuthSnapshot: async () => ({ userId: USER_A, token: "now-available-token" }) });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer now-available-token");
+    expect(getOfflineQueueSnapshot()).toHaveLength(0); // synced
+  });
+
+  it("repeated token-absent holds never increment retries or eventually dead-letter the item (distinct from a real fetch failure)", async () => {
+    enqueue({ userId: USER_A });
+
+    for (let i = 0; i < PENDING_SYNC_MAX_RETRIES + 3; i++) {
+      await replay({ resolveAuthSnapshot: async () => ({ userId: USER_A, token: null }) });
+    }
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    const snapshot = getOfflineQueueSnapshot();
+    expect(snapshot).toHaveLength(1);
+    expect(snapshot[0].status).toBe("pending");
+    expect(snapshot[0].retries).toBe(0);
+  });
+
+  it("an empty-string token is treated the same as absent (defense in depth against a non-conforming resolver)", async () => {
+    enqueue({ userId: USER_A });
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    await replay({ resolveAuthSnapshot: async () => ({ userId: USER_A, token: "" }) });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(getOfflineQueueSnapshot()[0].status).toBe("pending");
   });
 });
 

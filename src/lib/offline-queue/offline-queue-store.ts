@@ -114,7 +114,7 @@ function isValidSerializedPendingSync(raw: unknown): raw is SerializedPendingSyn
  */
 export type DiscardedRowsReport = {
   count: number;
-  reason: "invalid_entries" | "unparsable_queue";
+  reason: "invalid_entries" | "unparsable_queue" | "top_level_invalid";
   ts: number;
 };
 let lastDiscardedRowsReport: DiscardedRowsReport | null = null;
@@ -144,7 +144,15 @@ export function readQueue(): PendingSync[] {
   if (!raw) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) {
+      // Valid JSON (e.g. "{}" or "null") but not the array shape the queue
+      // requires — the WHOLE persisted queue is unusable, not just some
+      // rows. CodeRabbit PR #51 round 3 nit: this used to fail safe to []
+      // with no report at all, making a fully-corrupt-but-parsable queue
+      // invisible to diagnostics.
+      reportDiscardedRows(1, "top_level_invalid");
+      return [];
+    }
     const valid = parsed.filter(isValidSerializedPendingSync);
     reportDiscardedRows(parsed.length - valid.length, "invalid_entries");
     return valid.map(deserialize);

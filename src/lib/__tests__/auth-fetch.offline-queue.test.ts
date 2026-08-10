@@ -149,7 +149,21 @@ describe("authFetch offline-queue wiring", () => {
     expect(getOfflineQueueSnapshot()).toHaveLength(0);
   });
 
-  it("a null body is still enqueued correctly (queueable) — only opaque non-string bodies are excluded", async () => {
+  it("an explicit null body is still enqueued correctly (queueable) — only opaque non-string bodies are excluded (CodeRabbit PR #51 nit)", async () => {
+    const original = NETWORK_ERROR();
+    mockFetch.mockRejectedValue(original);
+
+    await authFetch("/api/equipment/eq-1/checkout", {
+      method: "POST",
+      body: null,
+    }).catch(() => {});
+
+    const snapshot = getOfflineQueueSnapshot();
+    expect(snapshot).toHaveLength(1);
+    expect(snapshot[0].body).toBe("");
+  });
+
+  it("an omitted body (undefined) is also still enqueued correctly (queueable)", async () => {
     const original = NETWORK_ERROR();
     mockFetch.mockRejectedValue(original);
 
