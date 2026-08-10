@@ -68,15 +68,17 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
           </Text>
         </Pressable>
       ) : null}
-      <Pressable
-        className="items-center rounded-xl border border-border px-6 py-3 active:opacity-80"
-        accessibilityRole="button"
-        onPress={() => {
-          void identity.refetch();
-        }}
-      >
-        <Text className="text-[15px] font-semibold text-foreground">{t("bootstrap.retry")}</Text>
-      </Pressable>
+      {!view.canSignIn ? (
+        <Pressable
+          className="items-center rounded-xl border border-border px-6 py-3 active:opacity-80"
+          accessibilityRole="button"
+          onPress={() => {
+            void identity.refetch();
+          }}
+        >
+          <Text className="text-[15px] font-semibold text-foreground">{t("bootstrap.retry")}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
