@@ -318,6 +318,13 @@ export function CodeBlueActions() {
   // for the latter, so this bar simply stays absent until both are ready.
   if (identity.isPending || sessionQuery.isPending) return null;
 
+  // CodeRabbit PR #49: a FAILED/absent identity read is "unknown", never a
+  // signed-in user — role-gated affordances would be misleading (e.g. showing
+  // the vet-requirement to someone whose identity simply failed to load). The
+  // broader auth recovery lives upstream in BootstrapGate; here the action bar
+  // just stays absent until identity truly resolves.
+  if (identity.isError || !identity.data) return null;
+
   // CodeRabbit PR #49: a FAILED read is "unknown", never "no session" — must
   // come before the `!session` branch so a transient error can't fall
   // through into offering Start.
