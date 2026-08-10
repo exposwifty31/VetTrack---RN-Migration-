@@ -182,7 +182,7 @@
     "title": "Code Blue",
     "noActiveSession": "No active Code Blue",
     "noActiveSessionBody": "Nothing in progress right now. This screen updates automatically the moment one starts.",
-    "readOnlyNotice": "Read-only for now — starting or logging a Code Blue still happens in the existing app.",
+    "readOnlyNotice": "This view updates automatically — start, log, and end actions are above.",
     "manager": "Manager",
     "startedBy": "Started by",
     "elapsed": "Elapsed",
@@ -194,7 +194,33 @@
     "cartNotChecked": "No recent crash cart check",
     "cartAllPassed": "All items passed",
     "cartIssues": "Issues found",
-    "loadError": "Couldn't load Code Blue status"
+    "loadError": "Couldn't load Code Blue status",
+    "actions": {
+      "start": "Start Code Blue",
+      "starting": "Starting…",
+      "startRequiresVet": "Only a vet can start and self-manage a Code Blue right now.",
+      "addLog": "Add to log",
+      "logging": "Adding…",
+      "logPlaceholder": "What just happened?",
+      "join": "I'm in the room",
+      "joining": "Joining…",
+      "end": "End session",
+      "confirmEnd": "Confirm end",
+      "ending": "Ending…"
+    },
+    "outcome": {
+      "rosc": "ROSC",
+      "died": "Died",
+      "transferred": "Transferred",
+      "ongoing": "Ongoing"
+    },
+    "errors": {
+      "offline": "No connection — this action needs the internet and was not saved. Try again once you're back online.",
+      "conflict": "An active Code Blue already exists.",
+      "notFound": "This session could not be found.",
+      "forbidden": "You're not allowed to do that for this session.",
+      "generic": "That didn't go through. Please try again."
+    }
   },
   "menu": {
     "title": "Menu",
