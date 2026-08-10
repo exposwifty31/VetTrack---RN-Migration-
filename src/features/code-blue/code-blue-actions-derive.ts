@@ -27,10 +27,36 @@ export function canEndCodeBlue(
   return !!currentUserId && currentUserId === managerUserId;
 }
 
-/** `max(0, nowMs - startedAt)`, 0 for an unparsable timestamp — never NaN. */
+/**
+ * `max(0, nowMs - startedAt)`, 0 for an unparsable timestamp OR a non-finite
+ * `nowMs` — never NaN. (CodeRabbit PR #49: `startMs` was guarded but `nowMs`
+ * wasn't, so `Math.max(0, NaN)` could still leak a NaN elapsedMs into a log
+ * entry payload.)
+ */
 export function computeElapsedMsForLog(startedAt: string, nowMs: number): number {
   const startMs = Date.parse(startedAt);
-  return Number.isFinite(startMs) ? Math.max(0, nowMs - startMs) : 0;
+  if (!Number.isFinite(startMs) || !Number.isFinite(nowMs)) return 0;
+  return Math.max(0, nowMs - startMs);
+}
+
+/**
+ * A pending log-entry draft's stable idempotency entry (the
+ * `resolveStableIdempotencyKey` idiom from `dispense-derive.ts`, applied to
+ * the Code Blue log form — CodeRabbit PR #49). Keyed by the draft's trimmed
+ * text: a RETRY of the identical draft (same signature) reuses the same key
+ * so a flaky offline attempt followed by a retry can never double-post the
+ * same log entry server-side; the draft only clears (and the key resets to
+ * `null`) once the mutation actually succeeds.
+ */
+export type LogDraftIdempotencyEntry = Readonly<{ key: string; signature: string }>;
+
+export function resolveLogDraftIdempotencyKey(
+  previous: LogDraftIdempotencyEntry | null,
+  signature: string,
+  mint: () => string,
+): LogDraftIdempotencyEntry {
+  if (previous?.signature === signature) return previous;
+  return { key: mint(), signature };
 }
 
 /** Literal union so the strictly-typed `t` accepts the mapped result. */

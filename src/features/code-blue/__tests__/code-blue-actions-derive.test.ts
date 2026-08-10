@@ -10,6 +10,7 @@ import {
   canStartCodeBlue,
   codeBlueMutationErrorKey,
   computeElapsedMsForLog,
+  resolveLogDraftIdempotencyKey,
 } from "../code-blue-actions-derive";
 
 describe("canStartCodeBlue", () => {
@@ -55,6 +56,36 @@ describe("computeElapsedMsForLog", () => {
 
   it("returns 0 for an unparsable startedAt (never NaN)", () => {
     expect(computeElapsedMsForLog("not-a-date", Date.now())).toBe(0);
+  });
+
+  it("returns 0 when nowMs itself is non-finite — CodeRabbit PR #49 (never NaN via Math.max(0, NaN))", () => {
+    expect(computeElapsedMsForLog("2026-08-10T12:00:00.000Z", NaN)).toBe(0);
+    expect(computeElapsedMsForLog("2026-08-10T12:00:00.000Z", Infinity)).toBe(0);
+  });
+});
+
+describe("resolveLogDraftIdempotencyKey — CodeRabbit PR #49 (stable key across a retry)", () => {
+  it("mints a fresh key when there is no previous entry", () => {
+    const mint = jest.fn(() => "uuid-a");
+    const entry = resolveLogDraftIdempotencyKey(null, "Amiodarone 300mg", mint);
+    expect(entry).toEqual({ key: "uuid-a", signature: "Amiodarone 300mg" });
+    expect(mint).toHaveBeenCalledTimes(1);
+  });
+
+  it("reuses the previous key when the signature (draft text) is unchanged — a retry, not a new entry", () => {
+    const previous = { key: "uuid-a", signature: "Amiodarone 300mg" };
+    const mint = jest.fn(() => "uuid-b");
+    const entry = resolveLogDraftIdempotencyKey(previous, "Amiodarone 300mg", mint);
+    expect(entry).toBe(previous); // same object — no new key minted
+    expect(mint).not.toHaveBeenCalled();
+  });
+
+  it("mints a NEW key when the draft text actually changed", () => {
+    const previous = { key: "uuid-a", signature: "Amiodarone 300mg" };
+    const mint = jest.fn(() => "uuid-b");
+    const entry = resolveLogDraftIdempotencyKey(previous, "Different note", mint);
+    expect(entry).toEqual({ key: "uuid-b", signature: "Different note" });
+    expect(mint).toHaveBeenCalledTimes(1);
   });
 });
 

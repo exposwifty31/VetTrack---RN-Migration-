@@ -11,6 +11,7 @@
  */
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import * as Crypto from "expo-crypto";
 
 import { CodeBlueActions } from "../CodeBlueActions";
 import { useCodeBlueMutations } from "../useCodeBlueMutations";
@@ -24,7 +25,10 @@ jest.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
 
-jest.mock("expo-crypto", () => ({ randomUUID: () => "idem-key-1" }));
+// Default "idem-key-1" for every existing call site; individual tests may
+// override with `.mockReturnValueOnce(...)` to prove stable-key behavior
+// (CodeRabbit PR #49) without disturbing the shared default.
+jest.mock("expo-crypto", () => ({ randomUUID: jest.fn(() => "idem-key-1") }));
 
 jest.mock("@tanstack/react-query", () => ({
   ...jest.requireActual<typeof import("@tanstack/react-query")>("@tanstack/react-query"),
@@ -131,6 +135,20 @@ describe("CodeBlueActions", () => {
     expect(screen.queryByTestId("code-blue-actions")).toBeNull();
   });
 
+  it("CodeRabbit PR #49 (Major): never offers Start when the active-session query itself FAILED — a failed read is 'unknown', not 'no session', and must not risk a double-start", async () => {
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    const refetch = jest.fn();
+    mockSessionQuery({ isError: true, data: undefined, refetch });
+
+    await render(<CodeBlueActions />);
+    expect(screen.queryByText("codeBlue.actions.start")).toBeNull();
+    expect(screen.queryByText("codeBlue.actions.startRequiresVet")).toBeNull();
+    expect(screen.getByText("codeBlue.loadError")).toBeTruthy();
+
+    fireEvent.press(screen.getByText("common.retry"));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
   describe("no active session", () => {
     it("a vet sees a Start button that self-designates as manager", async () => {
       mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen", displayName: null });
@@ -218,6 +236,9 @@ describe("CodeBlueActions", () => {
             category: "note",
           }),
         }),
+        // CodeRabbit PR #49: the draft only clears on the mutation's own
+        // onSuccess, passed as the per-call options object.
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
       );
     });
 
@@ -259,6 +280,78 @@ describe("CodeBlueActions", () => {
       fireEvent.press(screen.getByText("codeBlue.actions.join"));
 
       expect(presenceMutate).toHaveBeenCalledWith("cb-1");
+    });
+
+    it("CodeRabbit PR #49 (DOCTRINE breach): shows the LOUD offline banner for a failed presence attempt — was previously silently ignored", async () => {
+      mockIdentity({ id: "user-9", role: "technician", name: "Tech" });
+      mockSessionQuery({ data: ACTIVE });
+      const offlineErr = new EmergencyOfflineError(
+        "presence",
+        "/api/code-blue/sessions/cb-1/presence",
+        "PATCH",
+      );
+      mockMutations({ presence: { isError: true, error: offlineErr } });
+
+      await render(<CodeBlueActions />);
+      expect(screen.getByTestId("code-blue-offline-banner")).toBeTruthy();
+      expect(screen.getByText("codeBlue.errors.offline")).toBeTruthy();
+    });
+
+    it("presence: a generic coded error shows the generic banner (not the offline one)", async () => {
+      mockIdentity({ id: "user-9", role: "technician", name: "Tech" });
+      mockSessionQuery({ data: ACTIVE });
+      mockMutations({
+        presence: { isError: true, error: new ApiCodedError(404, "SESSION_NOT_FOUND") },
+      });
+
+      await render(<CodeBlueActions />);
+      expect(screen.getByTestId("code-blue-error-banner")).toBeTruthy();
+      expect(screen.queryByTestId("code-blue-offline-banner")).toBeNull();
+      expect(screen.getByText("codeBlue.errors.notFound")).toBeTruthy();
+    });
+
+    it("CodeRabbit PR #49 (Major): keeps the draft note on a failed log attempt and reuses the SAME idempotency key on a retry with unchanged text", async () => {
+      mockIdentity({ id: "user-9", role: "technician", name: "Tech" });
+      mockSessionQuery({ data: ACTIVE });
+      const addLogMutate = jest.fn();
+      mockMutations({ addLogEntry: { mutate: addLogMutate } });
+      jest.mocked(Crypto.randomUUID).mockReturnValueOnce("uuid-a").mockReturnValueOnce("uuid-b");
+
+      await render(<CodeBlueActions />);
+      await act(async () => {
+        fireEvent.changeText(screen.getByTestId("code-blue-log-input"), "Amiodarone 300mg");
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByText("codeBlue.actions.addLog"));
+      });
+
+      // `mutate` is a bare jest.fn() here — it never resolves, simulating an
+      // in-flight/failed attempt. The draft must still be visible; nothing
+      // clears it until the mutation's own onSuccess actually fires.
+      expect(screen.getByTestId("code-blue-log-input").props.value).toBe("Amiodarone 300mg");
+
+      // Retry with the SAME text — must reuse the same idempotency key, not
+      // mint a new one (a naive retry-with-a-fresh-key could double-post).
+      await act(async () => {
+        fireEvent.press(screen.getByText("codeBlue.actions.addLog"));
+      });
+
+      expect(addLogMutate).toHaveBeenCalledTimes(2);
+      const calls = addLogMutate.mock.calls as [{ payload: { idempotencyKey: string } }][];
+      expect(calls[0][0].payload.idempotencyKey).toBe("uuid-a");
+      expect(calls[1][0].payload.idempotencyKey).toBe("uuid-a"); // SAME key — no new mint
+      expect(Crypto.randomUUID).toHaveBeenCalledTimes(1);
+
+      // Now change the draft text — a genuinely NEW entry must mint a fresh key.
+      await act(async () => {
+        fireEvent.changeText(screen.getByTestId("code-blue-log-input"), "Different note");
+      });
+      await act(async () => {
+        fireEvent.press(screen.getByText("codeBlue.actions.addLog"));
+      });
+
+      expect(addLogMutate).toHaveBeenCalledTimes(3);
+      expect(calls[2][0].payload.idempotencyKey).toBe("uuid-b");
     });
 
     it("still renders the ACTIVE session UI when end.isSuccess is true but the query cache has not yet refetched (never derives 'ended' from mutation state)", async () => {
