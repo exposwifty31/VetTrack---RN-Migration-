@@ -1,17 +1,17 @@
 import { useEffect } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 
-import { resolveBearerToken, subscribeAuthChange, type AuthChange } from "@/lib/auth-fetch";
-import { getCurrentUserId as getCurrentUserIdFromStore } from "@/lib/auth-store";
+import { resolveAuthSnapshot, subscribeAuthChange, type AuthChange } from "@/lib/auth-fetch";
 
-import { replayOfflineQueue, type ReplayDeps } from "./offline-queue";
+import { replayOfflineQueue, type ReplayAuthSnapshot, type ReplayDeps } from "./offline-queue";
 
 type ReplayFn = (deps?: ReplayDeps) => Promise<void>;
 type AuthChangeSubscribe = (listener: (change: AuthChange) => void) => () => void;
+type ResolveAuthSnapshotFn = () => Promise<ReplayAuthSnapshot | null>;
 
 /**
  * Diagnostic record of the last time a triggered replay pass rejected (e.g.
- * `resolveToken` itself throwing). This repo has no Sentry/telemetry
+ * `resolveAuthSnapshot` itself throwing). This repo has no Sentry/telemetry
  * backend wired yet (verified: no `@sentry/*` dependency), so this mirrors
  * `emergency-block.ts`'s local-buffer precedent rather than inventing a
  * telemetry call that doesn't exist — CodeRabbit PR #51 flagged the
@@ -46,35 +46,39 @@ function reportReplayRejection(err: unknown): void {
  *
  *   - App becomes `active`           → replay() (attempts every pending write)
  *   - Auth "ready" (sign-in)         → replay() again IF still `active`
- *   - Auth "changed" (account switch)→ replay() IF still `active` (new Bearer
- *                                       AND new identity are fetched fresh via
- *                                       resolveToken / getCurrentUserId — see
- *                                       offline-queue.ts's per-item ownership
- *                                       gate, the CodeRabbit PR #51 fix)
+ *   - Auth "changed" (account switch)→ replay() IF still `active` (a fresh
+ *                                       ATOMIC {userId, token} snapshot is
+ *                                       resolved per item during replay —
+ *                                       see offline-queue.ts's ownership
+ *                                       gate)
  *   - Auth "cleared" (sign-out)      → no replay (no valid token to attach)
  *
- * `getCurrentUserId` is threaded into every replay call so the queue can
- * refuse to replay a write under the wrong identity on a shared device —
- * see `replayOfflineQueue`'s ownership-gate doc in offline-queue.ts.
+ * `resolveAuthSnapshot` (from `auth-fetch.ts`) is threaded into every replay
+ * call — CodeRabbit PR #51's CRITICAL re-review fix. A round-1 version of
+ * this bridge passed a pass-level `resolveToken` and a separately-read
+ * `getCurrentUserId` as two independent dependencies; that let an account
+ * switch straddle the two reads and pair one identity's token with a
+ * DIFFERENT identity's queued write. `resolveAuthSnapshot` returns both
+ * fields as ONE atomic unit (or `null`), so there is no seam left to
+ * straddle — see its doc in auth-fetch.ts for the revision-counter
+ * mechanism that makes the snapshot itself trustworthy.
  *
  * Headless component mounted at App level, sibling to RealtimeBridge.
  */
 export function OfflineQueueBridge({
   replay = replayOfflineQueue as ReplayFn,
-  resolveToken = resolveBearerToken,
-  getCurrentUserId = getCurrentUserIdFromStore,
+  resolveAuthSnapshot: resolveSnapshot = resolveAuthSnapshot as ResolveAuthSnapshotFn,
   onAuthChange = subscribeAuthChange,
 }: {
   replay?: ReplayFn;
-  resolveToken?: () => Promise<string | null>;
-  getCurrentUserId?: () => string | null;
+  resolveAuthSnapshot?: ResolveAuthSnapshotFn;
   onAuthChange?: AuthChangeSubscribe;
 }) {
   useEffect(() => {
     const triggerReplay = () => {
-      // Never let a rejection (e.g. resolveToken throwing) escape as an
-      // unhandled rejection at this lifecycle boundary — CodeRabbit PR #51.
-      replay({ resolveToken, getCurrentUserId }).catch(reportReplayRejection);
+      // Never let a rejection (e.g. resolveAuthSnapshot throwing) escape as
+      // an unhandled rejection at this lifecycle boundary — CodeRabbit PR #51.
+      replay({ resolveAuthSnapshot: resolveSnapshot }).catch(reportReplayRejection);
     };
 
     if (AppState.currentState === "active") {
@@ -95,7 +99,7 @@ export function OfflineQueueBridge({
       appStateSub.remove();
       unsubscribeAuthChange();
     };
-  }, [replay, resolveToken, getCurrentUserId, onAuthChange]);
+  }, [replay, resolveSnapshot, onAuthChange]);
 
   return null;
 }

@@ -102,9 +102,42 @@ function isValidSerializedPendingSync(raw: unknown): raw is SerializedPendingSyn
 }
 
 /**
+ * Diagnostic record of the last time `readQueue` discarded something —
+ * either individual invalid rows within otherwise-valid JSON, or the whole
+ * blob when it wasn't parsable JSON at all. Each discarded row is a
+ * potentially lost mutation; CodeRabbit PR #51 (trivial finding) flagged
+ * that dropping it via `.filter()` with no signal makes persistence
+ * corruption invisible to both the operator and any future debugging.
+ * Mirrors `OfflineQueueBridge.tsx`'s `reportReplayRejection` precedent — no
+ * Sentry/telemetry backend exists in this repo, so this is a local
+ * diagnostic buffer, not a fabricated telemetry call.
+ */
+export type DiscardedRowsReport = {
+  count: number;
+  reason: "invalid_entries" | "unparsable_queue";
+  ts: number;
+};
+let lastDiscardedRowsReport: DiscardedRowsReport | null = null;
+
+export function getLastDiscardedOfflineQueueRowsReport(): DiscardedRowsReport | null {
+  return lastDiscardedRowsReport;
+}
+
+/** Test-only — reset the module-lifetime diagnostic between cases. */
+export function _clearLastDiscardedOfflineQueueRowsReportForTests(): void {
+  lastDiscardedRowsReport = null;
+}
+
+function reportDiscardedRows(count: number, reason: DiscardedRowsReport["reason"]): void {
+  if (count <= 0) return;
+  lastDiscardedRowsReport = { count, reason, ts: Date.now() };
+}
+
+/**
  * Reads the persisted queue. Corrupt/missing top-level data fails safe to an
  * empty queue; individual malformed rows within otherwise-valid JSON are
- * dropped (not the whole queue) — see `isValidSerializedPendingSync`.
+ * dropped (not the whole queue) — see `isValidSerializedPendingSync`. Either
+ * case reports via `getLastDiscardedOfflineQueueRowsReport`.
  */
 export function readQueue(): PendingSync[] {
   const raw = getSafeStorage().safeStorageGetItem(QUEUE_STORAGE_KEY, "local");
@@ -112,8 +145,11 @@ export function readQueue(): PendingSync[] {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isValidSerializedPendingSync).map(deserialize);
+    const valid = parsed.filter(isValidSerializedPendingSync);
+    reportDiscardedRows(parsed.length - valid.length, "invalid_entries");
+    return valid.map(deserialize);
   } catch {
+    reportDiscardedRows(1, "unparsable_queue");
     return [];
   }
 }

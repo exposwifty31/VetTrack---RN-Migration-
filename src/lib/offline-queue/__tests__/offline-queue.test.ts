@@ -3,11 +3,20 @@
  * circuit-breaker, permanent-failure retention, and the frozen doctrine that
  * emergency (Code Blue) mutations are NEVER queued.
  *
- * CodeRabbit PR #51 additions: cross-user replay isolation (the shared-device
+ * CodeRabbit PR #51 round 1: cross-user replay isolation (the shared-device
  * security bug — a queued item must never be replayed under a different
  * signed-in identity), idempotency-key preservation across replay, and
  * item_permanent_failure firing for terminal 4xx (client_error), not just
  * exhausted-retries (dead).
+ *
+ * CodeRabbit PR #51 round 2 (CRITICAL): round 1's per-item `userId` check
+ * still combined it with a PASS-LEVEL token resolved separately — a TOCTOU
+ * window. `ReplayDeps` now takes ONE atomic `resolveAuthSnapshot` returning
+ * `{userId, token}` together; this file's `replay()` helper always passes
+ * that shape. The airtight proof that the snapshot itself can't straddle an
+ * account switch lives in `auth-fetch.auth-snapshot.test.ts` (this file
+ * only proves the QUEUE correctly consumes/trusts a snapshot it's given,
+ * including a `null` one).
  */
 import { PENDING_SYNC_MAX_RETRIES, type PendingSync } from "@vettrack/contracts";
 
@@ -19,6 +28,7 @@ import {
   subscribeOfflineQueueEvent,
   type EnqueueOfflineWriteInput,
   type OfflineQueueEvent,
+  type ReplayAuthSnapshot,
   type ReplayDeps,
 } from "../offline-queue";
 
@@ -63,10 +73,22 @@ beforeEach(() => {
   _resetOfflineQueueForTests();
 });
 
+afterEach(() => {
+  // CodeRabbit PR #51 minor finding: restore real timers unconditionally,
+  // even if a test's own `replay()` throws before reaching an explicit
+  // `jest.useRealTimers()` call — a leaked fake-timer install would
+  // otherwise bleed into later tests.
+  jest.useRealTimers();
+});
+
 const NETWORK_ERROR = () => new TypeError("Network request failed");
 
 const USER_A = "user-a";
 const USER_B = "user-b";
+
+function authSnapshot(userId: string | null, token: string | null = null): ReplayAuthSnapshot {
+  return { userId, token };
+}
 
 /** Test default: every write is issued by USER_A unless overridden — matches real
  * usage where `userId` is captured from the authenticated identity BEFORE dispatch. */
@@ -80,9 +102,12 @@ function enqueue(overrides: Partial<EnqueueOfflineWriteInput> = {}): PendingSync
   });
 }
 
-/** Test default: replay runs as USER_A unless overridden. */
+/** Test default: replay runs as USER_A, no token, unless overridden. */
 function replay(deps: ReplayDeps = {}): Promise<void> {
-  return replayOfflineQueue({ getCurrentUserId: () => USER_A, ...deps });
+  return replayOfflineQueue({
+    resolveAuthSnapshot: async () => authSnapshot(USER_A),
+    ...deps,
+  });
 }
 
 describe("enqueueOfflineWrite — doctrine guard", () => {
@@ -157,11 +182,11 @@ describe("replayOfflineQueue — FIFO replay", () => {
     expect(getOfflineQueueSnapshot()).toHaveLength(0); // synced items are removed
   });
 
-  it("attaches the injected bearer token to replayed requests", async () => {
+  it("attaches the token from the atomic auth snapshot to replayed requests", async () => {
     enqueue({});
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
 
-    await replay({ resolveToken: async () => "a.b.c" });
+    await replay({ resolveAuthSnapshot: async () => authSnapshot(USER_A, "a.b.c") });
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     const headers = init.headers as Record<string, string>;
@@ -185,7 +210,7 @@ describe("replayOfflineQueue — cross-user isolation (CodeRabbit PR #51 securit
     enqueue({ userId: USER_A });
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
 
-    await replay({ getCurrentUserId: () => USER_B, resolveToken: async () => "b-token" });
+    await replay({ resolveAuthSnapshot: async () => authSnapshot(USER_B, "b-token") });
 
     expect(mockFetch).not.toHaveBeenCalled(); // B's bearer token must never touch A's write
     const snapshot = getOfflineQueueSnapshot();
@@ -199,7 +224,7 @@ describe("replayOfflineQueue — cross-user isolation (CodeRabbit PR #51 securit
     const events: OfflineQueueEvent[] = [];
     const unsubscribe = subscribeOfflineQueueEvent((e) => events.push(e));
 
-    await replay({ getCurrentUserId: () => USER_B });
+    await replay({ resolveAuthSnapshot: async () => authSnapshot(USER_B) });
     unsubscribe();
 
     expect(events.some((e) => e.kind === "item_owner_mismatch")).toBe(true);
@@ -209,10 +234,10 @@ describe("replayOfflineQueue — cross-user isolation (CodeRabbit PR #51 securit
     enqueue({ userId: USER_A });
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
 
-    await replay({ getCurrentUserId: () => USER_B }); // B signed in — held
+    await replay({ resolveAuthSnapshot: async () => authSnapshot(USER_B) }); // B signed in — held
     expect(mockFetch).not.toHaveBeenCalled();
 
-    await replay({ getCurrentUserId: () => USER_A }); // A signed back in — replays
+    await replay({ resolveAuthSnapshot: async () => authSnapshot(USER_A) }); // A signed back in — replays
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(getOfflineQueueSnapshot()).toHaveLength(0);
   });
@@ -222,7 +247,7 @@ describe("replayOfflineQueue — cross-user isolation (CodeRabbit PR #51 securit
     enqueue({ userId: USER_B, endpoint: "/api/equipment/eq-b/checkout" });
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
 
-    await replay({ getCurrentUserId: () => USER_A });
+    await replay({ resolveAuthSnapshot: async () => authSnapshot(USER_A) });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -234,7 +259,7 @@ describe("replayOfflineQueue — cross-user isolation (CodeRabbit PR #51 securit
   });
 
   it("an identity change MID-PASS stops binding further items to the old identity, from the next item onward (effective 'abort')", async () => {
-    // getCurrentUserId is called FRESH per item (see offline-queue.ts doc) —
+    // resolveAuthSnapshot is called FRESH per item (see offline-queue.ts doc) —
     // simulating a sign-out/account-switch that happens WHILE a multi-item
     // replay pass is already running, without needing to cancel the pass.
     enqueue({ userId: USER_A, endpoint: "/api/equipment/eq-1/checkout" });
@@ -242,12 +267,12 @@ describe("replayOfflineQueue — cross-user isolation (CodeRabbit PR #51 securit
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
 
     let calls = 0;
-    const flippingGetCurrentUserId = () => {
+    const flippingSnapshot = async (): Promise<ReplayAuthSnapshot> => {
       calls++;
-      return calls === 1 ? USER_A : USER_B; // flips identity after the first item
+      return calls === 1 ? authSnapshot(USER_A) : authSnapshot(USER_B); // flips after item 1
     };
 
-    await replay({ getCurrentUserId: flippingGetCurrentUserId });
+    await replay({ resolveAuthSnapshot: flippingSnapshot });
 
     expect(mockFetch).toHaveBeenCalledTimes(1); // only the first item, issued as A
     const remaining = getOfflineQueueSnapshot();
@@ -260,19 +285,70 @@ describe("replayOfflineQueue — cross-user isolation (CodeRabbit PR #51 securit
     enqueue({ userId: undefined });
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
 
-    await replay({ getCurrentUserId: () => USER_A });
+    await replay({ resolveAuthSnapshot: async () => authSnapshot(USER_A) });
 
     expect(mockFetch).not.toHaveBeenCalled();
     expect(getOfflineQueueSnapshot()).toHaveLength(1); // retained, not dropped — awaits a deliberate migration decision
   });
 
-  it("without a getCurrentUserId dependency wired at all, replay holds every owned item (fail-closed default)", async () => {
+  it("without a resolveAuthSnapshot dependency wired at all, replay holds every owned item (fail-closed default)", async () => {
     enqueue({ userId: USER_A });
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
 
-    await replayOfflineQueue({}); // no getCurrentUserId — the OfflineQueueBridge always wires one in production
+    await replayOfflineQueue({}); // no resolveAuthSnapshot — the OfflineQueueBridge always wires one in production
 
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("CRITICAL (CodeRabbit PR #51 round 2): a null snapshot (identity changed DURING resolution) holds the item — never a partial/mixed pairing", async () => {
+    // The queue never composes {userId, token} from two separate reads —
+    // it only ever trusts whatever resolveAuthSnapshot() returns as ONE
+    // unit. A resolver detecting a mid-resolution identity change (the
+    // TOCTOU auth-fetch.auth-snapshot.test.ts proves) returns null; this
+    // proves the QUEUE'S side of that contract: null must never fall back
+    // to "send anyway with whatever's current".
+    enqueue({ userId: USER_A });
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    await replay({ resolveAuthSnapshot: async () => null });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    const snapshot = getOfflineQueueSnapshot();
+    expect(snapshot).toHaveLength(1);
+    expect(snapshot[0].status).toBe("pending");
+  });
+
+  it("resolveAuthSnapshot is resolved fresh per item, never reused as a stale pass-level pairing (the exact round-1→round-2 regression)", async () => {
+    // Two items, two DIFFERENT owners. If the snapshot resolver were ever
+    // called once and its result reused across items (the round-1 bug's
+    // shape — a pass-level token combined with per-item identity), this
+    // test would see BOTH items sent with the SAME token, or the second
+    // item incorrectly matched. Each item must get its own resolution.
+    enqueue({ userId: USER_A, endpoint: "/api/equipment/eq-a/checkout" });
+    enqueue({ userId: USER_B, endpoint: "/api/equipment/eq-b/checkout" });
+    mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+    const resolutions: string[] = [];
+    let call = 0;
+    const perCallSnapshot = async (): Promise<ReplayAuthSnapshot> => {
+      call++;
+      // First resolution is A (matches item 1); a SECOND, independent
+      // resolution for item 2 correctly reports B (matches item 2). A
+      // pass-level cache would have reused "A" for both.
+      const identity = call === 1 ? USER_A : USER_B;
+      resolutions.push(identity);
+      return authSnapshot(identity, `token-for-${identity}`);
+    };
+
+    await replay({ resolveAuthSnapshot: perCallSnapshot });
+
+    expect(resolutions).toEqual([USER_A, USER_B]); // resolved twice, once per item
+    expect(mockFetch).toHaveBeenCalledTimes(2); // both matched their own resolution
+    const [, firstInit] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const [, secondInit] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect((firstInit.headers as Record<string, string>).Authorization).toBe("Bearer token-for-user-a");
+    expect((secondInit.headers as Record<string, string>).Authorization).toBe("Bearer token-for-user-b");
+    expect(getOfflineQueueSnapshot()).toHaveLength(0);
   });
 });
 
@@ -333,10 +409,10 @@ describe("replayOfflineQueue — server-response outcomes", () => {
   it("a 401 that later succeeds (token becomes valid) syncs and clears the item, verified via the refreshed Authorization header", async () => {
     enqueue({});
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
-    await replay({ resolveToken: async () => "stale-or-missing-token" }); // cold-start race: no valid token yet
+    await replay({ resolveAuthSnapshot: async () => authSnapshot(USER_A, "stale-or-missing-token") }); // cold-start race
 
     mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
-    await replay({ resolveToken: async () => "fresh-token" }); // auth "ready" fires — retried with a valid token
+    await replay({ resolveAuthSnapshot: async () => authSnapshot(USER_A, "fresh-token") }); // retried with a valid token
 
     expect(getOfflineQueueSnapshot()).toHaveLength(0); // synced, not lost
     const [, secondInit] = mockFetch.mock.calls[1] as [string, RequestInit];
@@ -428,12 +504,14 @@ describe("replayOfflineQueue — circuit breaker", () => {
     const callsAfterFirstPass = mockFetch.mock.calls.length;
 
     await replay(); // cooldown still active — must no-op
-    expect(mockFetch.mock.calls.length).toBe(callsAfterFirstPass);
+    expect(mockFetch.mock.calls).toHaveLength(callsAfterFirstPass);
 
     jest.useFakeTimers().setSystemTime(Date.now() + 60_000); // past any reasonable cooldown
     mockFetch.mockResolvedValue({ ok: true, status: 200 });
     await replay();
-    jest.useRealTimers();
+    // Real timers are restored unconditionally in the top-level afterEach —
+    // no explicit jest.useRealTimers() needed here (CodeRabbit PR #51 minor
+    // finding: the old inline call never ran if replay() threw above it).
 
     expect(mockFetch.mock.calls.length).toBeGreaterThan(callsAfterFirstPass);
   });

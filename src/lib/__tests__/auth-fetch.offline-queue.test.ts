@@ -120,6 +120,46 @@ describe("authFetch offline-queue wiring", () => {
     expect(snapshot[0].idempotencyKey).toBe("caller-minted-key-abc");
   });
 
+  it("CodeRabbit PR #51 major finding: a FormData body is NEVER enqueued as an empty-body mutation (no durable codec yet)", async () => {
+    const original = NETWORK_ERROR();
+    mockFetch.mockRejectedValue(original);
+    const form = new FormData();
+    form.append("file", "not-a-real-file");
+
+    const err = await authFetch("/api/equipment/eq-1/checkout", {
+      method: "POST",
+      body: form,
+    }).catch((e: unknown) => e);
+
+    expect(err).toBe(original); // original network error still propagates unchanged
+    expect(getOfflineQueueSnapshot()).toHaveLength(0); // never queued — not silently corrupted to ""
+  });
+
+  it("CodeRabbit PR #51 major finding: a URLSearchParams body is NEVER enqueued as an empty-body mutation", async () => {
+    const original = NETWORK_ERROR();
+    mockFetch.mockRejectedValue(original);
+    const params = new URLSearchParams({ foo: "bar" });
+
+    const err = await authFetch("/api/equipment/eq-1/checkout", {
+      method: "POST",
+      body: params,
+    }).catch((e: unknown) => e);
+
+    expect(err).toBe(original);
+    expect(getOfflineQueueSnapshot()).toHaveLength(0);
+  });
+
+  it("a null body is still enqueued correctly (queueable) — only opaque non-string bodies are excluded", async () => {
+    const original = NETWORK_ERROR();
+    mockFetch.mockRejectedValue(original);
+
+    await authFetch("/api/equipment/eq-1/checkout", { method: "POST" }).catch(() => {});
+
+    const snapshot = getOfflineQueueSnapshot();
+    expect(snapshot).toHaveLength(1);
+    expect(snapshot[0].body).toBe("");
+  });
+
   it("offline + emergency mutation: throws EmergencyOfflineError and is NEVER enqueued", async () => {
     mockFetch.mockRejectedValue(NETWORK_ERROR());
 

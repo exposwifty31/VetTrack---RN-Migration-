@@ -244,17 +244,34 @@ async function attemptItem(
 let replaying = false;
 let circuitOpenUntil = 0;
 
+/** One atomic {userId, token} pairing — see `resolveAuthSnapshot` doc below. */
+export interface ReplayAuthSnapshot {
+  userId: string | null;
+  token: string | null;
+}
+
 export interface ReplayDeps {
-  resolveToken?: () => Promise<string | null>;
   /**
-   * The CURRENTLY authenticated identity. Read fresh on every item (not
-   * once per pass) so a sign-out/account-switch mid-pass stops binding
-   * further items to the old identity from the very next iteration —
-   * CodeRabbit PR #51's shared-device security gate. When omitted (or
-   * returns `null`), replay holds every owned item — fail-closed, never
-   * "no identity check means send anyway".
+   * Resolve ONE atomic auth snapshot — `userId` and `token` MUST come from
+   * the same identity generation. CodeRabbit PR #51's CRITICAL re-review
+   * finding: round 1 combined a token resolved ONCE per pass with a userId
+   * read fresh PER ITEM — two independent reads that can straddle an
+   * account switch, pairing user A's bearer token with user B's queued item
+   * (or vice versa). This module never composes a snapshot itself from two
+   * separate calls; it always takes whatever `resolveAuthSnapshot()`
+   * returns as one unit. The production wiring (`OfflineQueueBridge`) passes
+   * `resolveAuthSnapshot` from `auth-fetch.ts`, whose implementation closes
+   * the TOCTOU with a revision-counter check (see its doc there).
+   *
+   * Called FRESH before every item (not once per pass), so a sign-out /
+   * account-switch mid-pass stops binding further items to the old
+   * identity from the very next iteration — the shared-device security
+   * gate. Returning `null` (omitted dependency, or the resolver itself
+   * detecting a stale/mid-flight identity) means "nothing is safe to send
+   * right now" — the item is held, fail-closed, never "no snapshot means
+   * send anyway".
    */
-  getCurrentUserId?: () => string | null;
+  resolveAuthSnapshot?: () => Promise<ReplayAuthSnapshot | null>;
 }
 
 type ReplayLoopState = { consecutiveTransientFailures: number };
@@ -344,10 +361,6 @@ export async function replayOfflineQueue(deps: ReplayDeps = {}): Promise<void> {
     if (pending.length === 0) return;
     emit({ kind: "replay_start", count: pending.length });
 
-    const token = deps.resolveToken ? await deps.resolveToken() : null;
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) headers.Authorization = `Bearer ${token}`;
-
     const state: ReplayLoopState = { consecutiveTransientFailures: 0 };
 
     for (const snapshot of pending) {
@@ -357,18 +370,23 @@ export async function replayOfflineQueue(deps: ReplayDeps = {}): Promise<void> {
       const current = findByClientMutationId(snapshot.clientMutationId);
       if (current?.status !== "pending") continue;
 
-      // Fresh per-item identity read — see ReplayDeps.getCurrentUserId doc.
-      const activeUserId = deps.getCurrentUserId ? deps.getCurrentUserId() : null;
-      if (!current.userId || current.userId !== activeUserId) {
+      // Fresh, ATOMIC per-item {userId, token} — see ReplayDeps doc. Never
+      // decompose this into a separately-resolved token + separately-read
+      // userId; both fields of `auth` are guaranteed to be from the same
+      // identity generation, or `auth` is null.
+      const auth = deps.resolveAuthSnapshot ? await deps.resolveAuthSnapshot() : null;
+      if (!auth || !current.userId || current.userId !== auth.userId) {
         emit({ kind: "item_owner_mismatch", item: current });
         continue;
       }
 
-      const itemHeaders = {
-        ...headers,
+      const itemHeaders: Record<string, string> = {
+        "Content-Type": "application/json",
         "Idempotency-Key": current.idempotencyKey,
         "X-Client-Mutation-Id": current.clientMutationId,
       };
+      if (auth.token) itemHeaders.Authorization = `Bearer ${auth.token}`;
+
       const result = await attemptItem(current, itemHeaders);
       const circuitTripped = handleReplayOutcome(current, result, state);
       if (circuitTripped) break;

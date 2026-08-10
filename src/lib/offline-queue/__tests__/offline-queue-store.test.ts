@@ -7,7 +7,13 @@
  */
 import type { PendingSync } from "@vettrack/contracts";
 
-import { QUEUE_STORAGE_KEY, readQueue, writeQueue } from "../offline-queue-store";
+import {
+  _clearLastDiscardedOfflineQueueRowsReportForTests,
+  getLastDiscardedOfflineQueueRowsReport,
+  QUEUE_STORAGE_KEY,
+  readQueue,
+  writeQueue,
+} from "../offline-queue-store";
 
 const mockMemoryStore = new Map<string, string>();
 
@@ -42,6 +48,7 @@ function makeItem(overrides: Partial<PendingSync> = {}): PendingSync {
 
 beforeEach(() => {
   mockMemoryStore.clear();
+  _clearLastDiscardedOfflineQueueRowsReportForTests();
 });
 
 describe("offline-queue-store", () => {
@@ -126,5 +133,45 @@ describe("offline-queue-store", () => {
     const reread = readQueue();
     expect(() => writeQueue([...reread, makeItem({ clientMutationId: "new" })])).not.toThrow();
     expect(readQueue().map((i) => i.clientMutationId)).toEqual(["new"]);
+  });
+
+  it("reports discarded invalid rows instead of dropping them silently (CodeRabbit PR #51 trivial finding)", () => {
+    const good = makeItem({ clientMutationId: "good" });
+    mockMemoryStore.set(
+      QUEUE_STORAGE_KEY,
+      JSON.stringify([
+        { ...good, createdAt: good.createdAt.toISOString(), updatedAt: good.updatedAt.toISOString() },
+        { clientMutationId: "malformed-1", status: "pending" },
+        { ...good, clientMutationId: "malformed-2", createdAt: "not-a-date" },
+      ]),
+    );
+
+    expect(getLastDiscardedOfflineQueueRowsReport()).toBeNull(); // nothing reported before reading
+
+    readQueue();
+
+    const report = getLastDiscardedOfflineQueueRowsReport();
+    expect(report).not.toBeNull();
+    expect(report?.count).toBe(2);
+    expect(report?.reason).toBe("invalid_entries");
+  });
+
+  it("does not report anything when every persisted row is valid", () => {
+    writeQueue([makeItem()]);
+    _clearLastDiscardedOfflineQueueRowsReportForTests();
+
+    readQueue();
+
+    expect(getLastDiscardedOfflineQueueRowsReport()).toBeNull();
+  });
+
+  it("reports an unparsable queue distinctly, so a fully-corrupt blob isn't invisible either", () => {
+    mockMemoryStore.set(QUEUE_STORAGE_KEY, "{not valid json");
+
+    readQueue();
+
+    const report = getLastDiscardedOfflineQueueRowsReport();
+    expect(report).not.toBeNull();
+    expect(report?.reason).toBe("unparsable_queue");
   });
 });
