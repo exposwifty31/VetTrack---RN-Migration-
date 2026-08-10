@@ -147,6 +147,18 @@ describe("CodeBlueActions", () => {
     expect(screen.queryByText("codeBlue.actions.startRequiresVet")).toBeNull();
   });
 
+  it("CodeRabbit PR #49 (Minor): renders nothing when identity SETTLED without data (no error) — the other half of the guard", async () => {
+    jest.mocked(useIdentity).mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useIdentity>);
+    mockSessionQuery({ data: { session: null } as unknown as ActiveCodeBlueResponse });
+    await render(<CodeBlueActions />);
+    expect(screen.queryByTestId("code-blue-actions")).toBeNull();
+    expect(screen.queryByText("codeBlue.actions.startRequiresVet")).toBeNull();
+  });
+
   it("CodeRabbit PR #49 (Major): never offers Start when the active-session query itself FAILED — a failed read is 'unknown', not 'no session', and must not risk a double-start", async () => {
     mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
     const refetch = jest.fn();
