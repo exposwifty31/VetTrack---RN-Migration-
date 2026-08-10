@@ -47,7 +47,9 @@ type ActiveView = Extract<CodeBlueViewState, { kind: "active" }>;
 function useTickingElapsedMs(startedAt: string): number {
   const [elapsedMs, setElapsedMs] = useState(0);
   useEffect(() => {
-    const tick = () => setElapsedMs(Math.max(0, Date.now() - Date.parse(startedAt)));
+    const startMs = Date.parse(startedAt);
+    // Invalid timestamp → zero elapsed, matching deriveCodeBlueView (never render NaN:NaN).
+    const tick = () => setElapsedMs(Number.isFinite(startMs) ? Math.max(0, Date.now() - startMs) : 0);
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);

@@ -208,5 +208,17 @@ describe("CodeBlueViewer", () => {
       expect(screen.queryByText("03:00")).toBeNull();
       expect(screen.getByText("03:05")).toBeTruthy();
     });
+
+    it("renders 00:00, never NaN:NaN, for an unparsable startedAt", async () => {
+      const invalid: ActiveCodeBlueResponse = {
+        ...ACTIVE,
+        session: { ...ACTIVE.session!, startedAt: "not-a-date" },
+      };
+      mockQuery({ data: invalid });
+      await render(<CodeBlueViewer />);
+      // Header elapsed clamps to 00:00 (the log entry's elapsedMs:0 also renders 00:00).
+      expect(screen.getAllByText("00:00").length).toBeGreaterThan(0);
+      expect(screen.queryByText("NaN:NaN")).toBeNull();
+    });
   });
 });
