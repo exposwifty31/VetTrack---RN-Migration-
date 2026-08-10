@@ -1,35 +1,21 @@
 /**
- * חירום tab — honest "בקרוב" placeholder. Emergency doctrine applies even to a
- * placeholder: danger-styled, ZERO glass/translucency, ZERO animation. The
- * Code Blue flows arrive in a later migration phase; this screen makes no
- * pretense of emergency capability.
+ * חירום tab — G4-1 read-only Code Blue viewer (was an honest "בקרוב"
+ * placeholder; Slice G4-1 fills it in). Emergency doctrine still applies:
+ * danger-styled, ZERO glass/translucency, ZERO animation — `CodeBlueViewer`
+ * carries the same constraints. This screen is READ-ONLY: no start/end/log
+ * affordance lives here yet, so it still makes no pretense of full emergency
+ * capability, just of visibility into what is already happening.
+ *
+ * Self-gated via BootstrapGate (the `MyEquipmentScreen`/`EquipmentListScreen`
+ * precedent) — identity must resolve before the active-session fetch fires.
  */
-import { Text, View } from "react-native";
-import { useTranslation } from "react-i18next";
-import { useUniwind } from "uniwind";
-
-import { EmergencyGlyph } from "@/components/home/icons";
+import { BootstrapGate } from "@/app/BootstrapGate";
+import { CodeBlueViewer } from "@/features/code-blue/CodeBlueViewer";
 
 export function EmergencyScreen() {
-  const { t } = useTranslation();
-  const { theme } = useUniwind();
-  const dangerSolid = theme === "light" ? "#B91C1C" : "#DC2626";
-
   return (
-    <View className="flex-1 items-center justify-center gap-3 bg-background px-8">
-      <View
-        className="h-14 w-14 items-center justify-center rounded-full"
-        style={{ backgroundColor: dangerSolid }}
-      >
-        <EmergencyGlyph color="#FFFFFF" />
-      </View>
-      <Text className="font-rubik-bold text-[22px] text-foreground">{t("tabs.emergency")}</Text>
-      <Text className="font-rubik-semibold text-[15px] text-danger">
-        {t("emergency.comingSoon")}
-      </Text>
-      <Text className="text-center font-rubik text-[13px] text-muted">
-        {t("emergency.subtitle")}
-      </Text>
-    </View>
+    <BootstrapGate>
+      <CodeBlueViewer />
+    </BootstrapGate>
   );
 }
