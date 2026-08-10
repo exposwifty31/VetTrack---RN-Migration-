@@ -218,7 +218,8 @@
   },
   "bootstrap": {
     "reauth": "פג תוקף החיבור. התחבר שוב כדי להמשיך.",
-    "retry": "נסה שוב"
+    "retry": "נסה שוב",
+    "signIn": "התחברות"
   },
   "equipment": {
     "listTitle": "ציוד",

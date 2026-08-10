@@ -210,7 +210,8 @@
   },
   "bootstrap": {
     "reauth": "Session expired. Sign in again to continue.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "signIn": "Sign in"
   },
   "equipment": {
     "listTitle": "Equipment",
