@@ -2,8 +2,9 @@
  * Code Blue types — mirrors the server response shape for
  * `GET /api/code-blue/sessions/active` (verified read-only against
  * `server/routes/code-blue.ts` + `server/schema/er.ts` on the vettrack repo,
- * 2026-08-10). G4-1 is READ-ONLY: no mutation request/response types live
- * here yet — those arrive with the write-path slice.
+ * 2026-08-10). G4-5 adds the mutation request/response types below, verified
+ * read-only against the same file's `startSessionSchema` / `logEntrySchema` /
+ * `endSessionSchema` and their route handlers (2026-08-10).
  */
 
 export type CodeBlueSessionStatus = "active" | "ended";
@@ -70,4 +71,52 @@ export type ActiveCodeBlueResponse = Readonly<{
   presence: readonly CodeBluePresenceRow[];
   cartStatus: CodeBlueCartStatus | null;
   linkedEquipment: readonly unknown[];
+}>;
+
+/** POST /api/code-blue/sessions body — mirrors `startSessionSchema`. */
+export type StartCodeBlueRequest = Readonly<{
+  managerUserId: string;
+  managerUserName: string;
+  preCheckPassed?: boolean;
+  localStartedAt?: string;
+  equipmentId?: string;
+}>;
+
+/** POST /api/code-blue/sessions response — `{ id, startedAt }` (route handler). */
+export type StartCodeBlueResponse = Readonly<{
+  id: string;
+  startedAt: string;
+}>;
+
+/** POST /api/code-blue/sessions/:id/logs body — mirrors `logEntrySchema`. */
+export type LogEntryRequest = Readonly<{
+  idempotencyKey: string;
+  elapsedMs: number;
+  label: string;
+  category: CodeBlueLogCategory;
+  equipmentId?: string;
+}>;
+
+/** POST /api/code-blue/sessions/:id/logs response — `{ id, duplicate }`. */
+export type LogEntryResponse = Readonly<{
+  id: string;
+  duplicate: boolean;
+}>;
+
+/** PATCH /api/code-blue/sessions/:id/end body — mirrors `endSessionSchema`. */
+export type EndSessionRequest = Readonly<{
+  outcome: CodeBlueSessionOutcome;
+  earlyStopReason?: string;
+}>;
+
+/** PATCH /api/code-blue/sessions/:id/end response — `{ id, endedAt, summary }`. `summary` is opaque JSON, not consumed client-side. */
+export type EndSessionResponse = Readonly<{
+  id: string;
+  endedAt: string;
+  summary: unknown;
+}>;
+
+/** PATCH /api/code-blue/sessions/:id/presence response — `{ ok: true }`. No request body. */
+export type PresenceResponse = Readonly<{
+  ok: boolean;
 }>;

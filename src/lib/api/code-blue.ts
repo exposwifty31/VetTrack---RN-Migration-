@@ -1,13 +1,22 @@
 /**
- * Code Blue API module — G4-1 READ-ONLY slice. Server truth (verified
- * read-only against `server/routes/code-blue.ts`, 2026-08-10):
+ * Code Blue API module. Server truth (verified read-only against
+ * `server/routes/code-blue.ts`, 2026-08-10):
  *
  *   - GET /api/code-blue/sessions/active  requireAuth (student+) — returns
  *     the current active session (or `session: null`) + log entries +
  *     presence + crash-cart status. Reads are universal.
+ *   - POST /api/code-blue/sessions              — start (G4-5)
+ *   - POST /api/code-blue/sessions/:id/logs      — add log entry (G4-5)
+ *   - PATCH /api/code-blue/sessions/:id/end      — end session (G4-5)
+ *   - PATCH /api/code-blue/sessions/:id/presence — presence heartbeat (G4-5)
  *
- * No mutation endpoints are wired here (start/end/log/presence) — this slice
- * is display-only by doctrine; write actions arrive in a later G4 slice.
+ * G4-5 doctrine: all four mutation endpoints below are on the emergency
+ * offline-block manifest (`@vettrack/contracts`) — an offline attempt throws
+ * `EmergencyOfflineError` from `authFetch` (via `requestJson`), NEVER queued
+ * or retried (see `src/lib/emergency-block.ts`, `auth-fetch.emergency.test.ts`
+ * which already proves this for all four endpoints). Nothing in this module
+ * catches or reroutes that error — it propagates to the mutation hook
+ * untouched, which is the contract `useCodeBlueMutations` relies on.
  *
  * DOCTRINE: `codeBlueKeys.active()` must NEVER be added to any React Query
  * persist include-list if one is introduced later (there is none today —
@@ -16,10 +25,20 @@
  * in this repo). Code Blue sessions are on the server's emergency
  * cache-denylist (vettrack CLAUDE.md "Frozen architecture surfaces") — the
  * client-side mirror of that rule is: this key stays in-memory-only, refetched
- * via SSE invalidation, never dehydrated to disk.
+ * via SSE invalidation or a mutation's own post-success invalidation, never
+ * dehydrated to disk.
  */
 import { requestJson } from "@/lib/api/coded-error";
-import type { ActiveCodeBlueResponse } from "@/types/code-blue";
+import type {
+  ActiveCodeBlueResponse,
+  EndSessionRequest,
+  EndSessionResponse,
+  LogEntryRequest,
+  LogEntryResponse,
+  PresenceResponse,
+  StartCodeBlueRequest,
+  StartCodeBlueResponse,
+} from "@/types/code-blue";
 
 /** Canonical Code Blue query-key factory — `active()` derives from `all` (single source of truth). */
 export const codeBlueKeys = {
@@ -63,4 +82,31 @@ export const codeBlueApi = {
   /** GET /api/code-blue/sessions/active — poll-shaped endpoint, fetched only on mount + SSE invalidation (never on a timer). */
   active: (): Promise<ActiveCodeBlueResponse> =>
     requestJson<ActiveCodeBlueResponse>("/api/code-blue/sessions/active"),
+
+  /** POST /api/code-blue/sessions — start a live session. Online-only (emergency-blocked offline). */
+  start: (payload: StartCodeBlueRequest): Promise<StartCodeBlueResponse> =>
+    requestJson<StartCodeBlueResponse>("/api/code-blue/sessions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  /** POST /api/code-blue/sessions/:id/logs — add a log entry. Online-only (emergency-blocked offline). */
+  addLogEntry: (sessionId: string, payload: LogEntryRequest): Promise<LogEntryResponse> =>
+    requestJson<LogEntryResponse>(`/api/code-blue/sessions/${encodeURIComponent(sessionId)}/logs`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  /** PATCH /api/code-blue/sessions/:id/end — close out (manager-only, server-enforced). Online-only. */
+  end: (sessionId: string, payload: EndSessionRequest): Promise<EndSessionResponse> =>
+    requestJson<EndSessionResponse>(`/api/code-blue/sessions/${encodeURIComponent(sessionId)}/end`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  /** PATCH /api/code-blue/sessions/:id/presence — heartbeat, no body. Online-only. */
+  presence: (sessionId: string): Promise<PresenceResponse> =>
+    requestJson<PresenceResponse>(`/api/code-blue/sessions/${encodeURIComponent(sessionId)}/presence`, {
+      method: "PATCH",
+    }),
 };
