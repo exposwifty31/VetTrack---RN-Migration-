@@ -140,6 +140,26 @@ describe("SseAdapter", () => {
     expect(events).toContainEqual({ kind: "reset", reason: "last_event_pruned" });
   });
 
+  it("reopening after a reset sends NO Last-Event-ID (G4-4: this is what makes a reset " +
+    "storm structurally unreachable — the pruned-cursor branch on the server only " +
+    "fires when a Last-Event-ID header is present)", async () => {
+    const { adapter, instances } = makeAdapter();
+    adapter.open();
+    await flush();
+    instances[0].fire(
+      "message",
+      msg({ type: "EQUIPMENT_UPDATED", payload: {}, timestamp: "t", id: 10, outboxId: 10 }),
+    );
+    instances[0].fire(
+      "message",
+      msg({ type: "RESET_STATE", payload: { reason: "last_event_pruned" }, timestamp: "t" }),
+    );
+    adapter.close();
+    adapter.open();
+    await flush();
+    expect(instances[1].options.headers["Last-Event-ID"]).toBeUndefined();
+  });
+
   it("tears down the previous EventSource on reopen — no stale callbacks", async () => {
     const { adapter, instances } = makeAdapter();
     const events: RealtimeEvent[] = [];
