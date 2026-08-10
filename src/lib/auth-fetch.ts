@@ -5,7 +5,8 @@
 
 import { resolveApiUrl } from "@/lib/api-origin";
 import { getCurrentUserId, getStoredBearerToken } from "@/lib/auth-store";
-import { emergencyOfflineErrorFromFailedDispatch } from "@/lib/emergency-block";
+import { emergencyOfflineErrorFromFailedDispatch, isNetworkFailure } from "@/lib/emergency-block";
+import { enqueueOfflineWrite } from "@/lib/offline-queue/offline-queue";
 
 type ClerkTokenGetter = (() => Promise<string | null>) | null;
 
@@ -108,6 +109,14 @@ export async function resolveBearerToken(): Promise<string | null> {
  * network-level rejection on a Code Blue mutation becomes a loud
  * `EmergencyOfflineError` (never queued, never retried); every other failure
  * — and every successful response — passes through 100% unchanged.
+ *
+ * G4-6: a network-level rejection on a NON-emergency write is additionally
+ * captured into the offline write-queue as a pure side effect (see
+ * `enqueueOfflineWrite`, which itself refuses GETs, non-`/api/*` paths, and
+ * — belt-and-suspenders — emergency endpoints). This does NOT change what
+ * this function throws: the caller still sees the original network error,
+ * byte-identical to the pre-G4-6 contract (`auth-fetch.emergency.test.ts`).
+ * Capturing the write for later replay is not the same as reporting success.
  */
 async function dispatchFetch(
   resolvedUrl: string,
@@ -119,6 +128,13 @@ async function dispatchFetch(
   } catch (err) {
     const blocked = emergencyOfflineErrorFromFailedDispatch(err, path, init.method ?? "GET");
     if (blocked) throw blocked;
+    if (isNetworkFailure(err)) {
+      enqueueOfflineWrite({
+        endpoint: path,
+        method: init.method ?? "GET",
+        body: typeof init.body === "string" ? init.body : "",
+      });
+    }
     throw err;
   }
 }

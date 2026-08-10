@@ -4,6 +4,15 @@
  * Doctrine under test: offline + emergency mutation → loud EmergencyOfflineError
  * (never queued/retried); offline + non-emergency → original network error
  * unchanged; online + emergency → passes through 100% untouched.
+ *
+ * G4-6 note: `dispatchFetch`'s offline + non-emergency branch now ALSO
+ * enqueues the write into the offline write-queue as a side effect (see
+ * `auth-fetch.offline-queue.test.ts`) — this suite still asserts the
+ * original network error propagates byte-identical, so the doctrine this
+ * file documents is unchanged. `@/lib/safe-storage` is mocked because that
+ * side effect now runs in the "offline + non-emergency" case below, and the
+ * real MMKV-backed adapter is unavailable under jest (same reason
+ * `locale-toggle.test.ts` mocks it).
  */
 import { authFetch } from "../auth-fetch";
 import { setCurrentUserId, setStoredBearerToken } from "../auth-store";
@@ -12,6 +21,16 @@ import {
   EmergencyOfflineError,
   readEmergencyBlockBuffer,
 } from "../emergency-block";
+
+const mockQueueStore = new Map<string, string>();
+jest.mock("@/lib/safe-storage", () => ({
+  safeStorageGetItem: jest.fn((key: string) => mockQueueStore.get(key) ?? null),
+  safeStorageSetItem: jest.fn((key: string, value: string) => {
+    mockQueueStore.set(key, value);
+    return true;
+  }),
+  safeStorageRemoveItem: jest.fn((key: string) => mockQueueStore.delete(key)),
+}));
 
 const realFetch = globalThis.fetch;
 const mockFetch = jest.fn();
