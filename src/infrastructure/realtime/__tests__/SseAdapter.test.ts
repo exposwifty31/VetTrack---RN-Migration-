@@ -207,6 +207,36 @@ describe("SseAdapter", () => {
     expect(adapter.getCursor()).toBe(0);
   });
 
+  it("ignores an SSE retry: control-line payload without dispatching a domain event or breaking subsequent parsing", async () => {
+    const { adapter, instances } = makeAdapter();
+    const events: RealtimeEvent[] = [];
+    adapter.subscribe((e) => events.push(e));
+    adapter.open();
+    await flush();
+    const before = events.length;
+
+    // Worst case for a naive line parser: a bare `retry:` control-line value
+    // reaches onMessage as `data` (react-native-sse never does this — it strips
+    // `retry:` before dispatch, see node_modules/react-native-sse/src/EventSource.js
+    // `_handleEvent`, which only calls `dispatch('message', ...)` when the parsed
+    // `data` array is non-empty — but this adapter must stay safe even if a future
+    // library version or a misbehaving factory ever forwarded it).
+    instances[0].fire("message", { type: "message", data: "retry: 3000" });
+    expect(events.length).toBe(before); // not mis-dispatched as a domain event
+    expect(adapter.getCursor()).toBe(0); // not mistaken for a numeric cursor
+
+    // Parsing must not be left broken for the next real frame.
+    instances[0].fire(
+      "message",
+      msg({ type: "EQUIPMENT_UPDATED", payload: {}, timestamp: "t", id: 7, outboxId: 7 }),
+    );
+    expect(adapter.getCursor()).toBe(7);
+    expect(events).toContainEqual({
+      kind: "event",
+      envelope: expect.objectContaining({ id: 7 }),
+    });
+  });
+
   it("maps an unknown RESET_STATE reason to last_event_unknown", async () => {
     const { adapter, instances } = makeAdapter();
     const events: RealtimeEvent[] = [];
