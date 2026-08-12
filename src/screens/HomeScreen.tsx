@@ -344,6 +344,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
         // G2.5 data seam: no notifications API yet — badge stays hidden.
         unreadCount={undefined}
         onSearchPress={() => navigation.navigate("EquipmentList")}
+        onBellPress={() => navigation.navigate("Alerts")}
         onSettingsPress={() => navigation.navigate("Menu")}
         onChatPress={() => navigation.navigate("ShiftChat")}
       />

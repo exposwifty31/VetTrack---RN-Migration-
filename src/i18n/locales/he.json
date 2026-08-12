@@ -142,7 +142,8 @@
     "searchA11y": "חיפוש",
     "settingsA11y": "הגדרות",
     "chatA11y": "צ'אט משמרת",
-    "attentionAllA11y": "כל ההתראות"
+    "attentionAllA11y": "כל ההתראות",
+    "alertsA11y": "התראות"
   },
   "tabs": {
     "today": "היום",

@@ -28,6 +28,8 @@ type GlassTopBarProps = Readonly<{
    */
   unreadCount?: number;
   onSearchPress: () => void;
+  /** Bell → alerts surface (the param-free "Alerts" route). */
+  onBellPress: () => void;
   onSettingsPress: () => void;
   /** G3 Slice 5: shift-chat launcher (Slice 8's surface, pre-wired here). */
   onChatPress?: () => void;
@@ -38,6 +40,7 @@ export function GlassTopBar({
   initial,
   unreadCount,
   onSearchPress,
+  onBellPress,
   onSettingsPress,
   onChatPress,
 }: GlassTopBarProps) {
@@ -106,8 +109,14 @@ export function GlassTopBar({
           <SearchIcon color={fg} />
         </PressableScale>
 
-        {/* G2.5 data seam: bell is a no-op until a notifications surface exists. */}
-        <View className="h-11 w-11 items-center justify-center">
+        {/* Bell → Alerts screen. Badge stays a data seam: unreadCount is
+            undefined until a caller derives an honest count — never fabricated. */}
+        <PressableScale
+          className="h-11 w-11 items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel={t("aurora.alertsA11y")}
+          onPress={onBellPress}
+        >
           <BellIcon color={fg} />
           {unreadCount != null && unreadCount > 0 ? (
             <View
@@ -122,7 +131,7 @@ export function GlassTopBar({
               </Text>
             </View>
           ) : null}
-        </View>
+        </PressableScale>
 
         <PressableScale
           className="h-11 w-11 items-center justify-center"

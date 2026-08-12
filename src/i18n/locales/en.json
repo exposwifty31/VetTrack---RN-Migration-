@@ -141,7 +141,8 @@
     "searchA11y": "Search",
     "settingsA11y": "Settings",
     "chatA11y": "Shift chat",
-    "attentionAllA11y": "All alerts"
+    "attentionAllA11y": "All alerts",
+    "alertsA11y": "Alerts"
   },
   "tabs": {
     "today": "Today",
