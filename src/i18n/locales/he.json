@@ -432,7 +432,15 @@
     "reading": "קורא…",
     "unsupported": "NFC אינו זמין במכשיר זה.",
     "readFailed": "לא ניתן לקרוא את התווית. נסה שוב.",
-    "noId": "אין מזהה ציוד בתווית זו."
+    "noId": "אין מזהה ציוד בתווית זו.",
+    "qrHint": "כוונו את קוד ה-QR אל תוך המסגרת",
+    "useNfc": "סריקה עם NFC",
+    "useQr": "סריקת QR (מצלמה)",
+    "cameraPermissionTitle": "נדרשת גישה למצלמה",
+    "cameraPermissionBody": "VetTrack משתמש במצלמה כדי לסרוק קודי QR של ציוד.",
+    "grantCamera": "אישור גישה למצלמה",
+    "cameraDenied": "הגישה למצלמה נדחתה. יש לאפשר אותה בהגדרות כדי לסרוק QR.",
+    "openSettings": "פתיחת הגדרות"
   },
   "confirm": {
     "title": "אישור סריקה",

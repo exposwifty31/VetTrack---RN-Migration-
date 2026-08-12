@@ -424,7 +424,15 @@
     "reading": "Reading…",
     "unsupported": "NFC is not available on this device.",
     "readFailed": "Could not read the tag. Try again.",
-    "noId": "No equipment id on this tag."
+    "noId": "No equipment id on this tag.",
+    "qrHint": "Point the QR code inside the frame",
+    "useNfc": "Scan with NFC",
+    "useQr": "Scan QR (camera)",
+    "cameraPermissionTitle": "Camera access needed",
+    "cameraPermissionBody": "VetTrack uses the camera to scan equipment QR codes.",
+    "grantCamera": "Grant camera access",
+    "cameraDenied": "Camera access was denied. Enable it in Settings to scan QR.",
+    "openSettings": "Open Settings"
   },
   "confirm": {
     "title": "Confirm scan",

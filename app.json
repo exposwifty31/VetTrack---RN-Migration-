@@ -75,6 +75,13 @@
           "includeNdefEntitlement": true
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "נדרשת גישה למצלמה לסריקת קודי QR של ציוד. VetTrack uses the camera to scan equipment QR codes.",
+          "recordAudioAndAskPermission": false
+        }
+      ],
       "expo-secure-store",
       "expo-web-browser",
       "expo-font",
