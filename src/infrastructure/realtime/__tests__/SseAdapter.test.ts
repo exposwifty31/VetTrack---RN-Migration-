@@ -270,3 +270,63 @@ describe("SseAdapter", () => {
     expect(events).toContainEqual({ kind: "reset", reason: "last_event_unknown" });
   });
 });
+
+describe("SseAdapter auth-rejected latch (stale-session hammering fix)", () => {
+  function makeMutableTokenAdapter() {
+    const instances: FakeEventSource[] = [];
+    const factory: SseFactory = (url, options) => {
+      const es = new FakeEventSource(url, options);
+      instances.push(es);
+      return es;
+    };
+    const tokenBox = { value: "a.b.c" };
+    const adapter = new SseAdapter({
+      factory,
+      resolveUrl: (p) => `https://x${p}`,
+      resolveToken: async () => tokenBox.value,
+      isValidToken: (t) => !!t && t.split(".").length === 3,
+    });
+    return { adapter, instances, tokenBox };
+  }
+
+  it("does NOT build a new connection for the SAME token after a 401/403-rejected stream", async () => {
+    const { adapter, instances } = makeMutableTokenAdapter();
+    adapter.open();
+    await flush();
+    expect(instances).toHaveLength(1);
+    instances[0].fire("error", { type: "error", xhrStatus: 403 });
+    expect(adapter.getState()).toBe("error");
+
+    adapter.open(); // e.g. an AppState flap or an auth "ready" re-fire with the same dead token
+    await flush();
+
+    expect(instances).toHaveLength(1); // no second EventSource — the hammering is gone
+    expect(adapter.getState()).toBe("error");
+  });
+
+  it("reconnects once the token CHANGES (real sign-in replaces the dead session)", async () => {
+    const { adapter, instances, tokenBox } = makeMutableTokenAdapter();
+    adapter.open();
+    await flush();
+    instances[0].fire("error", { type: "error", xhrStatus: 401 });
+
+    tokenBox.value = "d.e.f";
+    adapter.open();
+    await flush();
+
+    expect(instances).toHaveLength(2);
+    expect(instances[1].options.headers.Authorization).toBe("Bearer d.e.f");
+  });
+
+  it("keeps the old behavior for a NON-auth error (no xhrStatus) — next open() reconnects", async () => {
+    const { adapter, instances } = makeMutableTokenAdapter();
+    adapter.open();
+    await flush();
+    instances[0].fire("error", { type: "error" }); // network drop — transient, retry is fine
+
+    adapter.open();
+    await flush();
+
+    expect(instances).toHaveLength(2);
+  });
+});

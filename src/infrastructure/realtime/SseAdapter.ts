@@ -117,6 +117,17 @@ export class SseAdapter implements RealtimePort {
   private cursor = 0;
   private state: RealtimeConnectionState = "idle";
   private generation = 0;
+  /** Token of the CURRENT (or most recent) connection attempt. */
+  private lastToken: string | null = null;
+  /**
+   * Auth-rejected latch (physical-device finding, 2026-08-12): a stream the server
+   * rejected with 401/403 means the TOKEN is dead, not the network. Every external
+   * open() driver (AppState flaps, auth "ready" re-fires) would otherwise rebuild
+   * the connection ~2×/s forever against the same dead session. open() refuses to
+   * reconnect while resolveToken() still returns this exact token; a genuinely new
+   * token (sign-in, Clerk refresh) clears the latch by simply not matching.
+   */
+  private authRejectedToken: string | null = null;
 
   constructor(deps: SseAdapterDeps) {
     this.deps = deps;
@@ -152,6 +163,13 @@ export class SseAdapter implements RealtimePort {
           this.setState("error");
           return;
         }
+        if (this.authRejectedToken !== null && token === this.authRejectedToken) {
+          // The server already rejected this exact token (401/403) — reconnecting
+          // with it can only fail again. Stay in error until the token changes.
+          this.setState("error");
+          return;
+        }
+        this.lastToken = token;
         const url = this.deps.resolveUrl(this.deps.streamPath ?? DEFAULT_STREAM_PATH);
         // Never send the Bearer token over cleartext http:// (CWE-319). Refuse the
         // connect before EventSource ever sees the Authorization header. Dev opts
@@ -197,7 +215,17 @@ export class SseAdapter implements RealtimePort {
 
     es.addEventListener("open", guard(() => this.setState("open")));
     es.addEventListener("message", guard((event) => this.onMessage(event)));
-    es.addEventListener("error", guard(() => this.setState("error")));
+    es.addEventListener(
+      "error",
+      guard((event) => {
+        // react-native-sse surfaces the HTTP status of a rejected stream on the
+        // error event. 401/403 = the token is dead → arm the latch (see field doc).
+        if (event.xhrStatus === 401 || event.xhrStatus === 403) {
+          this.authRejectedToken = this.lastToken;
+        }
+        this.setState("error");
+      }),
+    );
     es.addEventListener("close", guard(() => this.setState("closed")));
   }
 

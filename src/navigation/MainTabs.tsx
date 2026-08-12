@@ -16,11 +16,11 @@ import { useUniwind } from "uniwind";
 import { useIdentity } from "@/app/useIdentity";
 import { EmergencyScreen } from "@/screens/EmergencyScreen";
 import { EquipmentListScreen } from "@/screens/EquipmentListScreen";
-import { HomeScreen } from "@/screens/HomeScreen";
 import { MenuScreen } from "@/screens/MenuScreen";
 import { MyEquipmentScreen } from "@/screens/MyEquipmentScreen";
 
 import { deriveMainTabSet, type MainTabName } from "./main-tab-set";
+import { TodayTabScreen } from "./TodayTabScreen";
 import type { MainTabParamList, MainTabScreenProps, RootStackScreenProps } from "./types";
 import { EmergencyGlyph, EquipmentGlyph, MenuGlyph, MineGlyph, TodayGlyph } from "@/components/home/icons";
 
@@ -37,6 +37,7 @@ function EquipmentTabScreen(props: MainTabScreenProps<"EquipmentTab">) {
     <EquipmentListScreen {...(props as unknown as RootStackScreenProps<"EquipmentList">)} />
   );
 }
+
 
 /**
  * MyEquipmentScreen is typed against its root-stack route (it stays registered
@@ -150,7 +151,7 @@ const renderAuroraTabBar = (props: BottomTabBarProps) => <AuroraTabBar {...props
 function renderTabScreen(name: MainTabName) {
   switch (name) {
     case "Today":
-      return <Tab.Screen key={name} name="Today" component={HomeScreen} />;
+      return <Tab.Screen key={name} name="Today" component={TodayTabScreen} />;
     case "EquipmentTab":
       return <Tab.Screen key={name} name="EquipmentTab" component={EquipmentTabScreen} />;
     case "Emergency":

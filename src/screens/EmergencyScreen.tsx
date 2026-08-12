@@ -13,15 +13,24 @@
  * precedent) — identity must resolve before the active-session fetch fires.
  */
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BootstrapGate } from "@/app/BootstrapGate";
 import { CodeBlueActions } from "@/features/code-blue/CodeBlueActions";
 import { CodeBlueViewer } from "@/features/code-blue/CodeBlueViewer";
 
 export function EmergencyScreen() {
+  // Tab mode has no native header, so this screen owns its TOP inset (the
+  // MineTabScreen precedent). Without it the vet-only banner painted OVER the
+  // status-bar row on notch devices — both platforms (G3 physical pass).
+  const insets = useSafeAreaInsets();
   return (
     <BootstrapGate>
-      <View className="flex-1 bg-background">
+      <View
+        testID="emergency-screen-root"
+        className="flex-1 bg-background"
+        style={{ paddingTop: insets.top }}
+      >
         <CodeBlueActions />
         <View className="flex-1">
           <CodeBlueViewer />

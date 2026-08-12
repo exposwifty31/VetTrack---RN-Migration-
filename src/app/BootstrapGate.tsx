@@ -19,7 +19,9 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { getCurrentUserId } from "@/lib/auth-store";
-import { isAuthSessionActive, subscribeAuthSession } from "@/infrastructure/auth/authSession";
+import { getAuthSession, isAuthSessionActive, subscribeAuthSession } from "@/infrastructure/auth/authSession";
+import { deregisterActivePushRegistration } from "@/infrastructure/push/active-registration";
+import { ApiCodedError } from "@/lib/api/coded-error";
 import type { RootStackParamList } from "@/navigation/types";
 
 import { resolveBootstrapView } from "./bootstrap-view";
@@ -37,6 +39,9 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
     hasUserId: !!getCurrentUserId(),
     effectiveRole: identity.data?.effectiveRole,
     hasActiveSession,
+    isAuthError:
+      identity.error instanceof ApiCodedError &&
+      (identity.error.status === 401 || identity.error.status === 403),
   });
 
   if (view.kind === "loading") {
@@ -68,7 +73,32 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
           </Text>
         </Pressable>
       ) : null}
-      {!view.canSignIn ? (
+      {view.canReauth ? (
+        <Pressable
+          className="items-center rounded-xl bg-primary px-6 py-3 active:opacity-80"
+          accessibilityRole="button"
+          onPress={() => {
+            // The active session is dead server-side (401/403 on identity): clear it
+            // and route to SignIn. Push deregister runs FIRST, while the bearer may
+            // still authenticate the DELETE (the active-registration seam).
+            void (async () => {
+              await deregisterActivePushRegistration();
+              try {
+                await getAuthSession().signOut();
+              } catch {
+                // A failed teardown still lands on SignIn — signing in installs a
+                // fresh session either way.
+              }
+              navigation.navigate("SignIn");
+            })();
+          }}
+        >
+          <Text className="text-[15px] font-semibold text-primary-foreground">
+            {t("bootstrap.reauthSignIn")}
+          </Text>
+        </Pressable>
+      ) : null}
+      {view.canRetry ? (
         <Pressable
           className="items-center rounded-xl border border-border px-6 py-3 active:opacity-80"
           accessibilityRole="button"
