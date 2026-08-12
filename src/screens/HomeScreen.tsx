@@ -345,7 +345,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
         unreadCount={undefined}
         onSearchPress={() => navigation.navigate("EquipmentList")}
         onBellPress={() => navigation.navigate("Alerts")}
-        onSettingsPress={() => navigation.navigate("Menu")}
+        onSettingsPress={() => navigation.navigate("Settings")}
         onChatPress={() => navigation.navigate("ShiftChat")}
       />
       <ShiftAdjustmentSheet

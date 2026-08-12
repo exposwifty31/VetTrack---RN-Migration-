@@ -26,15 +26,12 @@ import {
   isValidDisplayName,
 } from "@/lib/api/account";
 import { ApiCodedError } from "@/lib/api/coded-error";
-import { applyLocaleChange } from "@/features/account/locale-toggle";
 import {
   getAuthSession,
   isAuthSessionActive,
   subscribeAuthSession,
 } from "@/infrastructure/auth/authSession";
 import { deregisterActivePushRegistration } from "@/infrastructure/push/active-registration";
-import { type Locale } from "@/i18n/locale-resolver";
-import { isRtlReloadPending } from "@/i18n/rtl";
 import { AURORA_COLORS } from "@/theme/colors";
 
 /** FSI…PDI isolate so a Latin display name sits correctly in an RTL row. */
@@ -53,8 +50,8 @@ export function AccountSection({ onSignedOut }: Readonly<{ onSignedOut: () => vo
   return (
     <View className="gap-3">
       <DisplayNameCard />
-      <LanguageCard />
-      {/* Sign-out and account-deletion are offered only when an interactive
+      {/* Language now lives in Settings (single toggle, no duplicate). Sign-out
+          and account-deletion are offered only when an interactive
           session exists (hidden in dev-bypass). The port adapter — not this
           component — knows about Clerk. Delete sits last as the most
           destructive affordance. */}
@@ -192,81 +189,6 @@ function DisplayNameCard() {
         </PressableScale>
       </View>
     </SectionCard>
-  );
-}
-
-function LanguageCard() {
-  const { t, i18n } = useTranslation();
-  const active: Locale = i18n.language === "en" ? "en" : "he";
-  // Seeded from the current direction; updated from the change RESULT so the
-  // returned `reloadPending` (and a failed persist) are consumed, not recomputed.
-  const [reloadPending, setReloadPending] = useState(() => isRtlReloadPending(active));
-  const [persistFailed, setPersistFailed] = useState(false);
-
-  const choose = async (locale: Locale) => {
-    // After a failed persist, i18next already shows `locale`, so `active` equals
-    // it — allow the same-locale press through so the user can retry the write.
-    if (locale === active && !persistFailed) return;
-    setPersistFailed(false);
-    try {
-      const result = await applyLocaleChange(i18n, locale);
-      setReloadPending(result.reloadPending);
-      if (!result.persisted) setPersistFailed(true);
-    } catch {
-      setPersistFailed(true);
-    }
-  };
-
-  return (
-    <SectionCard>
-      <Text className="font-rubik text-[12.5px] text-text-tertiary">{t("account.language")}</Text>
-      <View className="mt-2 flex-row gap-2">
-        <LocaleOption
-          label={t("common.hebrew")}
-          selected={active === "he"}
-          onPress={() => void choose("he")}
-        />
-        <LocaleOption
-          label={t("common.english")}
-          selected={active === "en"}
-          onPress={() => void choose("en")}
-        />
-      </View>
-      {persistFailed ? (
-        <Text className="mt-2 font-rubik text-[12.5px] text-danger">{t("account.localeError")}</Text>
-      ) : reloadPending ? (
-        <Text className="mt-2 font-rubik text-[12.5px] text-warning">{t("account.restartHint")}</Text>
-      ) : null}
-    </SectionCard>
-  );
-}
-
-function LocaleOption({
-  label,
-  selected,
-  onPress,
-}: Readonly<{ label: string; selected: boolean; onPress: () => void }>) {
-  return (
-    <PressableScale
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      className={
-        selected
-          ? "min-h-[44px] flex-1 items-center justify-center rounded-md border border-primary bg-surface-raised px-4"
-          : "min-h-[44px] flex-1 items-center justify-center rounded-md border border-border bg-surface px-4"
-      }
-      onPress={onPress}
-    >
-      <Text
-        className={
-          selected
-            ? "font-rubik-semibold text-[15px] text-foreground"
-            : "font-rubik-medium text-[15px] text-muted"
-        }
-      >
-        {label}
-      </Text>
-    </PressableScale>
   );
 }
 

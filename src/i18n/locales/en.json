@@ -78,7 +78,8 @@
     "shiftChat": "Shift chat",
     "handoff": "Handoff",
     "inventory": "Inventory",
-    "autopilotQueue": "Autopilot queue"
+    "autopilotQueue": "Autopilot queue",
+    "settings": "Settings"
   },
   "home": {
     "title": "VetTrack",
@@ -238,6 +239,13 @@
       "account": "Account",
       "developer": "Developer tools"
     }
+  },
+  "settings": {
+    "notifications": "Notifications",
+    "notificationsPlaceholder": "Notification preferences are coming soon.",
+    "about": "About",
+    "version": "Version {{version}}",
+    "privacyPolicy": "Privacy Policy"
   },
   "account": {
     "displayName": "Display name",

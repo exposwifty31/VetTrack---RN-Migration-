@@ -79,7 +79,8 @@
     "shiftChat": "צ'אט משמרת",
     "handoff": "העברת משמרת",
     "inventory": "מלאי",
-    "autopilotQueue": "תור האוטופיילוט"
+    "autopilotQueue": "תור האוטופיילוט",
+    "settings": "הגדרות"
   },
   "home": {
     "title": "VetTrack",
@@ -246,6 +247,13 @@
       "account": "חשבון",
       "developer": "כלי פיתוח ובדיקה"
     }
+  },
+  "settings": {
+    "notifications": "התראות",
+    "notificationsPlaceholder": "העדפות ההתראות יתווספו בקרוב.",
+    "about": "אודות",
+    "version": "גרסה {{version}}",
+    "privacyPolicy": "מדיניות פרטיות"
   },
   "account": {
     "displayName": "שם תצוגה",

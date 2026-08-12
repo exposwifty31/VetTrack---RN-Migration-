@@ -18,6 +18,7 @@ import { RealtimeDebugScreen } from "../screens/RealtimeDebugScreen";
 import { RoomDetailScreen } from "../screens/RoomDetailScreen";
 import { RoomsScreen } from "../screens/RoomsScreen";
 import { ScanScreen } from "../screens/ScanScreen";
+import { SettingsScreen } from "../screens/SettingsScreen";
 import { ShiftChatScreen } from "../screens/ShiftChatScreen";
 import { SignInScreen } from "../screens/SignInScreen";
 import { StorageDebugScreen } from "../screens/StorageDebugScreen";
@@ -140,6 +141,7 @@ export function RootNavigator() {
       }}
     >
       <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t("nav.settings") }} />
       <Stack.Screen
         name="EquipmentList"
         component={EquipmentListScreen}

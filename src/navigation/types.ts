@@ -45,6 +45,9 @@ export type RootStackParamList = {
   Handoff: undefined;
   Inventory: undefined;
   AutopilotQueue: undefined;
+  // Settings — the home gear's real destination (param-free root-stack route,
+  // distinct from the Menu tab the gear used to open by mistake).
+  Settings: undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<
