@@ -266,7 +266,8 @@
   "bootstrap": {
     "reauth": "Session expired. Sign in again to continue.",
     "retry": "Try again",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "reauthSignIn": "Sign in again"
   },
   "equipment": {
     "listTitle": "Equipment",

@@ -15,12 +15,19 @@ export interface BootstrapViewInput {
   hasUserId: boolean;
   effectiveRole: string | null | undefined;
   hasActiveSession: boolean;
+  /**
+   * The identity query failed with a 401/403 coded error. With an ACTIVE session
+   * that means the session itself is dead server-side (revoked user, clinic
+   * reassignment, stale device session) — retry can only fail; the affordance
+   * must be sign-out-and-sign-in.
+   */
+  isAuthError?: boolean;
 }
 
 export type BootstrapView =
   | { kind: "loading" }
   | { kind: "ready" }
-  | { kind: "reauth"; canSignIn: boolean };
+  | { kind: "reauth"; canSignIn: boolean; canReauth: boolean };
 
 export function resolveBootstrapView(input: BootstrapViewInput): BootstrapView {
   if (input.isPending) return { kind: "loading" };
@@ -29,5 +36,9 @@ export function resolveBootstrapView(input: BootstrapViewInput): BootstrapView {
     input.isSuccess && input.hasUserId && hasRoleAtLeast(input.effectiveRole, "student");
   if (ready) return { kind: "ready" };
 
-  return { kind: "reauth", canSignIn: !input.hasActiveSession };
+  return {
+    kind: "reauth",
+    canSignIn: !input.hasActiveSession,
+    canReauth: input.hasActiveSession && input.isAuthError === true,
+  };
 }

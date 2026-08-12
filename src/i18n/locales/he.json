@@ -274,7 +274,8 @@
   "bootstrap": {
     "reauth": "פג תוקף החיבור. התחבר שוב כדי להמשיך.",
     "retry": "נסה שוב",
-    "signIn": "התחברות"
+    "signIn": "התחברות",
+    "reauthSignIn": "התחברות מחדש"
   },
   "equipment": {
     "listTitle": "ציוד",
