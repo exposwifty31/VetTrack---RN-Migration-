@@ -34,9 +34,11 @@ type AuthChangeSubscribe = (listener: (change: AuthChange) => void) => () => voi
  *     Android creates the immutable channel BEFORE the token fetch (Android 13+).
  *   - Token rotation: APNs/FCM can roll the native token while the app runs; the
  *     old token stops delivering. A rotation listener re-registers the replacement
- *     while an authenticated user is active (only AFTER the initial registration
- *     succeeded — the flow above owns the first POST) and is removed with the
- *     registration effect.
+ *     while an authenticated user is active and is removed with the registration
+ *     effect. Submissions are ORDER-SAFE: every register() takes a monotonic seq
+ *     and only the highest seq commits, so overlapping registers resolving out of
+ *     order always leave the NEWEST token as the deregister target; a rotation
+ *     arriving before the initial POST is deferred (newest only) and wins after it.
  *   - Deregister on sign-out: the AUTHENTICATED path is the sign-out UI calling
  *     `deregisterActivePushRegistration()` BEFORE tearing the session down (the
  *     bearer is still valid there — see active-registration.ts). The "cleared"
@@ -78,24 +80,46 @@ export function PushBridge({
   useEffect(() => {
     if (!identityReady) return;
     let cancelled = false;
-    // Rotation listener lives exactly as long as this registration attempt. It
-    // re-registers only when an initial registration already succeeded — before
-    // that, the async flow below owns the first POST.
+    // Rotation ordering (PR #54 round-2): register() calls may overlap and resolve
+    // out of order, so each submission takes a monotonic seq and only the HIGHEST
+    // seq ever commits (registeredToken + active-registration) — a late-resolving
+    // stale register can no longer overwrite the newest token as the deregister
+    // target. A rotation arriving before the flow below reaches its own POST is
+    // cached (newest only) and submitted right after it, where its higher seq wins.
+    let nextSeq = 0;
+    let committedSeq = 0;
+    let submitAllowed = false;
+    let pendingRotation: PushDeviceToken | null = null;
+
+    const submit = (token: PushDeviceToken, label: string) => {
+      const seq = ++nextSeq;
+      void port
+        .register(token)
+        .then(() => {
+          if (cancelled || seq <= committedSeq) return; // a newer token already committed
+          committedSeq = seq;
+          registeredToken.current = token;
+          setActivePushRegistration(port, token);
+        })
+        .catch((err) => {
+          console.warn(`[push] ${label} registration failed (non-fatal):`, err);
+        });
+    };
+
+    // Rotation listener lives exactly as long as this registration attempt.
     const stopTokenListener = port.addTokenListener((rotated) => {
       if (cancelled) return;
       const current = registeredToken.current;
-      if (!current) return;
-      if (current.platform === rotated.platform && current.token === rotated.token) return;
-      void port
-        .register(rotated)
-        .then(() => {
-          if (cancelled) return;
-          registeredToken.current = rotated;
-          setActivePushRegistration(port, rotated);
-        })
-        .catch((err) => {
-          console.warn("[push] rotated-token registration failed (non-fatal):", err);
-        });
+      if (current && current.platform === rotated.platform && current.token === rotated.token) {
+        return;
+      }
+      if (!submitAllowed) {
+        // Permission/token flow hasn't cleared yet — nothing may POST. Keep only
+        // the newest rotation; it is submitted after the initial token.
+        pendingRotation = rotated;
+        return;
+      }
+      submit(rotated, "rotated-token");
     });
     void (async () => {
       // `cancelled` is re-checked after EVERY await: an unmount / identity swap
@@ -106,10 +130,15 @@ export function PushBridge({
       if (!granted || cancelled) return;
       const token = await port.getDeviceToken();
       if (!token || cancelled) return;
-      await port.register(token);
-      if (cancelled) return;
-      registeredToken.current = token;
-      setActivePushRegistration(port, token);
+      submitAllowed = true;
+      submit(token, "initial");
+      // Assertion, not annotation: TS's flow analysis cannot see the
+      // listener-callback assignment and narrows this read to `null` otherwise.
+      const rotated = pendingRotation as PushDeviceToken | null;
+      pendingRotation = null;
+      if (rotated && (rotated.platform !== token.platform || rotated.token !== token.token)) {
+        submit(rotated, "rotated-token"); // higher seq — the newest token wins
+      }
     })().catch((err) => {
       console.warn("[push] registration skipped/failed (non-fatal):", err);
     });
