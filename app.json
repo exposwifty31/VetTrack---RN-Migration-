@@ -86,6 +86,12 @@
           "enableBackgroundRemoteNotifications": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c45b4abf-8c8e-4bb6-b977-b258d632436e"
+      }
+    },
+    "owner": "exposwifty31"
   }
 }
