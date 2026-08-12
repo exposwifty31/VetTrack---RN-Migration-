@@ -5,10 +5,10 @@
  *     Inventory, Autopilot), each a param-free `navigation.navigate`.
  *   • Session — End shift → Handoff.
  *   • Account — display-name edit, locale toggle, sign out (AccountSection).
- *   • Developer — every debug screen from the old Menu, preserved under a
- *     collapsible section (default-collapsed to keep the front door clean, but
- *     ALWAYS rendered so nothing is lost — critically, G2Measure stays reachable
- *     on a `__DEV__ === false` release build, which the G3 exit-pass depends on).
+ *   • Developer — debug launchers, BUILD-GATED (Settings wave): shown only in a
+ *     `__DEV__` build, and G2Measure only when EXPO_PUBLIC_ENABLE_MEASURE="true"
+ *     (a measurement build — the G3 exit-pass path). A real release shows none,
+ *     and the section renders nothing (see `computeDeveloperEntries`).
  *
  * The route map is compile-checked in `menu/menu-routes.ts` (every entry is a
  * param-free root-stack route). Aurora: opaque grouped `SectionCard`s, zero blur
@@ -66,16 +66,19 @@ export function MenuScreen({ navigation }: MainTabScreenProps<"Menu">) {
 }
 
 /**
- * Developer tools — collapsed by default (kept out of the daily-driver's way) but
- * ALWAYS rendered so every debug screen stays reachable, including on a release
- * build where `__DEV__` is false. G2Measure has no other UI entry point and the
- * exit-pass runs it on the release artifact, so it must not be `__DEV__`-gated.
+ * Developer tools — collapsed by default. Build-gated via `DEVELOPER_ENTRIES`
+ * (`computeDeveloperEntries`): a real release has no entries, so this renders
+ * nothing. G2Measure survives on a measurement build (EXPO_PUBLIC_ENABLE_MEASURE
+ * = "true") for the exit-pass; the SignIn screen stays registered regardless.
  */
 function DeveloperGroup({ onSelect }: Readonly<{ onSelect: (entry: MenuEntry) => void }>) {
   const { t } = useTranslation();
   // Client UI state lives in the Zustand app store, not local component state.
   const expanded = useAppStore((state) => state.developerMenuExpanded);
   const toggle = useAppStore((state) => state.toggleDeveloperMenu);
+  // A real release build has no developer entries → render nothing (no empty
+  // section, no dev tools). Hooks above stay unconditional (React rules).
+  if (DEVELOPER_ENTRIES.length === 0) return null;
   return (
     <View className="gap-3">
       <PressableScale
