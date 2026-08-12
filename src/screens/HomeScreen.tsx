@@ -21,7 +21,8 @@
  * Blur budget: GlassTopBar (T1) is the screen's ONLY blur layer. The
  * shift-adjustment sheet's T2 glass lives in a transient Modal — present only
  * while the sheet is open (the Tasks-sheet precedent, within the ≤2-tier
- * budget).
+ * budget). The quick-search overlay is a transient Modal too, but BLUR-FREE
+ * (dim backdrop + opaque surface), so it adds no blur layer.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
@@ -42,6 +43,7 @@ import { AttentionCard } from "@/components/home/AttentionCard";
 import { ExceptionsCard } from "@/components/home/ExceptionsCard";
 import { GlassTopBar, TOP_BAR_HEIGHT } from "@/components/home/GlassTopBar";
 import { GreetingHeader } from "@/components/home/GreetingHeader";
+import { QuickSearchOverlay } from "@/components/home/QuickSearchOverlay";
 import { resolveHomeColumns } from "@/components/home/home-bento-layout";
 import { HomeChipsRow } from "@/components/home/HomeChipsRow";
 import {
@@ -227,6 +229,8 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
   const heroState = deriveShiftHeroState(dashboard);
   const [sheetKind, setSheetKind] = useState<ShiftAdjustmentKind | null>(null);
   const closeSheet = useCallback(() => setSheetKind(null), []);
+  // Quick equipment search opens IN PLACE (a transient overlay), not a navigate.
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const activityItems = activityQuery.data
     ? flattenActivityPages(activityQuery.data.pages)
@@ -343,7 +347,7 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
         initial={initial}
         // G2.5 data seam: no notifications API yet — badge stays hidden.
         unreadCount={undefined}
-        onSearchPress={() => navigation.navigate("EquipmentList")}
+        onSearchPress={() => setSearchOpen(true)}
         onBellPress={() => navigation.navigate("Alerts")}
         onSettingsPress={() => navigation.navigate("Settings")}
         onChatPress={() => navigation.navigate("ShiftChat")}
@@ -353,6 +357,14 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
         shiftStart={clockTimeFromIso(dashboard?.shift?.startedAt)}
         shiftEnd={clockTimeFromIso(dashboard?.shift?.endsAt)}
         onClose={closeSheet}
+      />
+      <QuickSearchOverlay
+        visible={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onSelect={(equipmentId) => {
+          setSearchOpen(false);
+          navigation.navigate("EquipmentDetail", { equipmentId });
+        }}
       />
     </View>
   );
