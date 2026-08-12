@@ -96,7 +96,15 @@ export function PushBridge({
       void port
         .register(token)
         .then(() => {
-          if (cancelled || seq <= committedSeq) return; // a newer token already committed
+          if (cancelled || seq <= committedSeq) {
+            // register() is a durable server request with no abort seam: it can
+            // complete after teardown, or after a newer token already committed.
+            // Left alone, that subscription would exist on the server UNTRACKED by
+            // the sign-out deregister path — compensate with an immediate
+            // best-effort DELETE while the bearer may still be valid.
+            void port.deregister(token).catch(() => {});
+            return;
+          }
           committedSeq = seq;
           registeredToken.current = token;
           setActivePushRegistration(port, token);

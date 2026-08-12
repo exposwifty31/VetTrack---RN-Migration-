@@ -146,6 +146,64 @@ describe("PushBridge token rotation", () => {
     await view.unmount();
   });
 
+  it("wins the TRUE initial-POST race: rotation during the in-flight initial register", async () => {
+    const gates = new Map<string, { resolve: () => void }>();
+    const h = makeHarness({
+      register: (token) => {
+        h.registered.push(token);
+        let release!: () => void;
+        const promise = new Promise<void>((r) => {
+          release = r;
+        });
+        gates.set(token.token, { resolve: release });
+        return promise; // EVERY register held — the initial POST is genuinely in flight
+      },
+    });
+    const view = await render(<PushBridge port={h.port} onAuthChange={h.onAuthChange} />);
+    await act(async () => {});
+    expect(h.registered).toEqual([TOKEN]); // initial POST started, unresolved
+
+    await h.rotate(ROTATED); // rotation lands DURING the initial POST
+    expect(h.registered).toEqual([TOKEN, ROTATED]);
+
+    await act(async () => {
+      gates.get(ROTATED.token)!.resolve(); // rotated resolves FIRST
+    });
+    await act(async () => {
+      gates.get(TOKEN.token)!.resolve(); // initial resolves late — must not win
+    });
+
+    await h.fireAuth("cleared");
+    // The late stale initial resolve is compensated with an immediate DELETE, and
+    // sign-out deregisters the newest (rotated) token.
+    expect(h.deregistered).toEqual([TOKEN, ROTATED]);
+
+    await view.unmount();
+  });
+
+  it("compensates a register that completes after cleanup (no orphan subscription)", async () => {
+    const gate = deferred<void>();
+    const h = makeHarness({
+      register: (token) => {
+        h.registered.push(token);
+        return gate.promise; // initial register still in flight at unmount
+      },
+    });
+    const view = await render(<PushBridge port={h.port} onAuthChange={h.onAuthChange} />);
+    await act(async () => {});
+    expect(h.registered).toEqual([TOKEN]);
+
+    await view.unmount(); // cleanup while the POST is pending
+
+    await act(async () => {
+      gate.resolve(); // the durable server request completes anyway
+    });
+
+    // The completed-but-unwanted subscription is deleted best-effort instead of
+    // being silently dropped from tracking.
+    expect(h.deregistered).toEqual([TOKEN]);
+  });
+
   it("keeps the newest rotation when two in-flight registers resolve out of order", async () => {
     const ROTATED_B: PushDeviceToken = { platform: "ios", token: "tok-rotated-b" };
     const gates = new Map<string, { promise: Promise<void>; resolve: () => void }>();
@@ -178,7 +236,9 @@ describe("PushBridge token rotation", () => {
     });
 
     await h.fireAuth("cleared");
-    expect(h.deregistered).toEqual([ROTATED]); // the newest token, not the late-resolving stale one
+    // The stale late resolve (B) is compensated with an immediate DELETE; sign-out
+    // then deregisters the newest token (C) — never the other way around.
+    expect(h.deregistered).toEqual([ROTATED_B, ROTATED]);
 
     await view.unmount();
   });
