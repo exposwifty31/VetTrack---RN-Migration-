@@ -6,10 +6,22 @@ import { type AuthChange, subscribeAuthChange } from "@/lib/auth-fetch";
 import { getCurrentUserId } from "@/lib/auth-store";
 import { navigateToEmergency, navigateToMain } from "@/navigation/navigationRef";
 
+import {
+  deregisterActivePushRegistration,
+  setActivePushRegistration,
+} from "./active-registration";
 import { getDefaultPushPort } from "./defaultPush";
 import { resolvePushNavTarget } from "./push-deep-link";
 
 type AuthChangeSubscribe = (listener: (change: AuthChange) => void) => () => void;
+
+// Module scope ON PURPOSE (outlives effect generations and remounts): counts
+// in-flight register() calls per token VALUE. A stale completion may compensate
+// with a DELETE only when no live registration of the same value remains —
+// otherwise it would remove the row a committed/in-flight twin still owns
+// (PR #54 round 4).
+const inFlightRegisters = new Map<string, number>();
+const tokenKey = (t: PushDeviceToken) => `${t.platform}:${t.token}`;
 
 /**
  * Native push lifecycle (G4-3) — a headless bridge mounted at App level, mirroring
@@ -28,12 +40,21 @@ type AuthChangeSubscribe = (listener: (change: AuthChange) => void) => () => voi
  *     identity has resolved AND a userId is set — authFetch guards every /api route
  *     except /users/me on a non-null userId, so registering earlier would throw.
  *     Android creates the immutable channel BEFORE the token fetch (Android 13+).
- *   - Deregister on sign-out: BEST-EFFORT ONLY. The "cleared" signal fires AFTER
- *     the Clerk token getter is torn down, so authFetch throws AUTH_INVALID and the
- *     DELETE is a no-op under Clerk sign-out BY CONSTRUCTION (it succeeds only where
- *     a stored bearer survives — the dev path). Orphaned tokens are pruned
- *     server-side on delivery failure. Left best-effort to avoid touching the frozen
- *     ClerkTokenBridge / AuthSessionPort sign-out wiring.
+ *   - Token rotation: APNs/FCM can roll the native token while the app runs; the
+ *     old token stops delivering. A rotation listener re-registers the replacement
+ *     while an authenticated user is active and is removed with the registration
+ *     effect. Submissions are ORDER-SAFE: every register() takes a monotonic seq
+ *     and only the highest seq commits, so overlapping registers resolving out of
+ *     order always leave the NEWEST token as the deregister target; a rotation
+ *     arriving before the initial POST is deferred (newest only) and wins after it.
+ *   - Deregister on sign-out: the AUTHENTICATED path is the sign-out UI calling
+ *     `deregisterActivePushRegistration()` BEFORE tearing the session down (the
+ *     bearer is still valid there — see active-registration.ts). The "cleared"
+ *     handler below is the take-once FALLBACK for teardowns that skipped that seam
+ *     (session expiry, dev path); it fires after the Clerk getter is gone, so its
+ *     DELETE succeeds only where a stored bearer survives. Orphans are pruned
+ *     server-side on delivery failure. The frozen ClerkTokenBridge /
+ *     AuthSessionPort wiring stays untouched.
  */
 export function PushBridge({
   port = getDefaultPushPort(),
@@ -67,34 +88,110 @@ export function PushBridge({
   useEffect(() => {
     if (!identityReady) return;
     let cancelled = false;
+    // Rotation ordering (PR #54 round-2): register() calls may overlap and resolve
+    // out of order, so each submission takes a monotonic seq and only the HIGHEST
+    // seq ever commits (registeredToken + active-registration) — a late-resolving
+    // stale register can no longer overwrite the newest token as the deregister
+    // target. A rotation arriving before the flow below reaches its own POST is
+    // cached (newest only) and submitted right after it, where its higher seq wins.
+    let nextSeq = 0;
+    let committedSeq = 0;
+    let submitAllowed = false;
+    let pendingRotation: PushDeviceToken | null = null;
+
+    const submit = (token: PushDeviceToken, label: string) => {
+      const seq = ++nextSeq;
+      const key = tokenKey(token);
+      inFlightRegisters.set(key, (inFlightRegisters.get(key) ?? 0) + 1);
+      const settle = () => {
+        const left = (inFlightRegisters.get(key) ?? 1) - 1;
+        if (left <= 0) inFlightRegisters.delete(key);
+        else inFlightRegisters.set(key, left);
+      };
+      void port
+        .register(token)
+        .then(() => {
+          settle();
+          if (cancelled || seq <= committedSeq) {
+            // register() is a durable server request with no abort seam: it can
+            // complete after teardown, or after a newer token already committed.
+            // Left alone, that subscription would exist on the server UNTRACKED by
+            // the sign-out deregister path — compensate with an immediate
+            // best-effort DELETE while the bearer may still be valid. NEVER when a
+            // twin of the same value is committed or still in flight: the DELETE
+            // is token-scoped server-side and would remove the row the live
+            // registration owns.
+            const committed = registeredToken.current;
+            const ownedByCommitted =
+              committed !== null &&
+              committed.platform === token.platform &&
+              committed.token === token.token;
+            if (!ownedByCommitted && !inFlightRegisters.has(key)) {
+              void port.deregister(token).catch(() => {});
+            }
+            return;
+          }
+          committedSeq = seq;
+          registeredToken.current = token;
+          setActivePushRegistration(port, token);
+        })
+        .catch((err) => {
+          settle();
+          console.warn(`[push] ${label} registration failed (non-fatal):`, err);
+        });
+    };
+
+    // Rotation listener lives exactly as long as this registration attempt.
+    const stopTokenListener = port.addTokenListener((rotated) => {
+      if (cancelled) return;
+      const current = registeredToken.current;
+      if (current && current.platform === rotated.platform && current.token === rotated.token) {
+        return;
+      }
+      if (!submitAllowed) {
+        // Permission/token flow hasn't cleared yet — nothing may POST. Keep only
+        // the newest rotation; it is submitted after the initial token.
+        pendingRotation = rotated;
+        return;
+      }
+      submit(rotated, "rotated-token");
+    });
     void (async () => {
+      // `cancelled` is re-checked after EVERY await: an unmount / identity swap
+      // mid-flight must not prompt for permission or register a stale attempt.
       await port.ensureEmergencyChannel();
+      if (cancelled) return;
       const granted = await port.requestPermission();
       if (!granted || cancelled) return;
       const token = await port.getDeviceToken();
       if (!token || cancelled) return;
-      await port.register(token);
-      if (!cancelled) registeredToken.current = token;
+      submitAllowed = true;
+      submit(token, "initial");
+      // Assertion, not annotation: TS's flow analysis cannot see the
+      // listener-callback assignment and narrows this read to `null` otherwise.
+      const rotated = pendingRotation as PushDeviceToken | null;
+      pendingRotation = null;
+      if (rotated && (rotated.platform !== token.platform || rotated.token !== token.token)) {
+        submit(rotated, "rotated-token"); // higher seq — the newest token wins
+      }
     })().catch((err) => {
       console.warn("[push] registration skipped/failed (non-fatal):", err);
     });
     return () => {
       cancelled = true;
+      stopTokenListener();
     };
   }, [port, identityReady, userId]);
 
-  // Best-effort deregister on sign-out (see the header caveat).
+  // Take-once fallback deregister on "cleared" (see the header caveat — the
+  // authenticated path already ran in the sign-out UI, making this a no-op).
   useEffect(() => {
     return onAuthChange((change) => {
       if (change !== "cleared") return;
-      const token = registeredToken.current;
-      if (!token) return;
       registeredToken.current = null;
-      port.deregister(token).catch(() => {
-        // Expected under Clerk sign-out (Bearer already gone). Non-fatal.
-      });
+      void deregisterActivePushRegistration();
     });
-  }, [port, onAuthChange]);
+  }, [onAuthChange]);
 
   return null;
 }

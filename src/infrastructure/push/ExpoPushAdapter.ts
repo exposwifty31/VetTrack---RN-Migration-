@@ -37,6 +37,16 @@ function readData(response: Notifications.NotificationResponse): PushData {
   return data && typeof data === "object" ? (data as Record<string, unknown>) : undefined;
 }
 
+// Single mapping gate for BOTH the startup fetch and the rotation listener: only
+// a non-empty ios/android token may ever reach the server.
+function toDeviceToken(devicePushToken: { type: string; data: unknown }): PushDeviceToken | null {
+  const platform = toPushPlatform(String(devicePushToken.type));
+  if (!platform) return null; // web / macos / windows — not a native mobile target
+  const token = String(devicePushToken.data).trim();
+  if (!token) return null;
+  return { platform, token };
+}
+
 /**
  * expo-notifications adapter for the ADR-009 supplementary push channel. Uses the
  * NATIVE device token (APNs/FCM) — never an Expo push token — because the server
@@ -60,12 +70,12 @@ export class ExpoPushAdapter implements PushPort {
     // Physical-device gate: getDevicePushTokenAsync throws on the iOS simulator
     // (no APNs). A non-device is an environment SKIP — return null, not throw.
     if (!Device.isDevice) return null;
+    // Port contract: null when permission is not granted. Enforced HERE, not only
+    // in the bridge's call order — direct PushPort callers get the guarantee too.
+    const permission = await Notifications.getPermissionsAsync();
+    if (!permission.granted) return null;
     const devicePushToken = await Notifications.getDevicePushTokenAsync();
-    const platform = toPushPlatform(String(devicePushToken.type));
-    if (!platform) return null; // web / macos / windows — not a native mobile target
-    const token = String(devicePushToken.data).trim();
-    if (!token) return null;
-    return { platform, token };
+    return toDeviceToken(devicePushToken);
   }
 
   async register(token: PushDeviceToken): Promise<void> {
@@ -115,6 +125,14 @@ export class ExpoPushAdapter implements PushPort {
   addResponseListener(onResponse: PushResponseHandler): () => void {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       onResponse(readData(response));
+    });
+    return () => subscription.remove();
+  }
+
+  addTokenListener(onToken: (token: PushDeviceToken) => void): () => void {
+    const subscription = Notifications.addPushTokenListener((devicePushToken) => {
+      const token = toDeviceToken(devicePushToken);
+      if (token) onToken(token);
     });
     return () => subscription.remove();
   }
