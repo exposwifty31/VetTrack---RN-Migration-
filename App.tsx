@@ -24,6 +24,7 @@ import { PushBridge } from "./src/infrastructure/push/PushBridge";
 import { RealtimeBridge } from "./src/infrastructure/realtime/RealtimeBridge";
 import { i18n } from "./src/i18n";
 import { installDevAuthSeam } from "./src/lib/dev-auth";
+import { OfflineQueueBridge } from "./src/lib/offline-queue/OfflineQueueBridge";
 import { queryClient } from "./src/lib/query-client";
 import { flushPendingNavTarget, navigationRef } from "./src/navigation/navigationRef";
 import { RootNavigator } from "./src/navigation/RootNavigator";
@@ -48,6 +49,8 @@ const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
  * RealtimeBridge (Slice 5) drives the foreground-only SSE lifecycle; it is
  * Clerk-free (resolves a Bearer via the slice-4 seam) so it sits in the shared
  * tree, mounted in both the ClerkProvider and no-key branches.
+ * OfflineQueueBridge (G4-6) is the same pattern for the offline write-queue:
+ * foreground/auth-signal-triggered replay, no polling, Clerk-free.
  * i18next (Slice 6) is initialized on import of ./src/i18n; Hebrew is default.
  */
 export default function App() {
@@ -73,6 +76,7 @@ export default function App() {
         <SafeAreaProvider>
           <StatusBar style="light" />
           <RealtimeBridge />
+          <OfflineQueueBridge />
           {/* Clerk-free + nav-context-free (drives tap navigation via navigationRef);
               sits in the shared tree like RealtimeBridge so it runs in both branches. */}
           <PushBridge />

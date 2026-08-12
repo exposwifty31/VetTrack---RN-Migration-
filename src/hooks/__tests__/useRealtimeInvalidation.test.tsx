@@ -158,6 +158,48 @@ describe("useRealtimeInvalidation", () => {
     expect(invalidateSpy).toHaveBeenCalledTimes(2);
   });
 
+  it(
+    "G4-4: a normal delta still applies incrementally (matching key only) after a " +
+      "reset triggered a full resync — reset does not leave the consumer stuck in " +
+      "resync mode",
+    async () => {
+      const { invalidateSpy } = await setup();
+      // Full snapshot resync — every given key.
+      emit({ kind: "reset", reason: "last_event_pruned" });
+      expect(invalidateSpy).toHaveBeenCalledTimes(2);
+      invalidateSpy.mockClear();
+
+      // Back to incremental deltas — only the matching key.
+      emit({
+        kind: "event",
+        envelope: { type: "ROOM_OCCUPANCY_CHANGED", payload: {}, timestamp: "t" },
+      });
+      expect(invalidateSpy).toHaveBeenCalledTimes(2);
+
+      invalidateSpy.mockClear();
+      emit({
+        kind: "event",
+        envelope: { type: "EQUIPMENT_CUSTODY_STATE_CHANGED", payload: {}, timestamp: "t" },
+      });
+      expect(invalidateSpy).not.toHaveBeenCalled();
+    },
+  );
+
+  it(
+    "G4-4: a storm of repeated resets is idempotent — each reset still invalidates " +
+      "exactly the given keys, with no error, no duplicate listener growth, and no " +
+      "unbounded work per reset",
+    async () => {
+      const { invalidateSpy } = await setup();
+      for (let i = 0; i < 5; i++) {
+        emit({ kind: "reset", reason: "last_event_pruned" });
+      }
+      // 5 resets x 2 keys — bounded, linear in resets received, not exponential/leaking.
+      expect(invalidateSpy).toHaveBeenCalledTimes(10);
+      expect(listeners).toHaveLength(1); // no re-subscription happened as a side effect
+    },
+  );
+
   it("does NOT invalidate on keepalive", async () => {
     const { invalidateSpy } = await setup();
     emit({

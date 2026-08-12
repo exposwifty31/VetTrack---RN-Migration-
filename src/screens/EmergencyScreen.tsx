@@ -1,35 +1,32 @@
 /**
- * חירום tab — honest "בקרוב" placeholder. Emergency doctrine applies even to a
- * placeholder: danger-styled, ZERO glass/translucency, ZERO animation. The
- * Code Blue flows arrive in a later migration phase; this screen makes no
- * pretense of emergency capability.
+ * חירום tab — G4-1 read-only Code Blue viewer + G4-5 mutation action bar.
+ * Emergency doctrine still applies: danger-styled, ZERO glass/translucency,
+ * ZERO animation — both children carry the same constraints.
+ *
+ * `CodeBlueActions` (G4-5) owns every write affordance (start/log/end/
+ * presence) and renders ABOVE the frozen `CodeBlueViewer` (G4-1), which stays
+ * exactly as merged — read-only, no mutation affordance inside it. The two
+ * share the same `codeBlueKeys.active()` query (react-query dedupes to one
+ * network request), so stacking them costs nothing extra.
+ *
+ * Self-gated via BootstrapGate (the `MyEquipmentScreen`/`EquipmentListScreen`
+ * precedent) — identity must resolve before the active-session fetch fires.
  */
-import { Text, View } from "react-native";
-import { useTranslation } from "react-i18next";
-import { useUniwind } from "uniwind";
+import { View } from "react-native";
 
-import { EmergencyGlyph } from "@/components/home/icons";
+import { BootstrapGate } from "@/app/BootstrapGate";
+import { CodeBlueActions } from "@/features/code-blue/CodeBlueActions";
+import { CodeBlueViewer } from "@/features/code-blue/CodeBlueViewer";
 
 export function EmergencyScreen() {
-  const { t } = useTranslation();
-  const { theme } = useUniwind();
-  const dangerSolid = theme === "light" ? "#B91C1C" : "#DC2626";
-
   return (
-    <View className="flex-1 items-center justify-center gap-3 bg-background px-8">
-      <View
-        className="h-14 w-14 items-center justify-center rounded-full"
-        style={{ backgroundColor: dangerSolid }}
-      >
-        <EmergencyGlyph color="#FFFFFF" />
+    <BootstrapGate>
+      <View className="flex-1 bg-background">
+        <CodeBlueActions />
+        <View className="flex-1">
+          <CodeBlueViewer />
+        </View>
       </View>
-      <Text className="font-rubik-bold text-[22px] text-foreground">{t("tabs.emergency")}</Text>
-      <Text className="font-rubik-semibold text-[15px] text-danger">
-        {t("emergency.comingSoon")}
-      </Text>
-      <Text className="text-center font-rubik text-[13px] text-muted">
-        {t("emergency.subtitle")}
-      </Text>
-    </View>
+    </BootstrapGate>
   );
 }

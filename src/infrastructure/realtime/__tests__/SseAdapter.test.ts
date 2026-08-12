@@ -140,6 +140,26 @@ describe("SseAdapter", () => {
     expect(events).toContainEqual({ kind: "reset", reason: "last_event_pruned" });
   });
 
+  it("reopening after a reset sends NO Last-Event-ID (G4-4: this is what makes a reset " +
+    "storm structurally unreachable — the pruned-cursor branch on the server only " +
+    "fires when a Last-Event-ID header is present)", async () => {
+    const { adapter, instances } = makeAdapter();
+    adapter.open();
+    await flush();
+    instances[0].fire(
+      "message",
+      msg({ type: "EQUIPMENT_UPDATED", payload: {}, timestamp: "t", id: 10, outboxId: 10 }),
+    );
+    instances[0].fire(
+      "message",
+      msg({ type: "RESET_STATE", payload: { reason: "last_event_pruned" }, timestamp: "t" }),
+    );
+    adapter.close();
+    adapter.open();
+    await flush();
+    expect(instances[1].options.headers["Last-Event-ID"]).toBeUndefined();
+  });
+
   it("tears down the previous EventSource on reopen — no stale callbacks", async () => {
     const { adapter, instances } = makeAdapter();
     const events: RealtimeEvent[] = [];
@@ -205,6 +225,36 @@ describe("SseAdapter", () => {
     }
     expect(events.length).toBe(before); // nothing emitted, nothing thrown
     expect(adapter.getCursor()).toBe(0);
+  });
+
+  it("ignores an SSE retry: control-line payload without dispatching a domain event or breaking subsequent parsing", async () => {
+    const { adapter, instances } = makeAdapter();
+    const events: RealtimeEvent[] = [];
+    adapter.subscribe((e) => events.push(e));
+    adapter.open();
+    await flush();
+    const before = events.length;
+
+    // Worst case for a naive line parser: a bare `retry:` control-line value
+    // reaches onMessage as `data` (react-native-sse never does this — it strips
+    // `retry:` before dispatch, see node_modules/react-native-sse/src/EventSource.js
+    // `_handleEvent`, which only calls `dispatch('message', ...)` when the parsed
+    // `data` array is non-empty — but this adapter must stay safe even if a future
+    // library version or a misbehaving factory ever forwarded it).
+    instances[0].fire("message", { type: "message", data: "retry: 3000" });
+    expect(events.length).toBe(before); // not mis-dispatched as a domain event
+    expect(adapter.getCursor()).toBe(0); // not mistaken for a numeric cursor
+
+    // Parsing must not be left broken for the next real frame.
+    instances[0].fire(
+      "message",
+      msg({ type: "EQUIPMENT_UPDATED", payload: {}, timestamp: "t", id: 7, outboxId: 7 }),
+    );
+    expect(adapter.getCursor()).toBe(7);
+    expect(events).toContainEqual({
+      kind: "event",
+      envelope: expect.objectContaining({ id: 7 }),
+    });
   });
 
   it("maps an unknown RESET_STATE reason to last_event_unknown", async () => {
