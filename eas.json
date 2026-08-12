@@ -35,8 +35,10 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "<<owner: appleId>>",
-        "ascAppId": "<<owner: ascAppId>>",
+        "ascAppId": "6778937527",
+        "ascApiKeyId": "886L2S3X92",
+        "ascApiKeyIssuerId": "d7d61eb2-1935-4ba2-96e8-650199fe575e",
+        "ascApiKeyPath": "./AuthKey_886L2S3X92.p8",
         "appleTeamId": "87F5G378M6"
       },
       "android": {

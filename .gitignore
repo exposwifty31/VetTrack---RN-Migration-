@@ -45,6 +45,10 @@ yarn-error.*
 # Git worktrees (agent isolation)
 .worktrees/
 
+# Store credentials (never commit; *.p8 is covered above)
+google-service-account.json
+credentials.json
+
 # Pinned vettrack checkout for @vettrack/* file: deps (see scripts/vendor-vettrack.mjs)
 .vendor/
 docs/vettrack-g4-g5-slice13-verified.md
