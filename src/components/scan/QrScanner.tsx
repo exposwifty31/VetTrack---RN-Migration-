@@ -18,9 +18,16 @@ type QrScannerProps = Readonly<{
   onScanned: (data: string) => void;
   /** Viewfinder hint copy (already localized by the caller). */
   hint: string;
+  /**
+   * Scan only while the Scan screen is focused. ScanConfirm is a transparent
+   * modal, so this screen (and the camera) stays mounted underneath it — without
+   * this gate a code still in frame re-fires after the debounce and stacks
+   * confirm screens.
+   */
+  active: boolean;
 }>;
 
-export default function QrScanner({ onScanned, hint }: QrScannerProps) {
+export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
   const { t } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
   // onBarcodeScanned fires continuously; debounce to one hand-off per ~2s so a
@@ -62,9 +69,13 @@ export default function QrScanner({ onScanned, hint }: QrScannerProps) {
     <View className="flex-1">
       <CameraView
         style={{ flex: 1 }}
+        active={active}
         facing="back"
         barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
         onBarcodeScanned={(result) => {
+          // Ignore scans while unfocused (ScanConfirm open on top): the debounce
+          // alone would let a code still in frame re-fire and stack confirms.
+          if (!active) return;
           const now = Date.now();
           if (now - lastFireRef.current < 2000) return;
           lastFireRef.current = now;

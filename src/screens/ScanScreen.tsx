@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
+import { useIsFocused } from "@react-navigation/native";
 
 import { resolveContainerScan } from "@/components/inventory/container-scan-resolve";
 import { setPendingDispenseContainer } from "@/components/inventory/pending-container";
@@ -27,6 +28,7 @@ type ScanMode = "qr" | "nfc";
 export function ScanScreen({ navigation }: RootStackScreenProps<"Scan">) {
   const { t } = useTranslation();
   const { supported, reading, scan } = useNfcAdvisoryScan();
+  const isFocused = useIsFocused();
   const [mode, setMode] = useState<ScanMode>("qr");
   const [note, setNote] = useState<string | null>(null);
 
@@ -84,7 +86,7 @@ export function ScanScreen({ navigation }: RootStackScreenProps<"Scan">) {
             </View>
           }
         >
-          <QrScanner onScanned={onQrScanned} hint={t("scan.qrHint")} />
+          <QrScanner onScanned={onQrScanned} hint={t("scan.qrHint")} active={isFocused} />
         </Suspense>
         <View className="items-center gap-2 px-6 pb-8 pt-4">
           {note ? <Text className="text-center text-[14px] text-muted">{note}</Text> : null}
