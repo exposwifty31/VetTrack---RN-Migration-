@@ -11,14 +11,21 @@
  * destructive account actions (name, sign-out, delete) deliberately stay in the
  * Menu's AccountSection, not here.
  */
+import { useState } from "react";
 import Constants from "expo-constants";
 import { ScrollView, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import * as WebBrowser from "expo-web-browser";
+import { Uniwind } from "uniwind";
 
 import { PressableScale } from "@/components/PressableScale";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { LanguageCard } from "@/features/account/LanguageCard";
+import {
+  applyThemeChange,
+  resolveInitialTheme,
+  type ThemeMode,
+} from "@/features/account/theme-resolver";
 
 /** Store-required policy page (from the shared app metadata; opened in-app). */
 const PRIVACY_POLICY_URL = "https://vettrack.uk/privacy";
@@ -35,7 +42,7 @@ export function SettingsScreen() {
       contentContainerStyle={{ paddingTop: 16, paddingBottom: 40 }}
     >
       <View className="gap-4 px-[22px]">
-        {/* Appearance (theme mode) is added by the theme wave — kept first. */}
+        <AppearanceCard />
         <LanguageCard />
 
         <SectionCard>
@@ -64,5 +71,80 @@ export function SettingsScreen() {
         </SectionCard>
       </View>
     </ScrollView>
+  );
+}
+
+/**
+ * Appearance — Light (default) / Dark / System, applied LIVE via Uniwind's
+ * global setTheme and persisted through the MMKV port (theme-resolver). No
+ * restart hint: unlike the RTL flag, the theme applies this session immediately.
+ * "System" follows the OS only once app.json's userInterfaceStyle is "automatic"
+ * in the built binary.
+ */
+function AppearanceCard() {
+  const { t } = useTranslation();
+  const [mode, setMode] = useState<ThemeMode>(() => resolveInitialTheme());
+  const [persistFailed, setPersistFailed] = useState(false);
+
+  const choose = (next: ThemeMode) => {
+    setPersistFailed(false);
+    const result = applyThemeChange(next, (m) => Uniwind.setTheme(m));
+    setMode(next);
+    if (!result.persisted) setPersistFailed(true);
+  };
+
+  return (
+    <SectionCard>
+      <Text className="font-rubik text-[12.5px] text-text-tertiary">{t("settings.appearance")}</Text>
+      <View className="mt-2 flex-row gap-2">
+        <ThemeOption
+          label={t("settings.themeLight")}
+          selected={mode === "light"}
+          onPress={() => choose("light")}
+        />
+        <ThemeOption
+          label={t("settings.themeDark")}
+          selected={mode === "dark"}
+          onPress={() => choose("dark")}
+        />
+        <ThemeOption
+          label={t("settings.themeSystem")}
+          selected={mode === "system"}
+          onPress={() => choose("system")}
+        />
+      </View>
+      {persistFailed ? (
+        <Text className="mt-2 font-rubik text-[12.5px] text-danger">{t("settings.themeError")}</Text>
+      ) : null}
+    </SectionCard>
+  );
+}
+
+function ThemeOption({
+  label,
+  selected,
+  onPress,
+}: Readonly<{ label: string; selected: boolean; onPress: () => void }>) {
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      className={
+        selected
+          ? "min-h-[44px] flex-1 items-center justify-center rounded-md border border-primary bg-surface-raised px-2"
+          : "min-h-[44px] flex-1 items-center justify-center rounded-md border border-border bg-surface px-2"
+      }
+      onPress={onPress}
+    >
+      <Text
+        className={
+          selected
+            ? "font-rubik-semibold text-[14px] text-foreground"
+            : "font-rubik-medium text-[14px] text-muted"
+        }
+      >
+        {label}
+      </Text>
+    </PressableScale>
   );
 }

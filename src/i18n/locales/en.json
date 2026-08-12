@@ -241,6 +241,11 @@
     }
   },
   "settings": {
+    "appearance": "Appearance",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "themeError": "Couldn't save the theme. Try again.",
     "notifications": "Notifications",
     "notificationsPlaceholder": "Notification preferences are coming soon.",
     "about": "About",

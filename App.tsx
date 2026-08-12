@@ -23,13 +23,17 @@ import { ClerkTokenBridge } from "./src/infrastructure/auth/ClerkTokenBridge";
 import { PushBridge } from "./src/infrastructure/push/PushBridge";
 import { RealtimeBridge } from "./src/infrastructure/realtime/RealtimeBridge";
 import { i18n } from "./src/i18n";
+import { resolveInitialTheme } from "./src/features/account/theme-resolver";
 import { installDevAuthSeam } from "./src/lib/dev-auth";
 import { OfflineQueueBridge } from "./src/lib/offline-queue/OfflineQueueBridge";
 import { queryClient } from "./src/lib/query-client";
 import { flushPendingNavTarget, navigationRef } from "./src/navigation/navigationRef";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 
-Uniwind.setTheme("dark");
+// Theme boot: the persisted choice, else the LIGHT product default (see
+// theme-resolver). NOT a bare `setTheme()` — that silently follows the OS and
+// would change the default; "system" only follows the OS when the user picks it.
+Uniwind.setTheme(resolveInitialTheme());
 
 // Dev-only, opt-in, and refused when a Clerk key is configured — see
 // src/lib/dev-auth.ts for the five guard rails. Module scope so the identity

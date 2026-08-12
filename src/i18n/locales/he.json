@@ -249,6 +249,11 @@
     }
   },
   "settings": {
+    "appearance": "מראה",
+    "themeLight": "בהיר",
+    "themeDark": "כהה",
+    "themeSystem": "מערכת",
+    "themeError": "שמירת ערכת הנושא נכשלה. נסו שוב.",
     "notifications": "התראות",
     "notificationsPlaceholder": "העדפות ההתראות יתווספו בקרוב.",
     "about": "אודות",

@@ -15,6 +15,7 @@ import { useState, useSyncExternalStore } from "react";
 import { ActivityIndicator, Alert, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useUniwind } from "uniwind";
 
 import { PressableScale } from "@/components/PressableScale";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -32,7 +33,7 @@ import {
   subscribeAuthSession,
 } from "@/infrastructure/auth/authSession";
 import { deregisterActivePushRegistration } from "@/infrastructure/push/active-registration";
-import { AURORA_COLORS } from "@/theme/colors";
+import { AURORA_COLORS, dangerColor } from "@/theme/colors";
 
 /** FSI…PDI isolate so a Latin display name sits correctly in an RTL row. */
 function isolate(value: string): string {
@@ -194,6 +195,7 @@ function DisplayNameCard() {
 
 function SignOutCard({ onSignedOut }: Readonly<{ onSignedOut: () => void }>) {
   const { t } = useTranslation();
+  const { theme } = useUniwind();
   const [busy, setBusy] = useState(false);
 
   const run = async () => {
@@ -229,7 +231,7 @@ function SignOutCard({ onSignedOut }: Readonly<{ onSignedOut: () => void }>) {
       onPress={confirm}
     >
       {busy ? (
-        <ActivityIndicator color={AURORA_COLORS.danger} />
+        <ActivityIndicator color={dangerColor(theme)} />
       ) : (
         <Text className="font-rubik-semibold text-[15px] text-danger">{t("account.signOut")}</Text>
       )}
@@ -249,6 +251,7 @@ function SignOutCard({ onSignedOut }: Readonly<{ onSignedOut: () => void }>) {
  */
 function DeleteAccountCard({ onDeleted }: Readonly<{ onDeleted: () => void }>) {
   const { t } = useTranslation();
+  const { theme } = useUniwind();
 
   const mutation = useMutation({
     mutationFn: () => accountApi.deleteAccount(),
@@ -309,7 +312,7 @@ function DeleteAccountCard({ onDeleted }: Readonly<{ onDeleted: () => void }>) {
       onPress={confirm}
     >
       {mutation.isPending ? (
-        <ActivityIndicator color={AURORA_COLORS.danger} />
+        <ActivityIndicator color={dangerColor(theme)} />
       ) : (
         <Text className="font-rubik-semibold text-[15px] text-danger">
           {t("account.deleteAccount")}
