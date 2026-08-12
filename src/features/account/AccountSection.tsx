@@ -32,6 +32,7 @@ import {
   isAuthSessionActive,
   subscribeAuthSession,
 } from "@/infrastructure/auth/authSession";
+import { deregisterActivePushRegistration } from "@/infrastructure/push/active-registration";
 import { type Locale } from "@/i18n/locale-resolver";
 import { isRtlReloadPending } from "@/i18n/rtl";
 import { AURORA_COLORS } from "@/theme/colors";
@@ -276,6 +277,10 @@ function SignOutCard({ onSignedOut }: Readonly<{ onSignedOut: () => void }>) {
   const run = async () => {
     setBusy(true);
     try {
+      // Deregister the device push token WHILE the bearer is still valid — the
+      // "cleared" event fires after Clerk teardown, too late to authenticate the
+      // DELETE. Take-once + best-effort: never blocks or fails the sign-out.
+      await deregisterActivePushRegistration();
       // Through the AuthSessionPort — never Clerk directly (hexagonal boundary).
       await getAuthSession().signOut();
       onSignedOut();

@@ -57,6 +57,13 @@ export interface PushPort {
   installForegroundHandler(): void;
   /** Subscribe to notification taps. Returns an unsubscribe fn. ALERT-ONLY. */
   addResponseListener(onResponse: PushResponseHandler): () => void;
+  /**
+   * Subscribe to NATIVE token rotation — APNs/FCM may roll the device token while
+   * the app runs, and the old token stops delivering. Fires only with a valid
+   * mobile token (same platform/emptiness gates as `getDeviceToken`). Returns an
+   * unsubscribe fn; callers re-register the replacement for the active user.
+   */
+  addTokenListener(onToken: (token: PushDeviceToken) => void): () => void;
   /** Cold-start: the notification data that launched the app from a tap, if any. */
   getInitialResponseData(): Promise<PushData>;
 }

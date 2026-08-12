@@ -1,0 +1,185 @@
+/**
+ * PushBridge — the CodeRabbit PR #53 lifecycle contracts:
+ *  1. a rotated native token (APNs/FCM roll while the app runs) is re-registered
+ *     for the active user, and becomes the deregister target;
+ *  2. a rotation that arrives BEFORE the initial registration succeeded is ignored
+ *     (the registration flow owns the first POST);
+ *  3. a cancelled effect stops at the next await boundary — unmounting before the
+ *     channel resolves must NOT prompt for permission (React dev effect replay /
+ *     identity swap would otherwise surface an orphan OS dialog);
+ *  4. unmount removes the native rotation listener.
+ */
+import { act, render } from "@testing-library/react-native";
+
+import type { PushDeviceToken, PushPort } from "@/core/ports/push.port";
+import type { AuthChange } from "@/lib/auth-fetch";
+
+import { clearActivePushRegistration } from "../active-registration";
+import { PushBridge } from "../PushBridge";
+
+// Every test injects a fake port; stub the default-port module so its transitive
+// native/i18n imports never load in the jest environment.
+jest.mock("../defaultPush", () => ({
+  getDefaultPushPort: () => {
+    throw new Error("PushBridge tests must inject a port");
+  },
+}));
+jest.mock("@/app/useIdentity", () => ({
+  useIdentity: () => ({ isSuccess: true, data: { id: "user-1" } }),
+}));
+jest.mock("@/lib/auth-store", () => ({ getCurrentUserId: () => "user-1" }));
+jest.mock("@/navigation/navigationRef", () => ({
+  navigateToEmergency: jest.fn(),
+  navigateToMain: jest.fn(),
+}));
+
+const TOKEN: PushDeviceToken = { platform: "ios", token: "tok-initial" };
+const ROTATED: PushDeviceToken = { platform: "ios", token: "tok-rotated" };
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+function makeHarness(overrides: Partial<PushPort> = {}) {
+  const calls: string[] = [];
+  const registered: PushDeviceToken[] = [];
+  const deregistered: PushDeviceToken[] = [];
+  const removeTokenListener = jest.fn();
+  let tokenListener: ((token: PushDeviceToken) => void) | null = null;
+  let authListener: ((change: AuthChange) => void) | null = null;
+  const port: PushPort = {
+    requestPermission: async () => {
+      calls.push("requestPermission");
+      return true;
+    },
+    getDeviceToken: async () => TOKEN,
+    register: async (token) => {
+      registered.push(token);
+    },
+    deregister: async (token) => {
+      deregistered.push(token);
+    },
+    ensureEmergencyChannel: async () => {
+      calls.push("ensureEmergencyChannel");
+    },
+    installForegroundHandler: () => {},
+    addResponseListener: () => () => {},
+    addTokenListener: (onToken) => {
+      tokenListener = onToken;
+      return removeTokenListener;
+    },
+    getInitialResponseData: async () => undefined,
+    ...overrides,
+  };
+  const onAuthChange = (listener: (change: AuthChange) => void) => {
+    authListener = listener;
+    return () => {
+      authListener = null;
+    };
+  };
+  return {
+    port,
+    onAuthChange,
+    calls,
+    registered,
+    deregistered,
+    removeTokenListener,
+    rotate: async (token: PushDeviceToken) => {
+      await act(async () => {
+        tokenListener?.(token);
+      });
+    },
+    fireAuth: async (change: AuthChange) => {
+      await act(async () => {
+        authListener?.(change);
+      });
+    },
+  };
+}
+
+afterEach(() => {
+  clearActivePushRegistration();
+});
+
+describe("PushBridge token rotation", () => {
+  it("re-registers a rotated token and makes it the deregister target", async () => {
+    const h = makeHarness();
+    const view = await render(<PushBridge port={h.port} onAuthChange={h.onAuthChange} />);
+    await act(async () => {}); // settle channel → permission → token → register
+    expect(h.registered).toEqual([TOKEN]);
+
+    await h.rotate(ROTATED);
+    expect(h.registered).toEqual([TOKEN, ROTATED]);
+
+    await h.fireAuth("cleared");
+    expect(h.deregistered).toEqual([ROTATED]); // the rotated token, not the stale one
+
+    await view.unmount();
+  });
+
+  it("ignores a rotation that lands before the initial registration succeeded", async () => {
+    const gate = deferred<boolean>();
+    const h = makeHarness({
+      requestPermission: () => gate.promise, // initial flow parked mid-await
+    });
+    const view = await render(<PushBridge port={h.port} onAuthChange={h.onAuthChange} />);
+    await act(async () => {});
+
+    await h.rotate(ROTATED);
+    expect(h.registered).toEqual([]); // nothing registered yet → rotation ignored
+
+    await act(async () => {
+      gate.resolve(true);
+    });
+    expect(h.registered).toEqual([TOKEN]); // the registration flow owns the first POST
+
+    await view.unmount();
+  });
+
+  it("does not repeat an identical rotated token", async () => {
+    const h = makeHarness();
+    const view = await render(<PushBridge port={h.port} onAuthChange={h.onAuthChange} />);
+    await act(async () => {});
+
+    await h.rotate(TOKEN); // same token the flow just registered
+
+    expect(h.registered).toEqual([TOKEN]);
+    await view.unmount();
+  });
+
+  it("removes the native rotation listener on unmount", async () => {
+    const h = makeHarness();
+    const view = await render(<PushBridge port={h.port} onAuthChange={h.onAuthChange} />);
+    await act(async () => {});
+
+    await view.unmount();
+
+    expect(h.removeTokenListener).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PushBridge effect cancellation", () => {
+  it("stops before requestPermission when unmounted mid-channel-creation", async () => {
+    const channel = deferred<void>();
+    const h = makeHarness({
+      ensureEmergencyChannel: () => {
+        h.calls.push("ensureEmergencyChannel");
+        return channel.promise;
+      },
+    });
+    const view = await render(<PushBridge port={h.port} onAuthChange={h.onAuthChange} />);
+    await act(async () => {});
+
+    await view.unmount(); // cancels the effect while ensureEmergencyChannel is in flight
+    await act(async () => {
+      channel.resolve();
+    });
+
+    expect(h.calls).toEqual(["ensureEmergencyChannel"]);
+    expect(h.registered).toEqual([]);
+  });
+});
