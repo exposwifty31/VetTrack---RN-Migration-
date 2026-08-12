@@ -77,7 +77,15 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-font",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      [
+        "expo-notifications",
+        {
+          "color": "#B00020",
+          "defaultChannel": "emergency-code-blue",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ]
     ]
   }
 }

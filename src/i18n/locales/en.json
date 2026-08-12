@@ -1,4 +1,8 @@
 {
+  "push": {
+    "emergencyChannelName": "Emergency / Code Blue",
+    "emergencyChannelDescription": "Critical Code Blue and emergency alerts. Always high priority."
+  },
   "common": {
     "appName": "VetTrack",
     "back": "Back",

@@ -1,6 +1,7 @@
 import type { EquipmentTruthResponse, EquipmentWaitlistSnapshot } from "@vettrack/shared";
 import * as Crypto from "expo-crypto";
 
+import type { PushDeviceToken } from "@/core/ports/push.port";
 import { authFetch } from "@/lib/auth-fetch";
 import { setCurrentUserId } from "@/lib/auth-store";
 import type {
@@ -112,6 +113,24 @@ export const api = {
       requestJson<{ events: unknown[] }>(
         `/api/realtime/replay?afterId=${encodeURIComponent(String(afterId))}&limit=${limit}`,
       ),
+  },
+  push: {
+    /**
+     * Register the native device token (POST /api/push/subscribe — native branch of
+     * push-subscription-schema.ts). ADR-009 SUPPLEMENTARY alert channel; the server
+     * routes by `platform`. Reuses authFetch (requireAuth + clinic scope server-side).
+     */
+    subscribe: (token: PushDeviceToken) =>
+      requestJson<{ success: boolean }>("/api/push/subscribe", {
+        method: "POST",
+        body: JSON.stringify({ platform: token.platform, token: token.token }),
+      }),
+    /** Deregister the native device token (DELETE /api/push/subscribe; scoped to the caller server-side). */
+    unsubscribe: (token: PushDeviceToken) =>
+      requestJson<void>("/api/push/subscribe", {
+        method: "DELETE",
+        body: JSON.stringify({ token: token.token }),
+      }),
   },
   equipment: {
     /**
