@@ -48,6 +48,8 @@ yarn-error.*
 # Store credentials (never commit; *.p8 is covered above)
 google-service-account.json
 credentials.json
+# Firebase client config (owner-supplied; provided to EAS as a file env var)
+google-services.json
 
 # Pinned vettrack checkout for @vettrack/* file: deps (see scripts/vendor-vettrack.mjs)
 .vendor/
