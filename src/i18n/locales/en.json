@@ -206,7 +206,18 @@
     "signOutConfirmMessage": "You'll need to sign in again to use the app.",
     "displayNameInvalid": "Display name can't be empty.",
     "updateError": "Couldn't update your display name. Try again.",
-    "localeError": "Couldn't save your language. Try again."
+    "localeError": "Couldn't save your language. Try again.",
+    "deleteAccount": "Delete account",
+    "deleteAccountConfirmTitle": "Delete account?",
+    "deleteAccountConfirmMessage": "This starts permanently deleting your account.",
+    "deleteAccountContinue": "Continue",
+    "deleteAccountFinalTitle": "Permanently delete?",
+    "deleteAccountFinalMessage": "This permanently deletes your account and all your data. This can't be undone.",
+    "deleteAccountConfirm": "Delete",
+    "deleteAccountErrorTitle": "Couldn't delete account",
+    "deleteAccountError": "Couldn't delete your account. Try again.",
+    "deleteAccountErrorSoleAdmin": "You're the only member of your clinic. Transfer or remove the clinic before deleting this account.",
+    "deleteAccountErrorProtected": "This account can't be deleted through the app."
   },
   "bootstrap": {
     "reauth": "Session expired. Sign in again to continue.",

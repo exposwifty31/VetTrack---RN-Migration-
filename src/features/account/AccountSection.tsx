@@ -21,9 +21,11 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { IDENTITY_QUERY_KEY, useIdentity } from "@/app/useIdentity";
 import {
   accountApi,
+  ACCOUNT_DELETION_REASON,
   DISPLAY_NAME_MAX_LENGTH,
   isValidDisplayName,
 } from "@/lib/api/account";
+import { ApiCodedError } from "@/lib/api/coded-error";
 import { applyLocaleChange } from "@/features/account/locale-toggle";
 import {
   getAuthSession,
@@ -51,9 +53,16 @@ export function AccountSection({ onSignedOut }: Readonly<{ onSignedOut: () => vo
     <View className="gap-3">
       <DisplayNameCard />
       <LanguageCard />
-      {/* Sign-out is offered only when an interactive session exists (hidden in
-          dev-bypass). The port adapter — not this component — knows about Clerk. */}
-      {sessionActive ? <SignOutCard onSignedOut={onSignedOut} /> : null}
+      {/* Sign-out and account-deletion are offered only when an interactive
+          session exists (hidden in dev-bypass). The port adapter — not this
+          component — knows about Clerk. Delete sits last as the most
+          destructive affordance. */}
+      {sessionActive ? (
+        <>
+          <SignOutCard onSignedOut={onSignedOut} />
+          <DeleteAccountCard onDeleted={onSignedOut} />
+        </>
+      ) : null}
     </View>
   );
 }
@@ -296,6 +305,88 @@ function SignOutCard({ onSignedOut }: Readonly<{ onSignedOut: () => void }>) {
         <ActivityIndicator color={AURORA_COLORS.danger} />
       ) : (
         <Text className="font-rubik-semibold text-[15px] text-danger">{t("account.signOut")}</Text>
+      )}
+    </PressableScale>
+  );
+}
+
+/**
+ * Account deletion (A8) — the in-app store-compliance path (Apple 5.1.1(v),
+ * Google Play deletion-request). Two-step confirm so an accidental tap can't
+ * destroy an account: first Alert → Continue, second Alert → Delete, THEN the
+ * DELETE fires. On success the account is gone server-side, so we sign out
+ * through the port (best-effort — no session to preserve) and leave for SignIn
+ * REGARDLESS of whether that resolves. On failure we branch on the coded server
+ * `reason` for a truthful message and surface it LOUDLY as an Alert — never
+ * silent. `onDeleted` routes out (SignIn), same as sign-out.
+ */
+function DeleteAccountCard({ onDeleted }: Readonly<{ onDeleted: () => void }>) {
+  const { t } = useTranslation();
+
+  const mutation = useMutation({
+    mutationFn: () => accountApi.deleteAccount(),
+    onSuccess: async () => {
+      try {
+        await getAuthSession().signOut();
+      } catch {
+        // The account no longer exists — routing out is correct either way.
+      }
+      onDeleted();
+    },
+    onError: (error) => {
+      const reason = error instanceof ApiCodedError ? error.reason : null;
+      const message =
+        reason === ACCOUNT_DELETION_REASON.SOLE_CLINIC_ADMIN
+          ? t("account.deleteAccountErrorSoleAdmin")
+          : reason === ACCOUNT_DELETION_REASON.PROTECTED
+            ? t("account.deleteAccountErrorProtected")
+            : t("account.deleteAccountError");
+      Alert.alert(t("account.deleteAccountErrorTitle"), message);
+    },
+  });
+
+  const confirm = () => {
+    Alert.alert(
+      t("account.deleteAccountConfirmTitle"),
+      t("account.deleteAccountConfirmMessage"),
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: t("account.deleteAccountContinue"),
+          style: "destructive",
+          onPress: () => {
+            // Second, final confirmation before the irreversible DELETE fires.
+            Alert.alert(
+              t("account.deleteAccountFinalTitle"),
+              t("account.deleteAccountFinalMessage"),
+              [
+                { text: t("common.cancel"), style: "cancel" },
+                {
+                  text: t("account.deleteAccountConfirm"),
+                  style: "destructive",
+                  onPress: () => mutation.mutate(),
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  };
+
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      disabled={mutation.isPending}
+      className="min-h-[48px] flex-row items-center justify-center rounded-md border border-danger bg-surface px-4"
+      onPress={confirm}
+    >
+      {mutation.isPending ? (
+        <ActivityIndicator color={AURORA_COLORS.danger} />
+      ) : (
+        <Text className="font-rubik-semibold text-[15px] text-danger">
+          {t("account.deleteAccount")}
+        </Text>
       )}
     </PressableScale>
   );
