@@ -1,4 +1,8 @@
 {
+  "push": {
+    "emergencyChannelName": "חירום / קוד כחול",
+    "emergencyChannelDescription": "התראות קוד כחול וחירום קריטיות. תמיד בעדיפות גבוהה."
+  },
   "common": {
     "appName": "VetTrack",
     "back": "חזרה",

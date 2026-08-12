@@ -20,10 +20,12 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Uniwind } from "uniwind";
 
 import { ClerkTokenBridge } from "./src/infrastructure/auth/ClerkTokenBridge";
+import { PushBridge } from "./src/infrastructure/push/PushBridge";
 import { RealtimeBridge } from "./src/infrastructure/realtime/RealtimeBridge";
 import { i18n } from "./src/i18n";
 import { installDevAuthSeam } from "./src/lib/dev-auth";
 import { queryClient } from "./src/lib/query-client";
+import { flushPendingNavTarget, navigationRef } from "./src/navigation/navigationRef";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 
 Uniwind.setTheme("dark");
@@ -71,7 +73,10 @@ export default function App() {
         <SafeAreaProvider>
           <StatusBar style="light" />
           <RealtimeBridge />
-          <NavigationContainer>
+          {/* Clerk-free + nav-context-free (drives tap navigation via navigationRef);
+              sits in the shared tree like RealtimeBridge so it runs in both branches. */}
+          <PushBridge />
+          <NavigationContainer ref={navigationRef} onReady={flushPendingNavTarget}>
             {publishableKey ? <ClerkTokenBridge /> : null}
             <RootNavigator />
           </NavigationContainer>
