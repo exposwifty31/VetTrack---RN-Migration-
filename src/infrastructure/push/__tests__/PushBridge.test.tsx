@@ -204,6 +204,72 @@ describe("PushBridge token rotation", () => {
     expect(h.deregistered).toEqual([TOKEN]);
   });
 
+  it("never compensates a stale SAME-token completion against a committed twin", async () => {
+    const gates: { resolve: () => void }[] = [];
+    const h = makeHarness({
+      register: (token) => {
+        h.registered.push(token);
+        let release!: () => void;
+        const promise = new Promise<void>((r) => {
+          release = r;
+        });
+        gates.push({ resolve: release });
+        return promise;
+      },
+    });
+    const view = await render(<PushBridge port={h.port} onAuthChange={h.onAuthChange} />);
+    await act(async () => {});
+    expect(h.registered).toEqual([TOKEN]); // initial POST in flight
+
+    await h.rotate(TOKEN); // OS re-announces the SAME token value mid-flight
+    expect(h.registered).toEqual([TOKEN, TOKEN]);
+
+    await act(async () => {
+      gates[1].resolve(); // the second (newer-seq) twin commits first
+    });
+    await act(async () => {
+      gates[0].resolve(); // the stale twin completes late
+    });
+    // A token-only DELETE here would remove the row the committed twin tracks.
+    expect(h.deregistered).toEqual([]);
+
+    await h.fireAuth("cleared");
+    expect(h.deregistered).toEqual([TOKEN]); // exactly the sign-out DELETE, nothing else
+
+    await view.unmount();
+  });
+
+  it("compensates exactly once when two same-token registers outlive cleanup", async () => {
+    const gates: { resolve: () => void }[] = [];
+    const h = makeHarness({
+      register: (token) => {
+        h.registered.push(token);
+        let release!: () => void;
+        const promise = new Promise<void>((r) => {
+          release = r;
+        });
+        gates.push({ resolve: release });
+        return promise;
+      },
+    });
+    const view = await render(<PushBridge port={h.port} onAuthChange={h.onAuthChange} />);
+    await act(async () => {});
+    await h.rotate(TOKEN); // same value — two registers now in flight
+    expect(h.registered).toEqual([TOKEN, TOKEN]);
+
+    await view.unmount(); // cleanup while BOTH are pending
+
+    await act(async () => {
+      gates[0].resolve(); // first completes — its twin is still in flight, must wait
+    });
+    expect(h.deregistered).toEqual([]);
+
+    await act(async () => {
+      gates[1].resolve(); // last one out closes the door
+    });
+    expect(h.deregistered).toEqual([TOKEN]); // ONE compensating DELETE, not two
+  });
+
   it("keeps the newest rotation when two in-flight registers resolve out of order", async () => {
     const ROTATED_B: PushDeviceToken = { platform: "ios", token: "tok-rotated-b" };
     const gates = new Map<string, { promise: Promise<void>; resolve: () => void }>();

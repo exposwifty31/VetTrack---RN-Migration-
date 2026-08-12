@@ -15,6 +15,14 @@ import { resolvePushNavTarget } from "./push-deep-link";
 
 type AuthChangeSubscribe = (listener: (change: AuthChange) => void) => () => void;
 
+// Module scope ON PURPOSE (outlives effect generations and remounts): counts
+// in-flight register() calls per token VALUE. A stale completion may compensate
+// with a DELETE only when no live registration of the same value remains —
+// otherwise it would remove the row a committed/in-flight twin still owns
+// (PR #54 round 4).
+const inFlightRegisters = new Map<string, number>();
+const tokenKey = (t: PushDeviceToken) => `${t.platform}:${t.token}`;
+
 /**
  * Native push lifecycle (G4-3) — a headless bridge mounted at App level, mirroring
  * RealtimeBridge / ClerkTokenBridge. Clerk-free and navigation-context-free: it
@@ -93,16 +101,34 @@ export function PushBridge({
 
     const submit = (token: PushDeviceToken, label: string) => {
       const seq = ++nextSeq;
+      const key = tokenKey(token);
+      inFlightRegisters.set(key, (inFlightRegisters.get(key) ?? 0) + 1);
+      const settle = () => {
+        const left = (inFlightRegisters.get(key) ?? 1) - 1;
+        if (left <= 0) inFlightRegisters.delete(key);
+        else inFlightRegisters.set(key, left);
+      };
       void port
         .register(token)
         .then(() => {
+          settle();
           if (cancelled || seq <= committedSeq) {
             // register() is a durable server request with no abort seam: it can
             // complete after teardown, or after a newer token already committed.
             // Left alone, that subscription would exist on the server UNTRACKED by
             // the sign-out deregister path — compensate with an immediate
-            // best-effort DELETE while the bearer may still be valid.
-            void port.deregister(token).catch(() => {});
+            // best-effort DELETE while the bearer may still be valid. NEVER when a
+            // twin of the same value is committed or still in flight: the DELETE
+            // is token-scoped server-side and would remove the row the live
+            // registration owns.
+            const committed = registeredToken.current;
+            const ownedByCommitted =
+              committed !== null &&
+              committed.platform === token.platform &&
+              committed.token === token.token;
+            if (!ownedByCommitted && !inFlightRegisters.has(key)) {
+              void port.deregister(token).catch(() => {});
+            }
             return;
           }
           committedSeq = seq;
@@ -110,6 +136,7 @@ export function PushBridge({
           setActivePushRegistration(port, token);
         })
         .catch((err) => {
+          settle();
           console.warn(`[push] ${label} registration failed (non-fatal):`, err);
         });
     };
