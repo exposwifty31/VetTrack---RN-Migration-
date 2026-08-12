@@ -27,7 +27,7 @@ export interface BootstrapViewInput {
 export type BootstrapView =
   | { kind: "loading" }
   | { kind: "ready" }
-  | { kind: "reauth"; canSignIn: boolean; canReauth: boolean };
+  | { kind: "reauth"; canSignIn: boolean; canReauth: boolean; canRetry: boolean };
 
 export function resolveBootstrapView(input: BootstrapViewInput): BootstrapView {
   if (input.isPending) return { kind: "loading" };
@@ -36,9 +36,14 @@ export function resolveBootstrapView(input: BootstrapViewInput): BootstrapView {
     input.isSuccess && input.hasUserId && hasRoleAtLeast(input.effectiveRole, "student");
   if (ready) return { kind: "ready" };
 
+  const canSignIn = !input.hasActiveSession;
+  const canReauth = input.hasActiveSession && input.isAuthError === true;
   return {
     kind: "reauth",
-    canSignIn: !input.hasActiveSession,
-    canReauth: input.hasActiveSession && input.isAuthError === true,
+    canSignIn,
+    canReauth,
+    // Retry re-runs the identity request — offer it ONLY when no auth affordance
+    // applies (a rejected session can only fail again; CodeRabbit PR #55).
+    canRetry: !canSignIn && !canReauth,
   };
 }

@@ -39,7 +39,7 @@ describe("resolveBootstrapView", () => {
         effectiveRole: null,
         hasActiveSession: false,
       }),
-    ).toEqual({ kind: "reauth", canSignIn: true, canReauth: false });
+    ).toEqual({ kind: "reauth", canSignIn: true, canReauth: false, canRetry: false });
   });
 
   it("keeps retry-only when not ready but a session IS active (e.g. role below floor)", () => {
@@ -51,7 +51,7 @@ describe("resolveBootstrapView", () => {
         effectiveRole: "guest", // unknown role ranks 0 — below the student floor
         hasActiveSession: true,
       }),
-    ).toEqual({ kind: "reauth", canSignIn: false, canReauth: false });
+    ).toEqual({ kind: "reauth", canSignIn: false, canReauth: false, canRetry: true });
   });
 
   it("treats a resolved identity missing a userId as not-ready", () => {
@@ -63,7 +63,7 @@ describe("resolveBootstrapView", () => {
         effectiveRole: "technician",
         hasActiveSession: false,
       }),
-    ).toEqual({ kind: "reauth", canSignIn: true, canReauth: false });
+    ).toEqual({ kind: "reauth", canSignIn: true, canReauth: false, canRetry: false });
   });
 
   it("offers sign-out-and-sign-in when identity FAILED with an AUTH error despite an active session — the stale-session wall", () => {
@@ -79,7 +79,7 @@ describe("resolveBootstrapView", () => {
         hasActiveSession: true,
         isAuthError: true,
       }),
-    ).toEqual({ kind: "reauth", canSignIn: false, canReauth: true });
+    ).toEqual({ kind: "reauth", canSignIn: false, canReauth: true, canRetry: false });
   });
 
   it("keeps plain retry for a NON-auth identity failure with an active session (network blip)", () => {
@@ -92,6 +92,6 @@ describe("resolveBootstrapView", () => {
         hasActiveSession: true,
         isAuthError: false,
       }),
-    ).toEqual({ kind: "reauth", canSignIn: false, canReauth: false });
+    ).toEqual({ kind: "reauth", canSignIn: false, canReauth: false, canRetry: true });
   });
 });

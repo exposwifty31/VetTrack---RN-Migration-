@@ -98,7 +98,7 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
           </Text>
         </Pressable>
       ) : null}
-      {!view.canSignIn ? (
+      {view.canRetry ? (
         <Pressable
           className="items-center rounded-xl border border-border px-6 py-3 active:opacity-80"
           accessibilityRole="button"
