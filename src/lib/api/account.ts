@@ -18,12 +18,20 @@
  * screen pre-gates the affordance on `hasRoleAtLeast`-free self-edit (any signed
  * in user may rename themselves) and disables Save until identity resolves.
  *
- * G5: this repo deliberately ships NO account-deletion or avatar-upload call.
- * `DELETE /api/users/delete-account` is a store-submission prerequisite: Apple
- * (Guideline 5.1.1(v)) requires an in-app path that INITIATES deletion, while
- * Google Play requires a deletion-request path and permits it to LINK OUT to the
- * existing web deletion resource. That lands in the G5 store-submission slice,
- * not the G3 daily-driver gate. The web deletion page already exists as the interim.
+ * Account deletion (A8): `DELETE /api/users/delete-account` is the in-app
+ * store-compliance path — Apple (Guideline 5.1.1(v)) requires an in-app INITIATE
+ * of deletion; Google Play requires an in-app deletion-request path. Verified
+ * against the Capacitor repo `server/routes/users.ts:1363` (read-only):
+ *   - requireAuthAny + authSensitiveLimiter. Self-scoped by construction — the
+ *     handler reads `req.authUser` only; no id is sent. `requireAuthAny` (not
+ *     `requireAuth`) so a status='pending' account can still self-delete.
+ *   - Success → 200 `{ success: true, ... }`.
+ *   - 409 `{code:"CONFLICT", reason:"SOLE_CLINIC_ADMIN"}` — the caller is the
+ *     only member of their clinic org; must transfer/remove the clinic first.
+ *   - 403 `{code:"FORBIDDEN", reason:"ACCOUNT_DELETION_PROTECTED"}` — a
+ *     protected demo/reviewer account that can't be deleted through the app.
+ *   - 500 `{code:"INTERNAL_ERROR", reason:"ACCOUNT_DELETION_FAILED"}`.
+ * The screen branches on the coded `reason` for a truthful per-failure message.
  */
 import * as Crypto from "expo-crypto";
 
@@ -41,6 +49,18 @@ export type UpdatedAccountUser = Readonly<{
   id: string;
   displayName: string | null;
 }>;
+
+/**
+ * Server coded `reason`s the deletion screen branches on for a truthful
+ * per-failure message. Any other/absent reason falls back to a generic error.
+ */
+export const ACCOUNT_DELETION_REASON = {
+  SOLE_CLINIC_ADMIN: "SOLE_CLINIC_ADMIN",
+  PROTECTED: "ACCOUNT_DELETION_PROTECTED",
+} as const;
+
+/** Shape of the delete-account success envelope we care about (200 `{success}`). */
+export type DeleteAccountResult = Readonly<{ success: boolean }>;
 
 /** Per-attempt request id for server-side tracing (the established scan idiom). */
 function mutationHeaders(): Record<string, string> {
@@ -76,4 +96,16 @@ export const accountApi = {
         headers: mutationHeaders(),
       },
     ),
+
+  /**
+   * DELETE /api/users/delete-account — permanently delete the caller's own
+   * account. Self-scoped server-side (reads `req.authUser`); no id or body is
+   * sent. Non-OK responses surface an `ApiCodedError` whose `reason` the screen
+   * maps to a truthful message (see `ACCOUNT_DELETION_REASON`).
+   */
+  deleteAccount: async (): Promise<DeleteAccountResult> =>
+    requestJson<DeleteAccountResult>("/api/users/delete-account", {
+      method: "DELETE",
+      headers: mutationHeaders(),
+    }),
 };

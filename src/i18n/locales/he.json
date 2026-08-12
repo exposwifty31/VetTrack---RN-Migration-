@@ -254,7 +254,18 @@
     "signOutConfirmMessage": "יהיה עליך להתחבר מחדש כדי להשתמש באפליקציה.",
     "displayNameInvalid": "שם התצוגה אינו יכול להיות ריק.",
     "updateError": "עדכון שם התצוגה נכשל. יש לנסות שוב.",
-    "localeError": "שמירת השפה נכשלה. יש לנסות שוב."
+    "localeError": "שמירת השפה נכשלה. יש לנסות שוב.",
+    "deleteAccount": "מחיקת חשבון",
+    "deleteAccountConfirmTitle": "למחוק את החשבון?",
+    "deleteAccountConfirmMessage": "פעולה זו מתחילה מחיקה לצמיתות של החשבון שלך.",
+    "deleteAccountContinue": "המשך",
+    "deleteAccountFinalTitle": "למחוק לצמיתות?",
+    "deleteAccountFinalMessage": "פעולה זו מוחקת לצמיתות את החשבון שלך ואת כל הנתונים שלך. לא ניתן לבטל אותה.",
+    "deleteAccountConfirm": "מחיקה",
+    "deleteAccountErrorTitle": "מחיקת החשבון נכשלה",
+    "deleteAccountError": "מחיקת החשבון נכשלה. יש לנסות שוב.",
+    "deleteAccountErrorSoleAdmin": "את/ה החבר/ה היחיד/ה במרפאה שלך. יש להעביר או להסיר את המרפאה לפני מחיקת חשבון זה.",
+    "deleteAccountErrorProtected": "לא ניתן למחוק חשבון זה דרך האפליקציה."
   },
   "bootstrap": {
     "reauth": "פג תוקף החיבור. התחבר שוב כדי להמשיך.",
