@@ -22,6 +22,9 @@
       }
     },
     "production": {
+      "env": {
+        "EXPO_PUBLIC_ENABLE_MEASURE": "false"
+      },
       "distribution": "store",
       "autoIncrement": false,
       "ios": {

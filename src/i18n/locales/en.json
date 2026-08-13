@@ -78,7 +78,8 @@
     "shiftChat": "Shift chat",
     "handoff": "Handoff",
     "inventory": "Inventory",
-    "autopilotQueue": "Autopilot queue"
+    "autopilotQueue": "Autopilot queue",
+    "settings": "Settings"
   },
   "home": {
     "title": "VetTrack",
@@ -141,7 +142,8 @@
     "searchA11y": "Search",
     "settingsA11y": "Settings",
     "chatA11y": "Shift chat",
-    "attentionAllA11y": "All alerts"
+    "attentionAllA11y": "All alerts",
+    "alertsA11y": "Alerts"
   },
   "tabs": {
     "today": "Today",
@@ -237,6 +239,18 @@
       "account": "Account",
       "developer": "Developer tools"
     }
+  },
+  "settings": {
+    "appearance": "Appearance",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "themeError": "Couldn't save the theme. Try again.",
+    "notifications": "Notifications",
+    "notificationsPlaceholder": "Notification preferences are coming soon.",
+    "about": "About",
+    "version": "Version {{version}}",
+    "privacyPolicy": "Privacy Policy"
   },
   "account": {
     "displayName": "Display name",
@@ -410,7 +424,16 @@
     "reading": "Reading…",
     "unsupported": "NFC is not available on this device.",
     "readFailed": "Could not read the tag. Try again.",
-    "noId": "No equipment id on this tag."
+    "noId": "No equipment id on this tag.",
+    "qrHint": "Point the QR code inside the frame",
+    "useNfc": "Scan with NFC",
+    "useQr": "Scan QR (camera)",
+    "cameraPermissionTitle": "Camera access needed",
+    "cameraPermissionBody": "VetTrack uses the camera to scan equipment QR codes.",
+    "grantCamera": "Grant camera access",
+    "cameraDenied": "Camera access was denied. Enable it in Settings to scan QR.",
+    "cameraUnavailable": "The camera failed to start. Reopen the scan screen, or scan with NFC instead.",
+    "openSettings": "Open Settings"
   },
   "confirm": {
     "title": "Confirm scan",

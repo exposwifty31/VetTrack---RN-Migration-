@@ -17,19 +17,23 @@ import { StatusBar } from "expo-status-bar";
 import { I18nextProvider } from "react-i18next";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Uniwind } from "uniwind";
+import { Uniwind, useUniwind } from "uniwind";
 
 import { ClerkTokenBridge } from "./src/infrastructure/auth/ClerkTokenBridge";
 import { PushBridge } from "./src/infrastructure/push/PushBridge";
 import { RealtimeBridge } from "./src/infrastructure/realtime/RealtimeBridge";
 import { i18n } from "./src/i18n";
+import { resolveInitialTheme } from "./src/features/account/theme-resolver";
 import { installDevAuthSeam } from "./src/lib/dev-auth";
 import { OfflineQueueBridge } from "./src/lib/offline-queue/OfflineQueueBridge";
 import { queryClient } from "./src/lib/query-client";
 import { flushPendingNavTarget, navigationRef } from "./src/navigation/navigationRef";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 
-Uniwind.setTheme("dark");
+// Theme boot: the persisted choice, else the LIGHT product default (see
+// theme-resolver). NOT a bare `setTheme()` — that silently follows the OS and
+// would change the default; "system" only follows the OS when the user picks it.
+Uniwind.setTheme(resolveInitialTheme());
 
 // Dev-only, opt-in, and refused when a Clerk key is configured — see
 // src/lib/dev-auth.ts for the five guard rails. Module scope so the identity
@@ -42,6 +46,17 @@ installDevAuthSeam();
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+
+/**
+ * Status-bar icons derived from the EFFECTIVE Uniwind theme — dark icons on the
+ * Light theme, light icons on Dark. `useUniwind().theme` is always the resolved
+ * "light" | "dark" (setTheme("system") resolves to the OS scheme and adaptive
+ * updates re-fire the listener), so this tracks live theme changes too.
+ */
+function ThemedStatusBar() {
+  const { theme } = useUniwind();
+  return <StatusBar style={theme === "light" ? "dark" : "light"} />;
+}
 
 /**
  * VetTrack RN — app root.
@@ -74,7 +89,7 @@ export default function App() {
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
-          <StatusBar style="light" />
+          <ThemedStatusBar />
           <RealtimeBridge />
           <OfflineQueueBridge />
           {/* Clerk-free + nav-context-free (drives tap navigation via navigationRef);

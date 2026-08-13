@@ -1,7 +1,6 @@
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Text, TextInput, View } from "react-native";
 import { FlashList } from "@shopify/flash-list";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useUniwind } from "uniwind";
 
@@ -19,78 +18,23 @@ import { SelectPlaceholder, TwoPane } from "@/components/tablet/TwoPane";
 import { resolveSelectedItem } from "@/components/tablet/two-pane-layout";
 import { useDualFrameSampler } from "@/hooks/useDualFrameSampler";
 import { useEquipmentRealtimeSync } from "@/hooks/useEquipmentRealtimeSync";
-import { api, equipmentKeys, type EquipmentListParams } from "@/lib/api";
+import { useEquipmentSearch } from "@/hooks/useEquipmentSearch";
 import { mark, MARK } from "@/lib/instrumentation/perf";
 import { useIsTablet } from "@/lib/use-is-tablet";
-import type { EquipmentListPage } from "@/types/api";
 
 import type { RootStackScreenProps } from "../navigation/types";
 
-/** LRU bound for the per-search ETag map — plenty for a session of live search. */
-const ETAG_CACHE_MAX = 50;
-
-const EMPTY_PAGE: EquipmentListPage = {
-  items: [],
-  total: 0,
-  page: 1,
-  pageSize: 0,
-  hasMore: false,
-};
-
 function EquipmentListBody({ navigation, route }: RootStackScreenProps<"EquipmentList">) {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
   const { theme } = useUniwind();
   const light = theme === "light";
   useEquipmentRealtimeSync();
 
-  // Seed the search from an initialQuery param — the NFC advisory fallback: a
-  // non-canonical tag (no extractable id) lands here pre-filtered by its payload.
-  const [query, setQuery] = useState(route.params?.initialQuery ?? "");
-  // useDeferredValue keeps typing responsive while the filtered query re-runs.
-  const deferredQuery = useDeferredValue(query);
-  const params: EquipmentListParams = deferredQuery ? { q: deferredQuery } : {};
-  const queryKey = equipmentKeys.list(params);
-
-  // ETag threading scoped PER query key: a shared single-slot ref would send one
-  // search's ETag on another search's request, so a 304 would return the wrong
-  // page. The map stores ONLY the ETag string — 304 bodies are served from the
-  // query cache (`queryClient.getQueryData`), so distinct searches no longer
-  // pin a full page each. The map itself is a small LRU (touch on read,
-  // evict-oldest past ETAG_CACHE_MAX) so live search can't grow it unboundedly.
-  // If the cached body is gone (gc), skip If-None-Match — a 304 with nothing
-  // to serve would fabricate an empty page.
-  const etagRef = useRef<Map<string, string>>(new Map());
-
-  const listQuery = useQuery<EquipmentListPage>({
-    queryKey,
-    queryFn: async () => {
-      const cacheKey = JSON.stringify(queryKey);
-      const etags = etagRef.current;
-      const cachedPage = queryClient.getQueryData<EquipmentListPage>(queryKey);
-      const etag = cachedPage ? etags.get(cacheKey) : undefined;
-      if (etag) {
-        // LRU touch: re-insert so the hot key moves to the back of the map.
-        etags.delete(cacheKey);
-        etags.set(cacheKey, etag);
-      }
-      const res = await api.equipment.list(params, etag);
-      if (res.status === 304) {
-        return cachedPage ?? EMPTY_PAGE;
-      }
-      if (res.etag) {
-        etags.delete(cacheKey);
-        etags.set(cacheKey, res.etag);
-        if (etags.size > ETAG_CACHE_MAX) {
-          const oldest = etags.keys().next().value;
-          if (oldest !== undefined) etags.delete(oldest);
-        }
-      } else {
-        etags.delete(cacheKey);
-      }
-      return res.data;
-    },
-  });
+  // Search-query state + ETag-threaded fetch — the shared hook, so this screen
+  // and the home QuickSearchOverlay never drift. Seed from an initialQuery param
+  // (the NFC advisory fallback: a non-canonical tag pre-filters by its payload).
+  const { query, setQuery, items, isPending, isError, isSuccess, dataUpdatedAt } =
+    useEquipmentSearch(route.params?.initialQuery ?? "");
 
   // Cold-TTI (O4) end marker: the list is interactive on its FIRST successful
   // render. A ref latches for the screen lifetime so a later search re-entering
@@ -98,11 +42,12 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
   // the latest `screenInteractive`).
   const markedInteractive = useRef(false);
   useEffect(() => {
-    if (listQuery.isSuccess && !markedInteractive.current) {
-      markedInteractive.current = true;
-      mark(MARK.screenInteractive);
+    if (isSuccess && !markedInteractive.current) {
+      // Latch ONLY on a successful mark — a swallowed performance.mark failure
+      // must leave the latch open so a later render can still record the mark.
+      markedInteractive.current = mark(MARK.screenInteractive);
     }
-  }, [listQuery.isSuccess]);
+  }, [isSuccess]);
 
   // Slice 13: on a tablet the list stays mounted in the master pane and a row
   // press SELECTS (the detail pane renders EquipmentDetail's content). On a
@@ -135,7 +80,6 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
   // hand-off (end-drag fires before momentum-begin) costs at most one frame gap.
   const { start: startScrollSampling, stop: stopScrollSampling } = useDualFrameSampler();
 
-  const items = listQuery.data?.items ?? [];
   // Selection is DERIVED from the live list, never trusted from state alone: a
   // new search (or a realtime update that drops the row) collapses the detail
   // pane back to its placeholder instead of stranding an invisible row.
@@ -182,12 +126,12 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
           </View>
         </PressableScale>
 
-        {listQuery.isPending ? (
+        {isPending ? (
           <View className="flex-1 items-center justify-center gap-2.5">
             <ActivityIndicator color={light ? "#6D28D9" : "#A78BFA"} />
             <Text className="font-rubik text-[13px] text-muted">{t("common.loading")}</Text>
           </View>
-        ) : listQuery.isError ? (
+        ) : isError ? (
           <View className="flex-1 items-center justify-center">
             <Text className="text-center font-rubik text-[15px] text-danger">
               {t("equipment.loadError")}
@@ -203,7 +147,7 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
           <FlashList
             data={items}
             renderItem={({ item }) => (
-              <EquipmentRow item={item} onPress={onRowPress} sampledAtMs={listQuery.dataUpdatedAt} />
+              <EquipmentRow item={item} onPress={onRowPress} sampledAtMs={dataUpdatedAt} />
             )}
             keyExtractor={(item) => item.id}
             getItemType={(item) => item.status}

@@ -18,6 +18,7 @@ import { RealtimeDebugScreen } from "../screens/RealtimeDebugScreen";
 import { RoomDetailScreen } from "../screens/RoomDetailScreen";
 import { RoomsScreen } from "../screens/RoomsScreen";
 import { ScanScreen } from "../screens/ScanScreen";
+import { SettingsScreen } from "../screens/SettingsScreen";
 import { ShiftChatScreen } from "../screens/ShiftChatScreen";
 import { SignInScreen } from "../screens/SignInScreen";
 import { StorageDebugScreen } from "../screens/StorageDebugScreen";
@@ -26,6 +27,10 @@ import { MainTabs } from "./MainTabs";
 import type { RootStackParamList, RootStackScreenProps } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// Measurement builds (the G3 exit-pass) opt G2Measure back in via this env; a
+// real release leaves it unset, so G2Measure is neither registered nor listed.
+const MEASURE_ENABLED = process.env.EXPO_PUBLIC_ENABLE_MEASURE === "true";
 
 // The scan path must not mount before identity resolves: `ScanScreen` starts
 // `useNfcAdvisoryScan` (NfcManager.isSupported/start) on mount, and `ScanConfirm`
@@ -140,6 +145,7 @@ export function RootNavigator() {
       }}
     >
       <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t("nav.settings") }} />
       <Stack.Screen
         name="EquipmentList"
         component={EquipmentListScreen}
@@ -151,13 +157,24 @@ export function RootNavigator() {
         component={GatedScanConfirm}
         options={{ presentation: "transparentModal", headerShown: false }}
       />
+      {/* SignIn stays registered on every build — it is the real auth-flow
+          destination (sign-out / bootstrap reauth), not merely a dev shortcut. */}
       <Stack.Screen name="SignIn" component={SignInScreen} options={{ title: t("nav.signIn") }} />
-      <Stack.Screen name="ApiSmoke" component={ApiSmokeScreen} options={{ title: t("nav.apiSmoke") }} />
-      <Stack.Screen name="NfcSpike" component={NfcSpikeScreen} options={{ title: t("nav.nfcSpike") }} />
-      <Stack.Screen name="StorageDebug" component={StorageDebugScreen} options={{ title: t("nav.storageDebug") }} />
-      <Stack.Screen name="RealtimeDebug" component={RealtimeDebugScreen} options={{ title: t("nav.realtimeDebug") }} />
-      <Stack.Screen name="I18nDebug" component={I18nDebugScreen} options={{ title: t("nav.i18nDebug") }} />
-      <Stack.Screen name="G2Measure" component={G2MeasureScreen} options={{ title: t("nav.g2Measure") }} />
+      {/* Pure-debug screens — registered only in a __DEV__ build, matching their
+          gated Menu rows so a real release has no navigation target for them. */}
+      {__DEV__ ? (
+        <Stack.Group>
+          <Stack.Screen name="ApiSmoke" component={ApiSmokeScreen} options={{ title: t("nav.apiSmoke") }} />
+          <Stack.Screen name="NfcSpike" component={NfcSpikeScreen} options={{ title: t("nav.nfcSpike") }} />
+          <Stack.Screen name="StorageDebug" component={StorageDebugScreen} options={{ title: t("nav.storageDebug") }} />
+          <Stack.Screen name="RealtimeDebug" component={RealtimeDebugScreen} options={{ title: t("nav.realtimeDebug") }} />
+          <Stack.Screen name="I18nDebug" component={I18nDebugScreen} options={{ title: t("nav.i18nDebug") }} />
+        </Stack.Group>
+      ) : null}
+      {/* G2Measure — only in a measurement build (EXPO_PUBLIC_ENABLE_MEASURE). */}
+      {MEASURE_ENABLED ? (
+        <Stack.Screen name="G2Measure" component={G2MeasureScreen} options={{ title: t("nav.g2Measure") }} />
+      ) : null}
       {/* G3 routes — placeholders until their slices land. */}
       <Stack.Screen name="EquipmentDetail" component={GatedEquipmentDetail} options={{ title: t("nav.equipmentDetail") }} />
       <Stack.Screen name="Tasks" component={GatedTasks} options={{ title: t("nav.tasks") }} />

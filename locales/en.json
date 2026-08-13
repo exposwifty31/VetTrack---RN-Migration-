@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "VetTrack uses the camera to scan equipment QR codes."
+  }
+}

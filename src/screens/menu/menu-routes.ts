@@ -7,10 +7,10 @@
  * entries (a Menu tap has no id to pass); they are reached from their list
  * screens. Everything here is a `navigation.navigate("<Route>")` with no params.
  *
- * The Developer entries preserve EVERY debug screen reachable from the old
- * debug-launcher Menu — nothing is deleted. They render under a section that is
- * collapsed by default but ALWAYS rendered (NOT `__DEV__`-gated), so G2Measure
- * stays reachable on a release build for the exit-pass (see MenuScreen).
+ * The Developer entries are BUILD-GATED (Settings wave): the debug launchers show
+ * only in a `__DEV__` build, and G2Measure only when EXPO_PUBLIC_ENABLE_MEASURE
+ * is "true" (a measurement build — its G3 exit-pass path). A real release build
+ * (neither) exposes NO developer tools. See `computeDeveloperEntries`.
  */
 import { isCustodyScopedRole } from "@/navigation/main-tab-set";
 import type { RootStackParamList } from "@/navigation/types";
@@ -59,19 +59,45 @@ export const SESSION_ENTRIES = [
 ] as const satisfies readonly MenuEntry[];
 
 /**
- * Developer — every debug/dev screen from the old Menu, preserved. Rendered under
- * a collapsed-by-default but ALWAYS-rendered section (not `__DEV__`-gated) so
- * every screen — G2Measure especially — stays reachable on a release build.
+ * The `__DEV__`-only debug launchers: SignIn (a dev shortcut — the SignIn screen
+ * itself stays registered and is reached in a release via sign-out / bootstrap
+ * reauth) plus the five pure-debug screens.
  */
-export const DEVELOPER_ENTRIES = [
+const DEBUG_LAUNCHERS = [
   { route: "SignIn", labelKey: "nav.signIn" },
   { route: "ApiSmoke", labelKey: "nav.apiSmoke" },
   { route: "NfcSpike", labelKey: "nav.nfcSpike" },
   { route: "StorageDebug", labelKey: "nav.storageDebug" },
   { route: "RealtimeDebug", labelKey: "nav.realtimeDebug" },
   { route: "I18nDebug", labelKey: "nav.i18nDebug" },
-  { route: "G2Measure", labelKey: "nav.g2Measure" },
 ] as const satisfies readonly MenuEntry[];
+
+/**
+ * G2Measure has no other UI entry point; it is reached ONLY when a measurement
+ * build sets EXPO_PUBLIC_ENABLE_MEASURE="true" (the G3 exit-pass). To re-enable
+ * it on a release artifact, set that env in the eas.json production profile.
+ */
+const MEASURE_ENTRY = { route: "G2Measure", labelKey: "nav.g2Measure" } as const satisfies MenuEntry;
+
+/**
+ * Build-gated developer entries (pure — flags injected so it is unit-testable):
+ * `__DEV__` exposes the debug launchers; the measure flag adds G2Measure. A real
+ * release build (both false) returns [] → the Developer section renders nothing.
+ */
+export function computeDeveloperEntries(
+  flags: Readonly<{ isDev: boolean; measureEnabled: boolean }>,
+): readonly MenuEntry[] {
+  return [
+    ...(flags.isDev ? DEBUG_LAUNCHERS : []),
+    ...(flags.measureEnabled ? [MEASURE_ENTRY] : []),
+  ];
+}
+
+/** The developer entries for THIS build (empty in a real release). */
+export const DEVELOPER_ENTRIES = computeDeveloperEntries({
+  isDev: __DEV__,
+  measureEnabled: process.env.EXPO_PUBLIC_ENABLE_MEASURE === "true",
+});
 
 /** The custody-scoped-only entry hidden from the Operations list for students. */
 export const CUSTODY_HIDDEN_ROUTE: ParamFreeRoute = "MyEquipment";

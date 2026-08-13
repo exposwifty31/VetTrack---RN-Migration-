@@ -79,7 +79,8 @@
     "shiftChat": "צ'אט משמרת",
     "handoff": "העברת משמרת",
     "inventory": "מלאי",
-    "autopilotQueue": "תור האוטופיילוט"
+    "autopilotQueue": "תור האוטופיילוט",
+    "settings": "הגדרות"
   },
   "home": {
     "title": "VetTrack",
@@ -142,7 +143,8 @@
     "searchA11y": "חיפוש",
     "settingsA11y": "הגדרות",
     "chatA11y": "צ'אט משמרת",
-    "attentionAllA11y": "כל ההתראות"
+    "attentionAllA11y": "כל ההתראות",
+    "alertsA11y": "התראות"
   },
   "tabs": {
     "today": "היום",
@@ -245,6 +247,18 @@
       "account": "חשבון",
       "developer": "כלי פיתוח ובדיקה"
     }
+  },
+  "settings": {
+    "appearance": "מראה",
+    "themeLight": "בהיר",
+    "themeDark": "כהה",
+    "themeSystem": "מערכת",
+    "themeError": "שמירת ערכת הנושא נכשלה. נסו שוב.",
+    "notifications": "התראות",
+    "notificationsPlaceholder": "העדפות ההתראות יתווספו בקרוב.",
+    "about": "אודות",
+    "version": "גרסה {{version}}",
+    "privacyPolicy": "מדיניות פרטיות"
   },
   "account": {
     "displayName": "שם תצוגה",
@@ -418,7 +432,16 @@
     "reading": "קורא…",
     "unsupported": "NFC אינו זמין במכשיר זה.",
     "readFailed": "לא ניתן לקרוא את התווית. נסה שוב.",
-    "noId": "אין מזהה ציוד בתווית זו."
+    "noId": "אין מזהה ציוד בתווית זו.",
+    "qrHint": "כוונו את קוד ה-QR אל תוך המסגרת",
+    "useNfc": "סריקה עם NFC",
+    "useQr": "סריקת QR (מצלמה)",
+    "cameraPermissionTitle": "נדרשת גישה למצלמה",
+    "cameraPermissionBody": "VetTrack משתמש במצלמה כדי לסרוק קודי QR של ציוד.",
+    "grantCamera": "אישור גישה למצלמה",
+    "cameraDenied": "הגישה למצלמה נדחתה. יש לאפשר אותה בהגדרות כדי לסרוק QR.",
+    "cameraUnavailable": "המצלמה לא הופעלה. פתחו מחדש את מסך הסריקה, או סרקו עם NFC במקום.",
+    "openSettings": "פתיחת הגדרות"
   },
   "confirm": {
     "title": "אישור סריקה",

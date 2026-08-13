@@ -10,6 +10,7 @@ import {
   DEVELOPER_ENTRIES,
   OPERATIONS_ENTRIES,
   SESSION_ENTRIES,
+  computeDeveloperEntries,
   visibleOperationsEntries,
 } from "../menu-routes";
 
@@ -31,17 +32,35 @@ describe("menu route map", () => {
     expect(SESSION_ENTRIES).toEqual([{ route: "Handoff", labelKey: "menu.endShift" }]);
   });
 
-  it("Developer preserves EVERY debug screen from the old Menu (nothing deleted)", () => {
-    // The exact set the G1 debug-launcher Menu exposed.
-    expect(routesOf(DEVELOPER_ENTRIES)).toEqual([
-      "SignIn",
-      "ApiSmoke",
-      "NfcSpike",
-      "StorageDebug",
-      "RealtimeDebug",
-      "I18nDebug",
-      "G2Measure",
-    ]);
+  describe("computeDeveloperEntries — no dev tools reach a real release build", () => {
+    const DEBUG_LAUNCHERS = ["SignIn", "ApiSmoke", "NfcSpike", "StorageDebug", "RealtimeDebug", "I18nDebug"];
+
+    it("a real release (no __DEV__, measure flag off) exposes NO developer tools", () => {
+      expect(computeDeveloperEntries({ isDev: false, measureEnabled: false })).toEqual([]);
+    });
+
+    it("a dev build exposes the six debug launchers (SignIn + the five debug screens)", () => {
+      expect(routesOf(computeDeveloperEntries({ isDev: true, measureEnabled: false }))).toEqual(
+        DEBUG_LAUNCHERS,
+      );
+    });
+
+    it("a measurement release (flag on) reaches ONLY G2Measure — the G3 exit-pass path survives", () => {
+      expect(computeDeveloperEntries({ isDev: false, measureEnabled: true })).toEqual([
+        { route: "G2Measure", labelKey: "nav.g2Measure" },
+      ]);
+    });
+
+    it("a dev build with the measure flag shows the launchers and G2Measure", () => {
+      expect(routesOf(computeDeveloperEntries({ isDev: true, measureEnabled: true }))).toEqual([
+        ...DEBUG_LAUNCHERS,
+        "G2Measure",
+      ]);
+    });
+
+    it("the runtime DEVELOPER_ENTRIES reflects the jest context (__DEV__ true, flag unset)", () => {
+      expect(routesOf(DEVELOPER_ENTRIES)).toEqual(DEBUG_LAUNCHERS);
+    });
   });
 
   it("never routes to an id-parameterised screen from the Menu", () => {

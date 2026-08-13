@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "נדרשת גישה למצלמה לסריקת קודי QR של ציוד."
+  }
+}
