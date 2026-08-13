@@ -71,7 +71,7 @@ jest.mock("uniwind", () => ({ useUniwind: () => ({ theme: "dark" }) }));
 // Identity t that RECORDS its calls — the replace-flow tests assert the exact
 // interpolation option names ({name}/{team}) reach i18next (review finding:
 // renaming a call-site option key would otherwise ship a literal "{{name}}").
-const mockTCalls: Array<[string, Record<string, unknown> | undefined]> = [];
+const mockTCalls: [string, Record<string, unknown> | undefined][] = [];
 jest.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) => {

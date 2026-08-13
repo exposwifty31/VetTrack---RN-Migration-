@@ -8,6 +8,14 @@
  * (fail-open on error) before letting the user commit a team — an eligible
  * senior must not be able to commit before the senior toggle could render.
  */
+import {
+  DOCTOR_GATE_SNOOZE_KEY,
+  DOCTOR_GATE_SNOOZE_MS,
+  readGateSnooze,
+  resolveDoctorGateView,
+  writeGateSnooze,
+} from "../doctor-gate-derive";
+
 const mockGet = jest.fn((_key: string, _kind?: string): string | null => null);
 const mockSet = jest.fn((_key: string, _value: string, _kind?: string): boolean => true);
 
@@ -16,14 +24,6 @@ jest.mock("@/lib/safe-storage", () => ({
   safeStorageSetItem: (key: string, value: string, kind?: string) => mockSet(key, value, kind),
   safeStorageRemoveItem: jest.fn((): boolean => true),
 }));
-
-import {
-  DOCTOR_GATE_SNOOZE_KEY,
-  DOCTOR_GATE_SNOOZE_MS,
-  readGateSnooze,
-  resolveDoctorGateView,
-  writeGateSnooze,
-} from "../doctor-gate-derive";
 
 const NOW = 1_755_000_000_000;
 

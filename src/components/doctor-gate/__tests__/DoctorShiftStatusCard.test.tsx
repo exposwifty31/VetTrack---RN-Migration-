@@ -60,7 +60,7 @@ jest.mock("@/components/PressableScale", () => {
 jest.mock("uniwind", () => ({ useUniwind: () => ({ theme: "dark" }) }));
 // Identity t that RECORDS its calls — asserts the exact interpolation option
 // names reach i18next (see the DoctorShiftGate suite note).
-const mockTCalls: Array<[string, Record<string, unknown> | undefined]> = [];
+const mockTCalls: [string, Record<string, unknown> | undefined][] = [];
 jest.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) => {

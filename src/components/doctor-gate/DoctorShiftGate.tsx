@@ -42,7 +42,7 @@
  * outside the RN root view on Android, detaching it from App.tsx's root).
  */
 import type { ReactElement } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Modal, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -331,9 +331,10 @@ export function DoctorShiftGate(): ReactElement | null {
   // Session latch (review finding 5): an observed active check-in answers the
   // gate for this session — when end-shift / force-close / auto-expiry later
   // flips the query to null, the gate must NOT pop over the vet's screen.
-  useEffect(() => {
-    if (hasActiveCheckIn) setDismissed(true);
-  }, [hasActiveCheckIn]);
+  // Guarded render-time adjustment (react.dev "adjusting state when props
+  // change") instead of an effect: converges in one re-render, latches before
+  // paint, and satisfies react-hooks/set-state-in-effect.
+  if (hasActiveCheckIn && !dismissed) setDismissed(true);
 
   if (!isVet) return null;
 
