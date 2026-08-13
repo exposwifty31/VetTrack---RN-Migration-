@@ -46,14 +46,17 @@ import {
 
 import { resolveDoctorGateView, readGateSnooze, writeGateSnooze } from "./doctor-gate-derive";
 
-/** Typed against the generated i18n key union — server team value → label key. */
-const TEAM_LABEL_KEYS = {
+/**
+ * Typed against the generated i18n key union — server team value → label key.
+ * Exported for the status card (Task 5): one label source per team value.
+ */
+export const TEAM_LABEL_KEYS = {
   icu: "doctorGate.teamIcu",
   admission: "doctorGate.teamAdmission",
   internal_medicine: "doctorGate.teamInternalMedicine",
 } as const satisfies Record<DoctorTeamRole, string>;
 
-const TEAM_OPTIONS = ["icu", "admission", "internal_medicine"] as const satisfies readonly DoctorTeamRole[];
+export const TEAM_OPTIONS = ["icu", "admission", "internal_medicine"] as const satisfies readonly DoctorTeamRole[];
 
 /** Yes/No chip on the ask step — KindSegment geometry, side-by-side. */
 function AskChip({
@@ -79,8 +82,11 @@ function AskChip({
   );
 }
 
-/** Senior takeover switch — the EmergencyToggle row shape, non-danger accents. */
-function SeniorToggle({
+/**
+ * Senior takeover switch — the EmergencyToggle row shape, non-danger accents.
+ * Exported for the status card's switch sheet (Task 5).
+ */
+export function SeniorToggle({
   isSenior,
   onToggle,
 }: Readonly<{ isSenior: boolean; onToggle: () => void }>) {
