@@ -647,6 +647,7 @@
     "endShift": "End shift",
     "endShiftConfirmTitle": "End your shift?",
     "endShiftConfirmBody": "Your on-shift status will be cleared from the board.",
+    "endShiftFailed": "Couldn't end the shift — try again",
     "switchRole": "Switch role",
     "checkInFailed": "Check-in failed — try again"
   },

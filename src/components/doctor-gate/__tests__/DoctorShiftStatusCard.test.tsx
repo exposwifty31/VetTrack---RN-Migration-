@@ -49,13 +49,25 @@ jest.mock("@/app/useIdentity", () => ({
 jest.mock("@/components/ui/BottomSheet", () => ({
   BottomSheet: ({ children }: { children: React.ReactNode }) => children,
 }));
+jest.mock("react-native-gesture-handler", () => {
+  const { View } = jest.requireActual<typeof import("react-native")>("react-native");
+  return { GestureHandlerRootView: View };
+});
 jest.mock("@/components/PressableScale", () => {
   const { Pressable } = jest.requireActual<typeof import("react-native")>("react-native");
   return { PressableScale: Pressable };
 });
 jest.mock("uniwind", () => ({ useUniwind: () => ({ theme: "dark" }) }));
+// Identity t that RECORDS its calls — asserts the exact interpolation option
+// names reach i18next (see the DoctorShiftGate suite note).
+const mockTCalls: Array<[string, Record<string, unknown> | undefined]> = [];
 jest.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      mockTCalls.push([key, opts]);
+      return key;
+    },
+  }),
 }));
 
 type IdentityShape = Readonly<{
@@ -159,6 +171,7 @@ function alertButton(textKey: string): AlertButton {
 beforeEach(() => {
   mockAuthFetch.mockReset();
   mockUseIdentity.mockReset();
+  mockTCalls.length = 0;
   jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
 });
 
@@ -196,6 +209,11 @@ describe("DoctorShiftStatusCard — status line", () => {
     await renderCard();
     await waitForStatus();
     expect(screen.queryByText("doctorGate.onShiftSenior")).toBeNull();
+    // Interpolation wiring: the status line must pass the team label under {team}.
+    expect(mockTCalls).toContainEqual([
+      "doctorGate.onShiftStatus",
+      { team: "doctorGate.teamIcu" },
+    ]);
   });
 
   it("adds the senior suffix when the row isSenior", async () => {
@@ -248,6 +266,25 @@ describe("DoctorShiftStatusCard — end shift", () => {
     });
 
     expect(postedBodies()).toHaveLength(0);
+  });
+
+  it("a check-out failure alerts with the dedicated endShiftFailed copy and keeps the card", async () => {
+    // The failing operation is ENDING the shift — the alert must not read
+    // "Check-in failed" (review finding: opposite-of-intent copy).
+    mockUseIdentity.mockReturnValue(VET);
+    routeAuthFetch(ACTIVE_ROW, [jsonResponse(500, { code: "INTERNAL" })]);
+    await renderCard();
+    await waitForStatus();
+
+    await press(screen.getByText("doctorGate.endShift"));
+    await act(async () => {
+      alertButton("doctorGate.endShift").onPress?.();
+    });
+
+    await waitFor(() =>
+      expect(Alert.alert).toHaveBeenLastCalledWith("doctorGate.endShiftFailed"),
+    );
+    expect(screen.getByText("doctorGate.onShiftStatus")).toBeTruthy();
   });
 });
 
@@ -360,6 +397,28 @@ describe("DoctorShiftStatusCard — SENIOR_ALREADY_ASSIGNED replace flow", () =>
     await waitFor(() => expect(screen.queryByText("doctorGate.replaceSeniorTitle")).toBeNull());
     expect(screen.getByText("doctorGate.pickTeam")).toBeTruthy();
     expect(postedBodies()).toHaveLength(1);
+  });
+
+  it("a non-409 replace failure keeps the replace step and shows checkInFailed", async () => {
+    // Review finding: the replace step previously swallowed non-conflict
+    // errors — buttons re-enabled with zero visible feedback.
+    mockUseIdentity.mockReturnValue(SENIOR_VET);
+    routeAuthFetch(ACTIVE_ROW, [
+      conflict409("Dr. Shapiro"),
+      jsonResponse(500, { code: "INTERNAL" }),
+    ]);
+    await renderCard();
+    await waitForStatus();
+    await press(screen.getByText("doctorGate.switchRole"));
+    await press(screen.getByLabelText("doctorGate.iAmSenior"));
+    await press(screen.getByText("doctorGate.teamAdmission"));
+    await waitFor(() => expect(screen.getByText("doctorGate.replaceSeniorTitle")).toBeTruthy());
+
+    await press(screen.getByText("doctorGate.replace"));
+
+    await waitFor(() => expect(screen.getByText("doctorGate.checkInFailed")).toBeTruthy());
+    expect(screen.getByText("doctorGate.replaceSeniorTitle")).toBeTruthy();
+    expect(screen.queryByText("doctorGate.pickTeam")).toBeNull();
   });
 });
 

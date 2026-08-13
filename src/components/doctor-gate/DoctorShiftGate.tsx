@@ -8,9 +8,15 @@
  * hosting the `BottomSheet` primitive (navigation files frozen, no new route).
  * Blur budget: the sheet's T2 glass exists only while the modal is open.
  *
- * Behavior contract (plan Task 4 + the PR #180 contract delta):
+ * Behavior contract (plan Task 4 + the PR #180 contract delta + review wave):
  *   - Audience is `effectiveRole === "vet"` exactly; everyone else renders null
  *     and the active-check-in query never fires.
+ *   - Visibility is FAIL-CLOSED on the active-check-in lookup (vettrack
+ *     `useDoctorGateState` mirror): an errored GET never shows the gate — the
+ *     fail-open carve-out applies to /users/me eligibility ONLY.
+ *   - Session latch: once an active check-in has been OBSERVED this session,
+ *     the gate is answered — end-shift / admin force-close / 14h auto-expiry
+ *     flipping the query to null must NOT pop the gate over the vet's screen.
  *   - "לא" writes the 8h MMKV snooze and dismisses; drag-down/back dismisses
  *     WITHOUT snoozing (the gate may ask again next session).
  *   - Senior toggle renders only for `seniorDoctorEligible === true`
@@ -21,17 +27,26 @@
  *   - `eligibilityPending` (Task 3): while /users/me hasn't settled the team
  *     buttons are disabled so an eligible senior cannot commit before the
  *     toggle could render. Settled-with-error counts as settled (fail-open).
- *   - 409 SENIOR_ALREADY_ASSIGNED → inline replace-confirm; a null
- *     `details.currentSeniorName` (race path) renders the generic body.
- *     החלף retries the SAME team with `replaceSenior: true`; ביטול returns to
- *     the pick. Other errors → checkInFailed note, sheet stays.
+ *   - 409 SENIOR_ALREADY_ASSIGNED → replace-confirm held in EXPLICIT step
+ *     state (the SwitchStep pattern) so the confirm view stays mounted across
+ *     the retry; a null `details.currentSeniorName` (race path) renders the
+ *     generic body. החלף retries the SAME team with `replaceSenior: true`;
+ *     ביטול returns to the pick. A non-conflict retry failure keeps the
+ *     replace view and shows the checkInFailed note.
+ *   - 409 ALREADY_CHECKED_IN is success-shaped (a row was opened elsewhere,
+ *     e.g. the web app): invalidate + dismiss — never a retry-forever error.
  *   - Success → invalidate the canonical `clinicalCheckInKeys.all` + dismiss.
+ *
+ * Android: the BottomSheet's RNGH Pan gesture requires its own
+ * `GestureHandlerRootView` INSIDE the native Modal (a Modal's content mounts
+ * outside the RN root view on Android, detaching it from App.tsx's root).
  */
 import type { ReactElement } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { useIdentity } from "@/app/useIdentity";
 import { PressableScale } from "@/components/PressableScale";
@@ -39,6 +54,7 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import {
   clinicalCheckInApi,
   clinicalCheckInKeys,
+  isAlreadyCheckedIn,
   readSeniorConflict,
   type DoctorTeamRole,
   type OpenCheckInInput,
@@ -57,6 +73,9 @@ export const TEAM_LABEL_KEYS = {
 } as const satisfies Record<DoctorTeamRole, string>;
 
 export const TEAM_OPTIONS = ["icu", "admission", "internal_medicine"] as const satisfies readonly DoctorTeamRole[];
+
+/** Static style for the modal-scoped GestureHandlerRootView (third-party — no className). */
+const FLEX_1 = { flex: 1 } as const;
 
 /** Yes/No chip on the ask step — KindSegment geometry, side-by-side. */
 function AskChip({
@@ -123,6 +142,17 @@ type GateContentProps = Readonly<{
   onComplete: () => void;
 }>;
 
+/**
+ * Explicit step state (the status card's SwitchStep pattern): the replace
+ * confirm is a STATE, not a live-mutation-derived view — pressing החלף resets
+ * the mutation to pending, which must not collapse the confirm back to the
+ * team pick mid-retry (review findings 3/6).
+ */
+type GateStep =
+  | { kind: "ask" }
+  | { kind: "pick" }
+  | { kind: "replace"; team: DoctorTeamRole; currentSeniorName: string | null };
+
 function GateContent({
   seniorEligible,
   eligibilityPending,
@@ -132,10 +162,8 @@ function GateContent({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  const [step, setStep] = useState<"ask" | "pick">("ask");
+  const [step, setStep] = useState<GateStep>({ kind: "ask" });
   const [isSenior, setIsSenior] = useState(false);
-  /** The team of the in-flight/last commit — the replace retry re-targets it. */
-  const [committedTeam, setCommittedTeam] = useState<DoctorTeamRole | null>(null);
 
   const checkIn = useMutation({
     mutationFn: (input: OpenCheckInInput) => clinicalCheckInApi.open(input),
@@ -143,41 +171,62 @@ function GateContent({
       void queryClient.invalidateQueries({ queryKey: clinicalCheckInKeys.all });
       onComplete();
     },
+    onError: (err: unknown, variables) => {
+      if (isAlreadyCheckedIn(err)) {
+        // Success-shaped: a row was opened elsewhere (web app) while the gate
+        // was up — reconcile + dismiss; retrying can never succeed.
+        void queryClient.invalidateQueries({ queryKey: clinicalCheckInKeys.all });
+        onComplete();
+        return;
+      }
+      const conflict = readSeniorConflict(err);
+      if (conflict !== null) {
+        setStep({
+          kind: "replace",
+          team: variables.operationalRole,
+          currentSeniorName: conflict.currentSeniorName,
+        });
+      }
+    },
   });
 
-  const conflict = checkIn.isError ? readSeniorConflict(checkIn.error) : null;
   const commitBlocked = eligibilityPending || checkIn.isPending;
+  /** A settled non-conflict failure (conflicts route to the replace step). */
+  const failedGeneric = checkIn.isError && readSeniorConflict(checkIn.error) === null;
 
   const commitTeam = (team: DoctorTeamRole) => {
     if (commitBlocked) return;
-    setCommittedTeam(team);
     checkIn.mutate({ operationalRole: team, isSenior });
   };
 
-  if (step === "ask") {
+  if (step.kind === "ask") {
     return (
       <View className="gap-3.5">
         <Text className="text-center font-rubik-bold text-[17px] text-foreground">
           {t("doctorGate.areYouOnShift")}
         </Text>
         <View className="flex-row gap-2">
-          <AskChip label={t("doctorGate.yes")} emphasized onPress={() => setStep("pick")} />
+          <AskChip
+            label={t("doctorGate.yes")}
+            emphasized
+            onPress={() => setStep({ kind: "pick" })}
+          />
           <AskChip label={t("doctorGate.no")} emphasized={false} onPress={onDecline} />
         </View>
       </View>
     );
   }
 
-  if (conflict !== null && committedTeam !== null) {
-    const team = t(TEAM_LABEL_KEYS[committedTeam]);
+  if (step.kind === "replace") {
+    const team = t(TEAM_LABEL_KEYS[step.team]);
     return (
       <View className="gap-3.5">
         <Text className="text-center font-rubik-bold text-[17px] text-foreground">
           {t("doctorGate.replaceSeniorTitle")}
         </Text>
         <Text className="text-center font-rubik text-[14px] text-muted">
-          {conflict.currentSeniorName !== null
-            ? t("doctorGate.replaceSeniorBody", { name: conflict.currentSeniorName, team })
+          {step.currentSeniorName !== null
+            ? t("doctorGate.replaceSeniorBody", { name: step.currentSeniorName, team })
             : t("doctorGate.replaceSeniorBodyGeneric", { team })}
         </Text>
         <PressableScale
@@ -189,7 +238,7 @@ function GateContent({
             checkIn.isPending ? "opacity-60" : ""
           }`}
           onPress={() =>
-            checkIn.mutate({ operationalRole: committedTeam, isSenior, replaceSenior: true })
+            checkIn.mutate({ operationalRole: step.team, isSenior, replaceSenior: true })
           }
         >
           <Text className="font-rubik-semibold text-[15px] text-foreground">
@@ -200,12 +249,20 @@ function GateContent({
           accessibilityRole="button"
           accessibilityLabel={t("doctorGate.cancel")}
           className="min-h-[44px] items-center justify-center"
-          onPress={() => checkIn.reset()}
+          onPress={() => {
+            checkIn.reset();
+            setStep({ kind: "pick" });
+          }}
         >
           <Text className="font-rubik-semibold text-[14px] text-muted">
             {t("doctorGate.cancel")}
           </Text>
         </PressableScale>
+        {failedGeneric ? (
+          <Text className="text-center font-rubik-semibold text-[13px] text-danger">
+            {t("doctorGate.checkInFailed")}
+          </Text>
+        ) : null}
       </View>
     );
   }
@@ -240,7 +297,7 @@ function GateContent({
         ))}
       </View>
 
-      {checkIn.isError && conflict === null ? (
+      {failedGeneric ? (
         <Text className="text-center font-rubik-semibold text-[13px] text-danger">
           {t("doctorGate.checkInFailed")}
         </Text>
@@ -270,12 +327,22 @@ export function DoctorShiftGate(): ReactElement | null {
   /** Session-local dismissal (לא, drag-down, back, or a completed check-in). */
   const [dismissed, setDismissed] = useState(false);
 
+  const hasActiveCheckIn = activeQuery.data?.active != null;
+  // Session latch (review finding 5): an observed active check-in answers the
+  // gate for this session — when end-shift / force-close / auto-expiry later
+  // flips the query to null, the gate must NOT pop over the vet's screen.
+  useEffect(() => {
+    if (hasActiveCheckIn) setDismissed(true);
+  }, [hasActiveCheckIn]);
+
   if (!isVet) return null;
 
   const resolution = resolveDoctorGateView({
     effectiveRole: identity.data?.effectiveRole,
-    activeLoaded: activeQuery.isSuccess || activeQuery.isError,
-    hasActiveCheckIn: activeQuery.data?.active != null,
+    // FAIL-CLOSED (vettrack mirror): an errored lookup never shows the gate.
+    // The fail-open carve-out applies to /users/me eligibility only.
+    activeLoaded: activeQuery.isSuccess,
+    hasActiveCheckIn,
     eligibilitySettled: identity.isSuccess || identity.isError,
     snoozeUntilMs,
     nowMs: mountedAtMs,
@@ -299,14 +366,19 @@ export function DoctorShiftGate(): ReactElement | null {
       onRequestClose={dismiss}
     >
       {visible ? (
-        <BottomSheet onDismiss={dismiss}>
-          <GateContent
-            seniorEligible={identity.data?.seniorDoctorEligible === true}
-            eligibilityPending={resolution.eligibilityPending}
-            onDecline={declineAndSnooze}
-            onComplete={dismiss}
-          />
-        </BottomSheet>
+        // Android: RNGH gestures inside a native Modal need their own root
+        // view — the Modal's content mounts outside App.tsx's
+        // GestureHandlerRootView (RNGH docs; review finding 7).
+        <GestureHandlerRootView style={FLEX_1}>
+          <BottomSheet onDismiss={dismiss}>
+            <GateContent
+              seniorEligible={identity.data?.seniorDoctorEligible === true}
+              eligibilityPending={resolution.eligibilityPending}
+              onDecline={declineAndSnooze}
+              onComplete={dismiss}
+            />
+          </BottomSheet>
+        </GestureHandlerRootView>
       ) : null}
     </Modal>
   );

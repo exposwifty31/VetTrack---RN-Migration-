@@ -22,6 +22,11 @@
  * The vendored legacy `doctor-operational-shift` enum (`admission|ward|…`) is
  * deliberately NOT imported — the gate's team taxonomy is the server's
  * `icu|admission|internal_medicine`.
+ *
+ * Offline: all three mutations are EXCLUDED from the G4-6 offline write-queue
+ * (`offline-queue.ts` `TIME_SENSITIVE_PREFIXES`) — presence intent is bound to
+ * "now"; a replayed /switch or replaceSenior would reassign clinical
+ * responsibility long after the user's actual intent.
  */
 import * as Crypto from "expo-crypto";
 
@@ -66,6 +71,20 @@ type MutationOptions = Readonly<{
 
 /** 409 code when another senior already holds the requested team. */
 export const SENIOR_ALREADY_ASSIGNED = "SENIOR_ALREADY_ASSIGNED";
+
+/** 409 code when the caller already has an open check-in row (`openCheckIn`). */
+export const ALREADY_CHECKED_IN = "ALREADY_CHECKED_IN";
+
+/**
+ * True for the 409 ALREADY_CHECKED_IN error — reachable when the vet checked
+ * in elsewhere (web app) while the gate was open. Success-shaped for the gate:
+ * retrying can never succeed, so callers reconcile (invalidate) + dismiss.
+ */
+export function isAlreadyCheckedIn(err: unknown): boolean {
+  return (
+    typeof err === "object" && err !== null && (err as { code?: unknown }).code === ALREADY_CHECKED_IN
+  );
+}
 
 export type SeniorConflict = Readonly<{ currentSeniorName: string | null }>;
 

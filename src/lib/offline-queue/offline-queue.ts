@@ -38,6 +38,21 @@ import { readQueue, writeQueue } from "./offline-queue-store";
 const WRITABLE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /**
+ * Presence-shaped endpoints whose intent is bound to "now" — never queued for
+ * later replay (doctor-shift-gate review, RN-only divergence risk): a replayed
+ * `/switch` SUCCEEDS by design against whatever row is open at replay time,
+ * and a queued `replaceSenior: true` silently demotes whoever is senior THEN —
+ * clinical-responsibility reassignment with zero user intent at that moment.
+ * A queued `/check-out` likewise closes whatever row is open later. The user
+ * sees the network failure and re-expresses intent once online instead.
+ */
+const TIME_SENSITIVE_PREFIXES = ["/api/clinical-check-in/"] as const;
+
+function isTimeSensitiveEndpoint(endpoint: string): boolean {
+  return TIME_SENSITIVE_PREFIXES.some((prefix) => endpoint.startsWith(prefix));
+}
+
+/**
  * Consecutive-transient-failure threshold that opens the circuit WITHIN one
  * replay pass. Lower than the web sync-engine's desktop threshold (5): on a
  * mobile connection a handful of back-to-back failures already means "still
@@ -118,15 +133,17 @@ export interface EnqueueOfflineWriteInput {
 
 /**
  * Capture a non-emergency domain write for later replay. Returns the
- * persisted row, or `null` when the write was refused — either because it
- * targets an emergency endpoint (doctrine guard) or is a non-write method
- * (GET/HEAD) or not an `/api/*` path.
+ * persisted row, or `null` when the write was refused — because it targets an
+ * emergency endpoint (doctrine guard) or a time-sensitive presence endpoint
+ * (clinical check-in — see `TIME_SENSITIVE_PREFIXES`), or is a non-write
+ * method (GET/HEAD) or not an `/api/*` path.
  */
 export function enqueueOfflineWrite(input: EnqueueOfflineWriteInput): PendingSync | null {
   const method = input.method.toUpperCase();
   if (!input.endpoint.startsWith("/api/")) return null;
   if (!WRITABLE_METHODS.has(method)) return null;
   if (classifyEmergencyEndpoint(input.endpoint, method)) return null; // frozen doctrine
+  if (isTimeSensitiveEndpoint(input.endpoint)) return null; // presence intent is bound to "now"
 
   const now = Date.now();
   const nowDate = new Date(now);

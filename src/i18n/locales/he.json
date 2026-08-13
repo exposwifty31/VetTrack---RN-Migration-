@@ -655,6 +655,7 @@
     "endShift": "סיום משמרת",
     "endShiftConfirmTitle": "לסיים את המשמרת?",
     "endShiftConfirmBody": "הסטטוס שלך במשמרת יוסר מהלוח.",
+    "endShiftFailed": "סיום המשמרת נכשל — נסה שוב",
     "switchRole": "שינוי תפקיד",
     "checkInFailed": "הסימון נכשל — נסה שוב"
   },

@@ -20,7 +20,13 @@ export type DoctorGateResolution = Readonly<{
 export function resolveDoctorGateView(
   args: Readonly<{
     effectiveRole: string | undefined;
-    /** The active-check-in query settled (success or error). */
+    /**
+     * The active-check-in query loaded SUCCESSFULLY. FAIL-CLOSED (vettrack
+     * `useDoctorGateState` mirror): callers must NOT pass true on a settled
+     * error — an errored lookup never shows the gate, so a vet who may
+     * already be checked in is never re-prompted into a 409 loop. (The
+     * fail-open carve-out applies to /users/me eligibility only.)
+     */
     activeLoaded: boolean;
     hasActiveCheckIn: boolean;
     /** GET /users/me settled (success OR error — fail-open on error). */

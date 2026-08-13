@@ -28,6 +28,7 @@ import { useState } from "react";
 import { Alert, Modal, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { useIdentity } from "@/app/useIdentity";
 import { PressableScale } from "@/components/PressableScale";
@@ -47,6 +48,9 @@ type SwitchStep =
   | { kind: "closed" }
   | { kind: "pick" }
   | { kind: "replace"; team: DoctorTeamRole; currentSeniorName: string | null };
+
+/** Static style for the modal-scoped GestureHandlerRootView (third-party — no className). */
+const FLEX_1 = { flex: 1 } as const;
 
 /** Outline action chip — the card's two equal-width actions. */
 function ActionChip({
@@ -101,6 +105,11 @@ function SwitchSheetContent({
     },
   });
 
+  // A settled non-conflict failure — surfaced in BOTH steps (a replace retry
+  // failing with a network error/500 must not leave the replace step silent).
+  const failedGeneric =
+    switchMutation.isError && readSeniorConflict(switchMutation.error) === null;
+
   if (step.kind === "replace") {
     const team = t(TEAM_LABEL_KEYS[step.team]);
     return (
@@ -146,6 +155,11 @@ function SwitchSheetContent({
             {t("doctorGate.cancel")}
           </Text>
         </PressableScale>
+        {failedGeneric ? (
+          <Text className="text-center font-rubik-semibold text-[13px] text-danger">
+            {t("doctorGate.checkInFailed")}
+          </Text>
+        ) : null}
       </View>
     );
   }
@@ -185,7 +199,7 @@ function SwitchSheetContent({
         ))}
       </View>
 
-      {switchMutation.isError && readSeniorConflict(switchMutation.error) === null ? (
+      {failedGeneric ? (
         <Text className="text-center font-rubik-semibold text-[13px] text-danger">
           {t("doctorGate.checkInFailed")}
         </Text>
@@ -219,7 +233,9 @@ export function DoctorShiftStatusCard(): ReactElement | null {
       void queryClient.invalidateQueries({ queryKey: clinicalCheckInKeys.all });
     },
     onError: () => {
-      Alert.alert(t("doctorGate.checkInFailed"));
+      // Dedicated copy — the failing operation is ENDING the shift, not a
+      // check-in (review finding: opposite-of-intent message).
+      Alert.alert(t("doctorGate.endShiftFailed"));
     },
   });
 
@@ -279,13 +295,17 @@ export function DoctorShiftStatusCard(): ReactElement | null {
         onRequestClose={closeSwitch}
       >
         {switchOpen ? (
-          <BottomSheet onDismiss={closeSwitch}>
-            <SwitchSheetContent
-              active={active}
-              seniorEligible={identity.data?.seniorDoctorEligible === true}
-              onClose={closeSwitch}
-            />
-          </BottomSheet>
+          // Android: RNGH gestures inside a native Modal need their own root
+          // view (see DoctorShiftGate's note; review finding 7).
+          <GestureHandlerRootView style={FLEX_1}>
+            <BottomSheet onDismiss={closeSwitch}>
+              <SwitchSheetContent
+                active={active}
+                seniorEligible={identity.data?.seniorDoctorEligible === true}
+                onClose={closeSwitch}
+              />
+            </BottomSheet>
+          </GestureHandlerRootView>
         ) : null}
       </Modal>
     </View>

@@ -30,6 +30,7 @@ const REQUIRED_KEYS = [
   "endShift",
   "endShiftConfirmTitle",
   "endShiftConfirmBody",
+  "endShiftFailed",
   "switchRole",
   "checkInFailed",
 ] as const;

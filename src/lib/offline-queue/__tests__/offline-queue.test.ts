@@ -135,6 +135,23 @@ describe("enqueueOfflineWrite — doctrine guard", () => {
     expect(getOfflineQueueSnapshot()).toHaveLength(0);
   });
 
+  it("refuses every clinical-check-in write (presence intent is bound to 'now' — never replayed later)", () => {
+    // Doctor-gate review finding: a replayed /switch succeeds by design against
+    // an open row and a queued replaceSenior:true silently demotes whoever is
+    // senior AT REPLAY TIME — clinical-responsibility reassignment with zero
+    // user intent. These endpoints must never enter the persisted queue.
+    const cases = [
+      { path: "/api/clinical-check-in/check-in", method: "POST" },
+      { path: "/api/clinical-check-in/switch", method: "POST" },
+      { path: "/api/clinical-check-in/check-out", method: "POST" },
+    ];
+    for (const { path, method } of cases) {
+      const result = enqueue({ endpoint: path, method });
+      expect(result).toBeNull();
+    }
+    expect(getOfflineQueueSnapshot()).toHaveLength(0);
+  });
+
   it("refuses GET (reads are never queued)", () => {
     const result = enqueue({ endpoint: "/api/equipment", method: "GET", body: "" });
     expect(result).toBeNull();
