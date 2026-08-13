@@ -30,6 +30,14 @@ export type MeUser = {
   effectiveRole: string;
   roleSource?: string;
   activeShift?: unknown;
+  /**
+   * Admin-managed senior-doctor eligibility flag (server `users.seniorDoctorEligible`,
+   * returned by GET /api/users/me). Gates only the VISIBILITY of the doctor-gate
+   * senior toggle — the server independently enforces eligibility on check-in
+   * with 403 SENIOR_NOT_ELIGIBLE. Optional so an older server shape degrades to
+   * hiding the toggle.
+   */
+  seniorDoctorEligible?: boolean;
 };
 
 /**

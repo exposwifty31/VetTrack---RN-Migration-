@@ -13,13 +13,26 @@ export class ApiCodedError extends Error {
   readonly code: string;
   /** The envelope's `reason` field when present (finer-grained than `code`). */
   readonly reason: string | null;
+  /**
+   * The envelope's `details` object when present (server apiError metadata,
+   * e.g. `{currentSeniorName}` on 409 SENIOR_ALREADY_ASSIGNED). Untyped here;
+   * domain modules narrow it (see `readSeniorConflict`).
+   */
+  readonly details: unknown;
 
-  constructor(status: number, code: string, reason?: string | null, message?: string) {
+  constructor(
+    status: number,
+    code: string,
+    reason?: string | null,
+    message?: string,
+    details?: unknown,
+  ) {
     super(message ?? `${code} (HTTP ${status})`);
     this.name = "ApiCodedError";
     this.status = status;
     this.code = code;
     this.reason = reason ?? null;
+    this.details = details;
   }
 }
 
@@ -48,7 +61,7 @@ export async function requestJson<T>(path: string, init?: RequestInit): Promise<
           : `HTTP_${res.status}`;
     const reason = typeof body.reason === "string" ? body.reason : null;
     const message = typeof body.message === "string" ? body.message : undefined;
-    throw new ApiCodedError(res.status, code, reason, message);
+    throw new ApiCodedError(res.status, code, reason, message, body.details);
   }
   return (await res.json()) as T;
 }
