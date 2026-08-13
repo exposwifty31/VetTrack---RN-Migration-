@@ -33,6 +33,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useIdentity } from "@/app/useIdentity";
+import { DoctorShiftStatusCard } from "@/components/doctor-gate/DoctorShiftStatusCard";
 import {
   ActivityLoadMoreFooter,
   ActivityRow,
@@ -303,6 +304,10 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
   const listHeader = (
     <View>
       <GreetingHeader name={displayName} />
+      {/* Vet on-shift status card (doctor gate, Task 5) — self-gating: null for
+          non-vets and for vets without an open doctor-team check-in. Plain
+          opaque card, no new blur layer (GlassTopBar stays the only T1). */}
+      <DoctorShiftStatusCard />
       <BentoRow columns={columns} start={scanHero} end={shiftHero} />
       <HomeChipsRow
         tasksCounts={tasksDashboardQuery.data?.counts ?? null}

@@ -636,6 +636,29 @@
       "invalidReason": "הסיבה חייבת להיות באורך 3-500 תווים."
     }
   },
+  "doctorGate": {
+    "areYouOnShift": "האם אתה במשמרת?",
+    "yes": "כן",
+    "no": "לא",
+    "pickTeam": "באיזה תפקיד?",
+    "teamIcu": "ICU",
+    "teamAdmission": "קבלה",
+    "teamInternalMedicine": "פנימית",
+    "iAmSenior": "אני הבכיר האחראי",
+    "replaceSeniorTitle": "כבר יש בכיר",
+    "replaceSeniorBody": "{{name}} כבר מסומן כבכיר {{team}} — להחליף אותו?",
+    "replaceSeniorBodyGeneric": "כבר מסומן בכיר {{team}} — להחליף אותו?",
+    "replace": "החלף",
+    "cancel": "ביטול",
+    "onShiftStatus": "במשמרת — {{team}}",
+    "onShiftSenior": "(בכיר)",
+    "endShift": "סיום משמרת",
+    "endShiftConfirmTitle": "לסיים את המשמרת?",
+    "endShiftConfirmBody": "הסטטוס שלך במשמרת יוסר מהלוח.",
+    "endShiftFailed": "סיום המשמרת נכשל — נסה שוב",
+    "switchRole": "שינוי תפקיד",
+    "checkInFailed": "הסימון נכשל — נסה שוב"
+  },
   "handoff": {
     "title": "העברת משמרת",
     "generatedAt": "נוצר ב-{{when}}",

@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { useUniwind } from "uniwind";
 
 import { useIdentity } from "@/app/useIdentity";
+import { DoctorShiftGate } from "@/components/doctor-gate/DoctorShiftGate";
 import { EmergencyScreen } from "@/screens/EmergencyScreen";
 import { EquipmentListScreen } from "@/screens/EquipmentListScreen";
 import { MenuScreen } from "@/screens/MenuScreen";
@@ -172,8 +173,14 @@ export function MainTabs() {
   const identity = useIdentity();
   const tabSet = deriveMainTabSet(identity.data?.effectiveRole);
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false }} tabBar={renderAuroraTabBar}>
-      {tabSet.map(renderTabScreen)}
-    </Tab.Navigator>
+    <>
+      <Tab.Navigator screenOptions={{ headerShown: false }} tabBar={renderAuroraTabBar}>
+        {tabSet.map(renderTabScreen)}
+      </Tab.Navigator>
+      {/* Doctor shift gate (Task 5): mounted ONCE, globally for the signed-in
+          vet — a transient Modal sibling of the navigator (navigation files
+          carry no new route). Renders null for every non-vet identity. */}
+      <DoctorShiftGate />
+    </>
   );
 }

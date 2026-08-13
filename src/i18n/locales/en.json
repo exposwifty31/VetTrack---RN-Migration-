@@ -628,6 +628,29 @@
       "invalidReason": "The reason must be 3-500 characters."
     }
   },
+  "doctorGate": {
+    "areYouOnShift": "Are you on shift?",
+    "yes": "Yes",
+    "no": "No",
+    "pickTeam": "Which role?",
+    "teamIcu": "ICU",
+    "teamAdmission": "Admission",
+    "teamInternalMedicine": "Internal Medicine",
+    "iAmSenior": "I am the responsible senior",
+    "replaceSeniorTitle": "A senior is already marked",
+    "replaceSeniorBody": "{{name}} is already marked as the {{team}} senior — replace them?",
+    "replaceSeniorBodyGeneric": "A {{team}} senior is already marked — replace them?",
+    "replace": "Replace",
+    "cancel": "Cancel",
+    "onShiftStatus": "On shift — {{team}}",
+    "onShiftSenior": "(senior)",
+    "endShift": "End shift",
+    "endShiftConfirmTitle": "End your shift?",
+    "endShiftConfirmBody": "Your on-shift status will be cleared from the board.",
+    "endShiftFailed": "Couldn't end the shift — try again",
+    "switchRole": "Switch role",
+    "checkInFailed": "Check-in failed — try again"
+  },
   "handoff": {
     "title": "Shift handover",
     "generatedAt": "Generated {{when}}",
