@@ -8,7 +8,7 @@
  * Permission-denied fails LOUD — an explicit message + action (request, or open
  * Settings once the OS won't re-prompt), never a silent black frame.
  */
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Linking, Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -33,6 +33,9 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
   // onBarcodeScanned fires continuously; debounce to one hand-off per ~2s so a
   // single code can't push ScanConfirm repeatedly (re-arms after returning).
   const lastFireRef = useRef(0);
+  // Camera preview failed to start (onMountError) — fail LOUD with a localized
+  // state instead of a silent black frame, same doctrine as permission-denied.
+  const [mountFailed, setMountFailed] = useState(false);
 
   if (!permission) {
     // Permission state still resolving — brief neutral frame.
@@ -65,12 +68,23 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
     );
   }
 
+  if (mountFailed) {
+    return (
+      <View className="flex-1 items-center justify-center gap-3 bg-background px-8">
+        <Text className="text-center text-[15px] text-muted">
+          {t("scan.cameraUnavailable")}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1">
       <CameraView
         style={{ flex: 1 }}
         active={active}
         facing="back"
+        onMountError={() => setMountFailed(true)}
         barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
         onBarcodeScanned={(result) => {
           // Ignore scans while unfocused (ScanConfirm open on top): the debounce

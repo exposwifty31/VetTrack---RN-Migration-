@@ -7,7 +7,7 @@
  * the equipment list uses (shared `useEquipmentSearch`); selecting a result opens
  * EquipmentDetail.
  */
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Modal, Pressable, Text, TextInput, View } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { useTranslation } from "react-i18next";
@@ -15,9 +15,10 @@ import { useUniwind } from "uniwind";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { PressableScale } from "@/components/PressableScale";
-import { EquipmentRow } from "@/components/equipment/EquipmentRow";
+import { EquipmentRow, type RowPressHandler } from "@/components/equipment/EquipmentRow";
 import { SearchIcon } from "@/components/home/icons";
 import { useEquipmentSearch } from "@/hooks/useEquipmentSearch";
+import type { EquipmentRow as EquipmentRowModel } from "@/types/api";
 
 type QuickSearchOverlayProps = Readonly<{
   visible: boolean;
@@ -51,6 +52,17 @@ function QuickSearchContent({
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const { query, setQuery, items, isPending, isError, dataUpdatedAt } = useEquipmentSearch("");
+
+  // Stable row callbacks so memoized EquipmentRow instances survive the
+  // per-keystroke renders of this component (HomeScreen convention: a stable
+  // renderItem keeps FlashList recycling cheap).
+  const onRowPress = useCallback<RowPressHandler>((item) => onSelect(item.id), [onSelect]);
+  const renderRow = useCallback(
+    ({ item }: { item: EquipmentRowModel }) => (
+      <EquipmentRow item={item} onPress={onRowPress} sampledAtMs={dataUpdatedAt} />
+    ),
+    [onRowPress, dataUpdatedAt],
+  );
 
   // autoFocus is unreliable inside a freshly-mounted Modal; focus once it settles.
   useEffect(() => {
@@ -113,9 +125,7 @@ function QuickSearchContent({
         ) : (
           <FlashList
             data={items}
-            renderItem={({ item }) => (
-              <EquipmentRow item={item} onPress={(it) => onSelect(it.id)} sampledAtMs={dataUpdatedAt} />
-            )}
+            renderItem={renderRow}
             keyExtractor={(item) => item.id}
             getItemType={(item) => item.status}
             keyboardShouldPersistTaps="handled"

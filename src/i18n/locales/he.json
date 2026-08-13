@@ -440,6 +440,7 @@
     "cameraPermissionBody": "VetTrack משתמש במצלמה כדי לסרוק קודי QR של ציוד.",
     "grantCamera": "אישור גישה למצלמה",
     "cameraDenied": "הגישה למצלמה נדחתה. יש לאפשר אותה בהגדרות כדי לסרוק QR.",
+    "cameraUnavailable": "המצלמה לא הופעלה. פתחו מחדש את מסך הסריקה, או סרקו עם NFC במקום.",
     "openSettings": "פתיחת הגדרות"
   },
   "confirm": {

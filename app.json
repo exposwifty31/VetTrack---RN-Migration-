@@ -13,7 +13,8 @@
       "buildNumber": "27",
       "appleTeamId": "87F5G378M6",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleAllowMixedLocalizations": true
       },
       "associatedDomains": ["applinks:vettrack.uk"],
       "privacyManifests": {
@@ -67,6 +68,10 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "locales": {
+      "en": "./locales/en.json",
+      "he": "./locales/he.json"
+    },
     "plugins": [
       [
         "react-native-nfc-manager",
@@ -78,8 +83,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "נדרשת גישה למצלמה לסריקת קודי QR של ציוד. VetTrack uses the camera to scan equipment QR codes.",
-          "recordAudioAndAskPermission": false
+          "cameraPermission": "VetTrack uses the camera to scan equipment QR codes.",
+          "recordAudioAndroid": false
         }
       ],
       "expo-secure-store",

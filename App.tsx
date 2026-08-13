@@ -17,7 +17,7 @@ import { StatusBar } from "expo-status-bar";
 import { I18nextProvider } from "react-i18next";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Uniwind } from "uniwind";
+import { Uniwind, useUniwind } from "uniwind";
 
 import { ClerkTokenBridge } from "./src/infrastructure/auth/ClerkTokenBridge";
 import { PushBridge } from "./src/infrastructure/push/PushBridge";
@@ -46,6 +46,17 @@ installDevAuthSeam();
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+
+/**
+ * Status-bar icons derived from the EFFECTIVE Uniwind theme — dark icons on the
+ * Light theme, light icons on Dark. `useUniwind().theme` is always the resolved
+ * "light" | "dark" (setTheme("system") resolves to the OS scheme and adaptive
+ * updates re-fire the listener), so this tracks live theme changes too.
+ */
+function ThemedStatusBar() {
+  const { theme } = useUniwind();
+  return <StatusBar style={theme === "light" ? "dark" : "light"} />;
+}
 
 /**
  * VetTrack RN — app root.
@@ -78,7 +89,7 @@ export default function App() {
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
-          <StatusBar style="light" />
+          <ThemedStatusBar />
           <RealtimeBridge />
           <OfflineQueueBridge />
           {/* Clerk-free + nav-context-free (drives tap navigation via navigationRef);

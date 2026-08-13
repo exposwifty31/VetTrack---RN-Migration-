@@ -62,9 +62,11 @@ export function ScanScreen({ navigation }: RootStackScreenProps<"Scan">) {
   }, [handleResult, scan]);
 
   // QR decode → the SAME hardened extractor NFC uses (rejects foreign origins /
-  // noncanonical paths) → the SAME handoff. An unresolvable code falls through to
-  // the advisory search seed, and yields scan.noId when nothing matches — never a
-  // navigation on a bogus id.
+  // noncanonical paths) → the SAME handoff. A non-canonical payload is first tried
+  // as a container tag (containersApi.getByNfcTag — reused for QR on purpose; the
+  // resolver bounds the length and swallows lookup errors), then falls through to
+  // the advisory EquipmentList search seed. scan.noId is reached only for an empty
+  // decode. Never a navigation on a bogus id.
   const onQrScanned = useCallback(
     (data: string) => {
       setNote(null);

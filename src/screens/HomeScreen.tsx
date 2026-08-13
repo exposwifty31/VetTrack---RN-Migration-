@@ -231,6 +231,15 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
   const closeSheet = useCallback(() => setSheetKind(null), []);
   // Quick equipment search opens IN PLACE (a transient overlay), not a navigate.
   const [searchOpen, setSearchOpen] = useState(false);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+  // Stable so the overlay's memoized EquipmentRow onPress chain holds identity.
+  const onQuickSearchSelect = useCallback(
+    (equipmentId: string) => {
+      setSearchOpen(false);
+      navigation.navigate("EquipmentDetail", { equipmentId });
+    },
+    [navigation],
+  );
 
   const activityItems = activityQuery.data
     ? flattenActivityPages(activityQuery.data.pages)
@@ -360,11 +369,8 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
       />
       <QuickSearchOverlay
         visible={searchOpen}
-        onClose={() => setSearchOpen(false)}
-        onSelect={(equipmentId) => {
-          setSearchOpen(false);
-          navigation.navigate("EquipmentDetail", { equipmentId });
-        }}
+        onClose={closeSearch}
+        onSelect={onQuickSearchSelect}
       />
     </View>
   );

@@ -43,8 +43,9 @@ function EquipmentListBody({ navigation, route }: RootStackScreenProps<"Equipmen
   const markedInteractive = useRef(false);
   useEffect(() => {
     if (isSuccess && !markedInteractive.current) {
-      markedInteractive.current = true;
-      mark(MARK.screenInteractive);
+      // Latch ONLY on a successful mark — a swallowed performance.mark failure
+      // must leave the latch open so a later render can still record the mark.
+      markedInteractive.current = mark(MARK.screenInteractive);
     }
   }, [isSuccess]);
 

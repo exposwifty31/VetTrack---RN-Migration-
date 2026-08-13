@@ -10,7 +10,7 @@
  * SSE surface). A second subscription here would double-subscribe.
  */
 import { useDeferredValue, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, equipmentKeys, type EquipmentListParams } from "@/lib/api";
 import type { EquipmentListPage } from "@/types/api";
@@ -83,7 +83,22 @@ export function useEquipmentSearch(initialQuery = ""): EquipmentSearch {
       }
       return res.data;
     },
+    // Keep the PREVIOUS page visible while a new search key resolves — both
+    // hosts otherwise swap the list for a loading view on every keystroke's
+    // key change (isPending flashes true for each fresh key).
+    placeholderData: keepPreviousData,
   });
+
+  // While placeholder (previous-page) data shows, the fresh key's
+  // `dataUpdatedAt` is 0 — but the visible rows ARE the previous fetch, so the
+  // honest sample time is that fetch's timestamp. Hold the last real value via
+  // the render-time "adjust state from previous render" pattern (refs must not
+  // be written during render); a 0 would make `equipmentRowMeta` derive
+  // epoch-relative "last seen" ages.
+  const [heldUpdatedAt, setHeldUpdatedAt] = useState(0);
+  if (listQuery.dataUpdatedAt > 0 && listQuery.dataUpdatedAt !== heldUpdatedAt) {
+    setHeldUpdatedAt(listQuery.dataUpdatedAt);
+  }
 
   return {
     query,
@@ -92,6 +107,6 @@ export function useEquipmentSearch(initialQuery = ""): EquipmentSearch {
     isPending: listQuery.isPending,
     isError: listQuery.isError,
     isSuccess: listQuery.isSuccess,
-    dataUpdatedAt: listQuery.dataUpdatedAt,
+    dataUpdatedAt: listQuery.dataUpdatedAt || heldUpdatedAt,
   };
 }
