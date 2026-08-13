@@ -27,6 +27,31 @@ jest.mock("expo-camera", () => {
   };
 });
 
+describe("QrScanner active gate", () => {
+  beforeEach(() => {
+    cameraProps = null;
+  });
+
+  it("does not render CameraView while inactive (Android has no `active` prop — unmount is the only real stop)", async () => {
+    await render(<QrScanner onScanned={jest.fn()} hint="hint" active={false} />);
+
+    expect(screen.queryByTestId("camera-view")).toBeNull();
+  });
+
+  it("remounts CameraView when focus returns after ScanConfirm", async () => {
+    const { rerender } = await render(
+      <QrScanner onScanned={jest.fn()} hint="hint" active />,
+    );
+    expect(screen.getByTestId("camera-view")).toBeTruthy();
+
+    await rerender(<QrScanner onScanned={jest.fn()} hint="hint" active={false} />);
+    expect(screen.queryByTestId("camera-view")).toBeNull();
+
+    await rerender(<QrScanner onScanned={jest.fn()} hint="hint" active />);
+    expect(screen.getByTestId("camera-view")).toBeTruthy();
+  });
+});
+
 describe("QrScanner mount failure", () => {
   beforeEach(() => {
     cameraProps = null;

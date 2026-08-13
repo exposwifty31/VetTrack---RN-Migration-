@@ -20,9 +20,10 @@ type QrScannerProps = Readonly<{
   hint: string;
   /**
    * Scan only while the Scan screen is focused. ScanConfirm is a transparent
-   * modal, so this screen (and the camera) stays mounted underneath it — without
-   * this gate a code still in frame re-fires after the debounce and stacks
-   * confirm screens.
+   * modal, so this screen stays mounted underneath it. CameraView itself is
+   * unmounted while inactive — its `active` prop is iOS-only, so unmounting is
+   * the only way to actually release the Android camera session; it also stops
+   * a code still in frame from re-firing and stacking confirm screens.
    */
   active: boolean;
 }>;
@@ -80,22 +81,27 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
 
   return (
     <View className="flex-1">
-      <CameraView
-        style={{ flex: 1 }}
-        active={active}
-        facing="back"
-        onMountError={() => setMountFailed(true)}
-        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-        onBarcodeScanned={(result) => {
-          // Ignore scans while unfocused (ScanConfirm open on top): the debounce
-          // alone would let a code still in frame re-fire and stack confirms.
-          if (!active) return;
-          const now = Date.now();
-          if (now - lastFireRef.current < 2000) return;
-          lastFireRef.current = now;
-          onScanned(result.data);
-        }}
-      />
+      {active ? (
+        <CameraView
+          style={{ flex: 1 }}
+          facing="back"
+          onMountError={() => setMountFailed(true)}
+          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          onBarcodeScanned={(result) => {
+            // Defends against an event already in flight while `active` flips
+            // false (the unmount above is the primary gate).
+            if (!active) return;
+            const now = Date.now();
+            if (now - lastFireRef.current < 2000) return;
+            lastFireRef.current = now;
+            onScanned(result.data);
+          }}
+        />
+      ) : (
+        // Neutral frame under the transparent ScanConfirm modal while the
+        // camera session is released.
+        <View className="flex-1 bg-background" />
+      )}
       <View pointerEvents="none" className="absolute inset-0 items-center justify-center">
         <View className="h-56 w-56 rounded-2xl border-2 border-white/80" />
         <Text className="mt-4 rounded-full bg-black/50 px-4 py-1.5 text-center text-[13px] text-white">
