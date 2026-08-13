@@ -81,7 +81,8 @@
     ],
     "modulePathIgnorePatterns": [
       "<rootDir>/.vendor/",
-      "<rootDir>/.worktrees/"
+      "<rootDir>/.worktrees/",
+      "<rootDir>/.claude/"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1",
