@@ -1,0 +1,300 @@
+/// <reference types="node" />
+/**
+ * ENDPOINT-DRIFT CONTRACT TEST
+ *
+ * Extracts every `/api/*` literal from RN's API modules (`src/lib/api.ts`,
+ * `src/lib/api-origin.ts`, `src/lib/api/*.ts`) and asserts each one resolves to a
+ * real server route.
+ *
+ * ── How much server truth is actually reachable from THIS repo ───────────────
+ * The server lives in a different repository (vettrack). This repo vendors a
+ * pinned snapshot, and the vendored path set is SPARSE. Verified, not assumed:
+ *
+ *   - `scripts/vendor-vettrack.mjs:18` → SPARSE_PATHS = ["packages/contracts", "shared"].
+ *     `server/` is NOT vendored; `.vendor/vettrack/` has no server directory.
+ *   - `.gitignore:55` → `.vendor/` is gitignored (`git ls-files .vendor` = 0 files),
+ *     so the snapshot is regenerated from the network at preinstall.
+ *   - The pin (`VETTRACK_SHA = dc10c799…`) is 112 commits behind vettrack `main`.
+ *
+ * So the FULL route table is not reachable — but a real, server-owned SUBSET is:
+ * `EMERGENCY_SERVER_ROUTE_ALLOWLIST` from `@vettrack/contracts` (vendored, and it
+ * resolves under jest — see `contracts-bridge.test.ts`). That yields two tiers:
+ *
+ *   TIER 1 (armed, below): every RN path under an allowlist-derived prefix
+ *           (`/api/code-blue`, `/api/realtime`, `/api/display`) is checked against
+ *           real server truth. Path-only — see the comment on that suite.
+ *   TIER 2 (blocked, below): the remaining ~17 domains (`/api/equipment`,
+ *           `/api/appointments`, `/api/containers`, `/api/restock`, `/api/tasks`,
+ *           `/api/shift-*`, `/api/users`, …) have NO reachable server route list.
+ *           That suite is SKIPPED against a manifest that does not exist yet
+ *           rather than faked green. See SERVER_ROUTE_MANIFEST_PATH below.
+ */
+import fs from "fs";
+import path from "path";
+
+import { EMERGENCY_SERVER_ROUTE_ALLOWLIST } from "@vettrack/contracts";
+
+const LIB_DIR = path.resolve(__dirname, "..");
+
+/**
+ * TIER-2 BLOCKER — this file does not exist yet, so the full-surface suite below
+ * is skipped. To arm it, generate on the VETTRACK side and land here:
+ *
+ *   WHAT: a JSON manifest of every mounted Express route, shape
+ *         `{ "vettrackSha": "<sha>", "routes": ["GET /api/equipment", "POST /api/equipment/:id/checkout", …] }`
+ *         — one `"METHOD /path"` entry per route, `:param` for dynamic segments.
+ *   HOW:  a generator in vettrack that walks `server/app/routes.ts` (the ~56
+ *         `app.use(...)` mount prefixes) joined with each `server/routes/*.ts`
+ *         router's own method+path declarations.
+ *   WHERE it must end up in THIS repo: the path below, checked in.
+ *         Lower-friction alternative: emit it into `packages/contracts/src/`
+ *         (already inside SPARSE_PATHS) and export it, so a `VETTRACK_SHA` bump
+ *         in `scripts/vendor-vettrack.mjs` delivers it with no new RN file.
+ *   ALSO: bump VETTRACK_SHA — the current pin predates 112 commits of route changes.
+ */
+const SERVER_ROUTE_MANIFEST_PATH = path.join(LIB_DIR, "__generated__", "server-routes.manifest.json");
+
+/** `${...}` inside a template literal, reduced to a single opaque marker. */
+const INTERP = "\u0000";
+
+function apiSourceFiles(): string[] {
+  const files = [path.join(LIB_DIR, "api.ts"), path.join(LIB_DIR, "api-origin.ts")];
+  const nested = path.join(LIB_DIR, "api");
+  for (const entry of fs.readdirSync(nested).sort()) {
+    if (entry.endsWith(".ts") && !entry.endsWith(".d.ts") && !entry.endsWith(".test.ts")) {
+      files.push(path.join(nested, entry));
+    }
+  }
+  return files;
+}
+
+/**
+ * Single-pass scanner over TS source. Skips line/block comments (RN's API modules
+ * document server routes in prose and backticked globs — `/api/tasks/*` — which a
+ * raw regex would happily mistake for call sites), and returns each string/template
+ * literal's value with every `${…}` replaced by INTERP rather than terminating there.
+ */
+function scanStringLiterals(source: string): string[] {
+  const out: string[] = [];
+  let i = 0;
+  const n = source.length;
+
+  while (i < n) {
+    const ch = source[i];
+
+    if (ch === "/" && source[i + 1] === "/") {
+      i += 2;
+      while (i < n && source[i] !== "\n") i += 1;
+      continue;
+    }
+    if (ch === "/" && source[i + 1] === "*") {
+      i += 2;
+      while (i < n && !(source[i] === "*" && source[i + 1] === "/")) i += 1;
+      i += 2;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      i += 1;
+      let buf = "";
+      while (i < n && source[i] !== quote && source[i] !== "\n") {
+        if (source[i] === "\\") {
+          buf += source[i + 1] ?? "";
+          i += 2;
+          continue;
+        }
+        buf += source[i];
+        i += 1;
+      }
+      i += 1;
+      out.push(buf);
+      continue;
+    }
+
+    if (ch === "`") {
+      i += 1;
+      let buf = "";
+      while (i < n && source[i] !== "`") {
+        if (source[i] === "\\") {
+          buf += source[i + 1] ?? "";
+          i += 2;
+          continue;
+        }
+        if (source[i] === "$" && source[i + 1] === "{") {
+          i += 2;
+          let depth = 1;
+          while (i < n && depth > 0) {
+            const c = source[i];
+            if (c === "{") depth += 1;
+            else if (c === "}") depth -= 1;
+            else if (c === '"' || c === "'" || c === "`") {
+              const q = c;
+              i += 1;
+              while (i < n && source[i] !== q) {
+                if (source[i] === "\\") i += 1;
+                i += 1;
+              }
+            }
+            i += 1;
+          }
+          buf += INTERP;
+          continue;
+        }
+        buf += source[i];
+        i += 1;
+      }
+      i += 1;
+      out.push(buf);
+      continue;
+    }
+
+    i += 1;
+  }
+
+  return out;
+}
+
+/**
+ * Literal → canonical route path, or null when the literal is not an API path.
+ * `${id}` occupying a whole segment becomes `:param`; an interpolation glued to
+ * the end of a segment is a query/suffix builder (`` `/api/equipment${query}` ``),
+ * so the route ends there.
+ */
+function normalizePath(literal: string): string | null {
+  if (literal !== "/api" && !literal.startsWith("/api/")) return null;
+
+  const withoutQuery = literal.split("?")[0].split("#")[0];
+  const segments: string[] = [];
+
+  for (const segment of withoutQuery.split("/")) {
+    if (segment === "") continue;
+    if (segment === INTERP) {
+      segments.push(":param");
+      continue;
+    }
+    const at = segment.indexOf(INTERP);
+    if (at >= 0) {
+      if (at > 0) segments.push(segment.slice(0, at));
+      break;
+    }
+    segments.push(segment);
+  }
+
+  return `/${segments.join("/")}`;
+}
+
+function collectRnPaths(): Set<string> {
+  const out = new Set<string>();
+  for (const file of apiSourceFiles()) {
+    for (const literal of scanStringLiterals(fs.readFileSync(file, "utf8"))) {
+      const normalized = normalizePath(literal);
+      if (normalized) out.add(normalized);
+    }
+  }
+  return out;
+}
+
+/** Allowlist entries are `"METHOD /path"`; `:id`-style params → `:param`. */
+function allowlistPaths(): Set<string> {
+  const out = new Set<string>();
+  for (const entry of EMERGENCY_SERVER_ROUTE_ALLOWLIST) {
+    const routePath = entry.slice(entry.indexOf("/")).replace(/\/:[A-Za-z0-9_]+/g, "/:param");
+    const trimmed = routePath.length > 1 ? routePath.replace(/\/+$/, "") : routePath;
+    out.add(trimmed);
+  }
+  return out;
+}
+
+/** `/api/code-blue`, `/api/realtime`, `/api/display` — DERIVED from the allowlist, never
+ *  hardcoded, so a new emergency domain added in vettrack widens coverage on a pin bump. */
+function allowlistPrefixes(): string[] {
+  const out = new Set<string>();
+  for (const routePath of allowlistPaths()) {
+    const segments = routePath.split("/").filter(Boolean);
+    if (segments.length >= 2) out.add(`/${segments[0]}/${segments[1]}`);
+  }
+  return [...out];
+}
+
+const WELL_FORMED = /^\/api(\/(?::param|[a-z0-9][a-z0-9._-]*))+$/;
+
+describe("endpoint-drift: extraction", () => {
+  const rnPaths = collectRnPaths();
+
+  it("resolves interpolated path segments instead of truncating at the interpolation", () => {
+    expect([...rnPaths].sort()).toEqual(
+      expect.arrayContaining([
+        "/api/code-blue/sessions/:param/logs",
+        "/api/code-blue/sessions/:param/end",
+        "/api/code-blue/sessions/:param/presence",
+      ]),
+    );
+  });
+
+  it("emits only well-formed route paths (no comment prose, globs or interpolation debris)", () => {
+    const malformed = [...rnPaths].filter((p) => !WELL_FORMED.test(p)).sort();
+    expect(malformed).toEqual([]);
+  });
+
+  it("is not vacuous — covers the real breadth of the RN API surface", () => {
+    expect(rnPaths.size).toBeGreaterThanOrEqual(40);
+  });
+});
+
+/**
+ * TIER 1 — armed. Real server truth, vendored via `@vettrack/contracts`.
+ *
+ * Compared PATH-ONLY, deliberately: allowlist entries carry a method
+ * (`POST /api/code-blue/sessions` is listed, `GET` is not) but the RN call sites
+ * express the method in a `RequestInit` this extractor does not read. So this
+ * catches a RENAMED or REMOVED path — the drift that actually breaks the client —
+ * and does NOT claim to catch a wrong method. Don't inflate that claim.
+ */
+describe("endpoint-drift: emergency surface (real server truth via @vettrack/contracts)", () => {
+  const rnPaths = collectRnPaths();
+  const allowed = allowlistPaths();
+  const prefixes = allowlistPrefixes();
+  const inScope = [...rnPaths]
+    .filter((p) => prefixes.some((pre) => p === pre || p.startsWith(`${pre}/`)))
+    .sort();
+
+  it("covers the emergency surface non-vacuously", () => {
+    // Guard against the failure mode where a broken extractor empties the scope
+    // and makes the assertion below pass by checking nothing.
+    expect(inScope.length).toBeGreaterThanOrEqual(7);
+  });
+
+  it("every RN emergency-surface path resolves to a real server route", () => {
+    const unknown = inScope.filter((p) => !allowed.has(p));
+    expect(unknown).toEqual([]);
+  });
+});
+
+/**
+ * TIER 2 — BLOCKED. No server route list is reachable for the non-emergency
+ * domains, so this stays skipped rather than passing on invented data. It arms
+ * itself the moment SERVER_ROUTE_MANIFEST_PATH lands (see the constant above for
+ * exactly what must be generated, by whom, and where).
+ */
+const manifestPresent = fs.existsSync(SERVER_ROUTE_MANIFEST_PATH);
+const describeFullSurface = manifestPresent ? describe : describe.skip;
+
+describeFullSurface(
+  "endpoint-drift: full API surface [BLOCKED: src/lib/__generated__/server-routes.manifest.json not generated — see SERVER_ROUTE_MANIFEST_PATH]",
+  () => {
+    it("every RN /api path resolves to a real server route", () => {
+      const manifest = JSON.parse(fs.readFileSync(SERVER_ROUTE_MANIFEST_PATH, "utf8")) as {
+        routes: string[];
+      };
+      const serverPaths = new Set(
+        manifest.routes.map((entry) => {
+          const routePath = entry.slice(entry.indexOf("/")).replace(/\/:[A-Za-z0-9_]+/g, "/:param");
+          return routePath.length > 1 ? routePath.replace(/\/+$/, "") : routePath;
+        }),
+      );
+      const unknown = [...collectRnPaths()].filter((p) => !serverPaths.has(p)).sort();
+      expect(unknown).toEqual([]);
+    });
+  },
+);
