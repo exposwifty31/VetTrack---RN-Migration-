@@ -124,8 +124,8 @@ export const api = {
    * `replay` sent `?afterId=` until 2026-08-14. The server reads `from_id`
    * (server/routes/realtime.ts:242) and 400s `INVALID_FROM_ID` without it, so
    * every call would have failed — harmless while unused, a trap for whoever
-   * wires it up. `limit` is accepted for call-site clarity but the server
-   * ignores it and hard-caps at MAX_OUTBOX_REPLAY.
+   * wires it up. Callers cannot configure `limit`; the server enforces
+   * `MAX_OUTBOX_REPLAY`.
    */
   realtime: {
     outboxHead: () => requestJson<OutboxHead>("/api/realtime/outbox-head"),
