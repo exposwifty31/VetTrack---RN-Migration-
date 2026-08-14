@@ -116,11 +116,22 @@ export const api = {
       return me;
     },
   },
+  /**
+   * NOT CURRENTLY CALLED. Gap recovery runs over SSE `Last-Event-ID`
+   * (SseAdapter.ts:185); these are the sanctioned HTTP alternative, kept for a
+   * future consumer.
+   *
+   * `replay` sent `?afterId=` until 2026-08-14. The server reads `from_id`
+   * (server/routes/realtime.ts:242) and 400s `INVALID_FROM_ID` without it, so
+   * every call would have failed — harmless while unused, a trap for whoever
+   * wires it up. `limit` is accepted for call-site clarity but the server
+   * ignores it and hard-caps at MAX_OUTBOX_REPLAY.
+   */
   realtime: {
     outboxHead: () => requestJson<OutboxHead>("/api/realtime/outbox-head"),
-    replay: (afterId: number, limit = 100) =>
+    replay: (fromId: number) =>
       requestJson<{ events: unknown[] }>(
-        `/api/realtime/replay?afterId=${encodeURIComponent(String(afterId))}&limit=${limit}`,
+        `/api/realtime/replay?from_id=${encodeURIComponent(String(fromId))}`,
       ),
   },
   push: {
