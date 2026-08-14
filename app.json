@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "uk.vettrack.app",
-      "buildNumber": "27",
+      "buildNumber": "28",
       "appleTeamId": "87F5G378M6",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -77,7 +77,7 @@
         "react-native-nfc-manager",
         {
           "nfcPermission": "VetTrack reads NFC equipment stickers to identify and track hospital equipment.",
-          "includeNdefEntitlement": true
+          "includeNdefEntitlement": false
         }
       ],
       [
