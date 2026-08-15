@@ -550,6 +550,26 @@ describe("manifest-vs-code contract", () => {
     expect(facts.parseFailures).toEqual([]);
   });
 
+  it("parseDiagnosticsOf still reads a real TypeScript field (guards the `?? []` degradation)", () => {
+    // The guard above is only as good as the internal field it reads. If a
+    // TypeScript upgrade drops `parseDiagnostics`, `parseDiagnosticsOf` returns
+    // [] for EVERY file, `facts.parseFailures` is always empty, and that guard
+    // passes unconditionally — a test that silently stops testing.
+    //
+    // The reader's own comment already names this and says "re-check this cast
+    // when the version moves". That depends on a human remembering. This probe
+    // does not: it parses a source that CANNOT parse and requires a diagnostic,
+    // so the upgrade breaks HERE, loudly, instead of retiring the guard quietly.
+    const unparseable = ts.createSourceFile(
+      "probe.ts",
+      "const = ;",
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
+    );
+    expect(parseDiagnosticsOf(unparseable).length).toBeGreaterThan(0);
+  });
+
   it("the config-plugin discovery found real packages (guards a vacuous Layer-2 pass)", () => {
     // A wrong ROOT or a missing node_modules would discover zero
     // plugin-shipping packages and make (b-derived) below pass without checking
