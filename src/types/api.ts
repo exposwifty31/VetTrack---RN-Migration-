@@ -120,8 +120,6 @@ export type EquipmentListResult =
   | { status: 200; data: EquipmentListPage; etag?: string }
   | { status: 304 };
 
-export type OutboxHead = { maxPublishedId: number };
-
 /** Server `EQUIPMENT_STATUS_VALUES` (equipment.ts:61) — the /:id/scan status enum. */
 export type EquipmentStatusValue =
   | "ok"

@@ -20,7 +20,6 @@ import type {
   EquipmentTransferItem,
   MeUser,
   MyEquipmentItem,
-  OutboxHead,
   QuickScanToggleResult,
   ScanResult,
 } from "@/types/api";
@@ -116,24 +115,22 @@ export const api = {
       return me;
     },
   },
-  /**
-   * NOT CURRENTLY CALLED. Gap recovery runs over SSE `Last-Event-ID`
-   * (SseAdapter.ts:185); these are the sanctioned HTTP alternative, kept for a
-   * future consumer.
+  /*
+   * REMOVED 2026-08-15: `realtime.outboxHead` and `realtime.replay`.
    *
-   * `replay` sent `?afterId=` until 2026-08-14. The server reads `from_id`
-   * (server/routes/realtime.ts:242) and 400s `INVALID_FROM_ID` without it, so
-   * every call would have failed — harmless while unused, a trap for whoever
-   * wires it up. Callers cannot configure `limit`; the server enforces
-   * `MAX_OUTBOX_REPLAY`.
+   * Both were dead — zero call sites anywhere in `src/`, including the realtime
+   * debug screen. Gap recovery does not use them and never did: `SseAdapter`
+   * sends `Last-Event-ID` on the stream itself (SseAdapter.ts:185) and the
+   * server replays from that cursor. The HTTP endpoints remain a sanctioned
+   * frozen surface server-side; this app simply has no consumer for them.
+   *
+   * They also carried a live defect the whole time — `replay` sent `?afterId=`
+   * while the server reads `from_id` (server/routes/realtime.ts:242) and 400s
+   * `INVALID_FROM_ID` without it. Fixing an uncalled helper only preserves the
+   * shape of a trap; a future consumer would have inherited an untested client
+   * either way. Whoever needs HTTP replay should write it against the server
+   * contract of that day, with a caller and a test.
    */
-  realtime: {
-    outboxHead: () => requestJson<OutboxHead>("/api/realtime/outbox-head"),
-    replay: (fromId: number) =>
-      requestJson<{ events: unknown[] }>(
-        `/api/realtime/replay?from_id=${encodeURIComponent(String(fromId))}`,
-      ),
-  },
   push: {
     /**
      * Register the native device token (POST /api/push/subscribe — native branch of
