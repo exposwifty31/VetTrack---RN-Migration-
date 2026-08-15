@@ -66,7 +66,20 @@ jest.mock("react-native-reanimated", () => {
     // callers only ever read the settled value in assertions.
     withSpring: (toValue) => toValue,
     withTiming: (toValue) => toValue,
-    useSharedValue: (initial) => ({ value: initial }),
+    // `modify` is the ONLY write path useDualFrameSampler uses for its UI-thread
+    // delta accumulator, so a `{ value }`-only stub throws the moment a test
+    // drives a frame callback. Mirrors mutables.js: the modifier's RETURN value
+    // is assigned back, an absent modifier keeps the current value, and the call
+    // itself returns undefined. (Real `modify` is async off the UI runtime;
+    // synchronous here, which is what a deterministic test needs.)
+    useSharedValue: (initial) => {
+      const sharedValue = { value: initial };
+      sharedValue.modify = (modifier) => {
+        sharedValue.value =
+          modifier !== undefined ? modifier(sharedValue.value) : sharedValue.value;
+      };
+      return sharedValue;
+    },
     useAnimatedStyle: (factory) => factory(),
     useFrameCallback: () => ({ setActive: jest.fn(), isActive: false }),
     runOnUI: (fn) => fn,
@@ -104,8 +117,20 @@ jest.mock("react-native-mmkv", () => {
 // Surface mirrors exactly what those two call. NOTE: the JS surface is untouched
 // by patches/react-native-nfc-manager+3.17.2.patch (that patch is iOS .m only).
 jest.mock("react-native-nfc-manager", () => {
-  const decode = (bytes) =>
-    typeof bytes === "string" ? bytes : String.fromCharCode(...Array.from(bytes ?? []));
+  // NDEF payloads are NOT raw strings: a URI record's first byte is an index into
+  // the RTD protocol table (4 -> "https://"), and a text record's first byte packs
+  // an encoding bit plus the language-code length. Returning those bytes as JS
+  // code units invents URLs no tag emits ("\x04vet.app/e/EQ-1" instead of
+  // "https://vet.app/e/EQ-1"), which is exactly how a decode test goes falsely
+  // green. Rather than re-implement the semantics, delegate to the REAL helpers:
+  // `ndef-lib` is plain JS (only ./util + ./constants, no native imports), so it
+  // loads fine under jest — only the package ROOT is unloadable, and this subpath
+  // is a different specifier that resolves past the mock. This keeps the exact
+  // library behaviour, including its quirks (`bytesToString` returns null on
+  // malformed UTF-8; astral codepoints truncate through String.fromCharCode), and
+  // it cannot drift on upgrade because it IS the library.
+  const uriHelper = require("react-native-nfc-manager/ndef-lib/ndef-uri");
+  const textHelper = require("react-native-nfc-manager/ndef-lib/ndef-text");
   return {
     __esModule: true,
     default: {
@@ -120,9 +145,6 @@ jest.mock("react-native-nfc-manager", () => {
     },
     NfcTech: { Ndef: "Ndef", NfcA: "NfcA", MifareUltralight: "MifareUltralight" },
     NfcEvents: { DiscoverTag: "NfcManagerDiscoverTag", SessionClosed: "NfcManagerSessionClosed" },
-    Ndef: {
-      uri: { decodePayload: decode, encodePayload: (s) => s },
-      text: { decodePayload: decode, encodePayload: (s) => s },
-    },
+    Ndef: { uri: uriHelper, text: textHelper },
   };
 });

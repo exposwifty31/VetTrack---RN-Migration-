@@ -35,14 +35,19 @@ import path from "path";
 import { EMERGENCY_SERVER_ROUTE_ALLOWLIST } from "@vettrack/contracts";
 
 const LIB_DIR = path.resolve(__dirname, "..");
+const REPO_ROOT = path.resolve(LIB_DIR, "..", "..");
+const VENDOR_SCRIPT_PATH = path.join(REPO_ROOT, "scripts", "vendor-vettrack.mjs");
 
 /**
  * TIER-2 BLOCKER — this file does not exist yet, so the full-surface suite below
  * is skipped. To arm it, generate on the VETTRACK side and land here:
  *
  *   WHAT: a JSON manifest of every mounted Express route, shape
- *         `{ "vettrackSha": "<sha>", "routes": ["GET /api/equipment", "POST /api/equipment/:id/checkout", …] }`
+ *         `{ "vettrackSha": "<40-char lowercase sha>", "routes": ["GET /api/equipment", "POST /api/equipment/:id/checkout", …] }`
  *         — one `"METHOD /path"` entry per route, `:param` for dynamic segments.
+ *         `vettrackSha` is the vettrack commit the manifest was generated FROM and
+ *         must equal the pin below exactly (see `pinnedVettrackSha`); a short sha
+ *         is rejected on purpose, so the format stays canonical.
  *   HOW:  a generator in vettrack that walks `server/app/routes.ts` (the ~56
  *         `app.use(...)` mount prefixes) joined with each `server/routes/*.ts`
  *         router's own method+path declarations.
@@ -53,6 +58,85 @@ const LIB_DIR = path.resolve(__dirname, "..");
  *   ALSO: bump VETTRACK_SHA — the current pin predates 112 commits of route changes.
  */
 const SERVER_ROUTE_MANIFEST_PATH = path.join(LIB_DIR, "__generated__", "server-routes.manifest.json");
+
+type ServerRouteManifest = { vettrackSha: string; routes: string[] };
+
+/**
+ * The vettrack revision this repo is pinned to, read from the ONE checked-in
+ * declaration of it: `VETTRACK_SHA` in `scripts/vendor-vettrack.mjs`.
+ *
+ * Deliberately NOT read from `.vendor/vettrack/.vettrack-pin`: `.vendor/` is
+ * gitignored and, verified on disk, `node_modules/@vettrack/contracts` is a
+ * COPY rather than a symlink into it — so the pin file describes the vendor
+ * tree, not necessarily the installed package. The script constant is the
+ * declaration a manifest generator would be pointed at, and it is always
+ * readable from a clean checkout.
+ *
+ * Throws rather than returning a placeholder: a sentinel like `""`/`"unknown"`
+ * would compare equal to a matching sentinel in a manifest and wave it through.
+ */
+function pinnedVettrackSha(): string {
+  if (!fs.existsSync(VENDOR_SCRIPT_PATH)) {
+    throw new Error(
+      `Cannot determine the pinned vettrack revision: ${VENDOR_SCRIPT_PATH} is missing. ` +
+        `This test compares the server-route manifest against that pin; without it, the ` +
+        `full-surface suite would validate routes from an unknown server revision.`,
+    );
+  }
+  const source = fs.readFileSync(VENDOR_SCRIPT_PATH, "utf8");
+  const match = /VETTRACK_SHA\s*=\s*["'`]([0-9a-fA-F]{40})["'`]/.exec(source);
+  if (!match) {
+    throw new Error(
+      `Cannot parse VETTRACK_SHA (a 40-char sha) out of ${VENDOR_SCRIPT_PATH}. ` +
+        `If the pin was renamed or reformatted, update pinnedVettrackSha() in this file — ` +
+        `do not delete the check: it is what stops a stale manifest from asserting coverage it does not have.`,
+    );
+  }
+  return match[1].toLowerCase();
+}
+
+/**
+ * Reads the manifest AND enforces that it was generated from the pinned revision.
+ * The enforcement lives here, not in a sibling `it`, so no caller can build
+ * `serverPaths` out of a manifest from the wrong server revision.
+ */
+function readServerRouteManifest(): ServerRouteManifest {
+  const pinned = pinnedVettrackSha();
+  const raw: unknown = JSON.parse(fs.readFileSync(SERVER_ROUTE_MANIFEST_PATH, "utf8"));
+  const manifest = raw as Partial<ServerRouteManifest>;
+
+  const declared = typeof manifest?.vettrackSha === "string" ? manifest.vettrackSha.trim().toLowerCase() : "";
+  if (!declared) {
+    throw new Error(
+      `${SERVER_ROUTE_MANIFEST_PATH} has no "vettrackSha". Without it there is no way to tell ` +
+        `which server revision these routes came from, so the manifest cannot be trusted. ` +
+        `Regenerate it from vettrack @ ${pinned} with the documented shape.`,
+    );
+  }
+  if (!Array.isArray(manifest.routes) || manifest.routes.some((entry) => typeof entry !== "string")) {
+    throw new Error(
+      `${SERVER_ROUTE_MANIFEST_PATH} has no usable "routes" array (expected string entries like "GET /api/equipment"). ` +
+        `Regenerate it from vettrack @ ${pinned} with the documented shape.`,
+    );
+  }
+
+  if (declared !== pinned) {
+    throw new Error(
+      [
+        `server-routes.manifest.json was generated from a DIFFERENT vettrack revision than this repo is pinned to.`,
+        `  manifest "vettrackSha" : ${declared}   (${SERVER_ROUTE_MANIFEST_PATH})`,
+        `  pinned  VETTRACK_SHA   : ${pinned}   (${VENDOR_SCRIPT_PATH})`,
+        `Validating RN paths against the wrong server revision asserts coverage this suite does not have,`,
+        `which is worse than leaving the suite skipped. Fix whichever side is stale — the guard cannot tell which:`,
+        `  • manifest older than the pin → regenerate it in vettrack at ${pinned} and replace the file above.`,
+        `  • manifest newer than the pin → set VETTRACK_SHA = "${declared}" in scripts/vendor-vettrack.mjs,`,
+        `    then run: pnpm vendor:vettrack && pnpm install`,
+      ].join("\n"),
+    );
+  }
+
+  return { vettrackSha: declared, routes: manifest.routes };
+}
 
 /** `${...}` inside a template literal, reduced to a single opaque marker. */
 const INTERP = "\u0000";
@@ -243,6 +327,20 @@ describe("endpoint-drift: extraction", () => {
 });
 
 /**
+ * Runs TODAY, with no manifest present. The manifest guard below is only as good as
+ * its ability to name the pinned revision, and that resolution is a regex over a
+ * separate `.mjs` file — the kind of thing that rots silently when someone reformats
+ * or renames the constant. Exercising it here means the rot surfaces as a failure now,
+ * instead of as a guard that quietly throws (or worse, matches nothing) the day a
+ * manifest finally lands.
+ */
+describe("endpoint-drift: pinned vettrack revision", () => {
+  it("resolves the pinned server revision from scripts/vendor-vettrack.mjs", () => {
+    expect(pinnedVettrackSha()).toMatch(/^[0-9a-f]{40}$/);
+  });
+});
+
+/**
  * TIER 1 — armed. Real server truth, vendored via `@vettrack/contracts`.
  *
  * Compared PATH-ONLY, deliberately: allowlist entries carry a method
@@ -276,17 +374,32 @@ describe("endpoint-drift: emergency surface (real server truth via @vettrack/con
  * domains, so this stays skipped rather than passing on invented data. It arms
  * itself the moment SERVER_ROUTE_MANIFEST_PATH lands (see the constant above for
  * exactly what must be generated, by whom, and where).
+ *
+ * Presence is NOT sufficient to arm it honestly. A manifest checked in today would
+ * describe vettrack @ its own revision while this repo is pinned ~112 commits back,
+ * so `readServerRouteManifest()` refuses any manifest whose `vettrackSha` does not
+ * match the pin — a green assertion over routes from the wrong server revision would
+ * claim coverage this suite does not have.
  */
 const manifestPresent = fs.existsSync(SERVER_ROUTE_MANIFEST_PATH);
 const describeFullSurface = manifestPresent ? describe : describe.skip;
 
-describeFullSurface(
-  "endpoint-drift: full API surface [BLOCKED: src/lib/__generated__/server-routes.manifest.json not generated — see SERVER_ROUTE_MANIFEST_PATH]",
-  () => {
+/** Reporter line must track reality: "BLOCKED … not generated" printed above green
+ *  checkmarks would itself be a lie about what this suite covers. */
+const fullSurfaceTitle = manifestPresent
+  ? "endpoint-drift: full API surface (armed — server-routes.manifest.json, pinned revision enforced)"
+  : "endpoint-drift: full API surface [BLOCKED: src/lib/__generated__/server-routes.manifest.json not generated — see SERVER_ROUTE_MANIFEST_PATH]";
+
+describeFullSurface(fullSurfaceTitle, () => {
+    it("was generated from the pinned vettrack revision", () => {
+      // Throws with both shas and the two possible remedies when they diverge;
+      // the assertion states the invariant for the reader.
+      expect(readServerRouteManifest().vettrackSha).toBe(pinnedVettrackSha());
+    });
+
     it("every RN /api path resolves to a real server route", () => {
-      const manifest = JSON.parse(fs.readFileSync(SERVER_ROUTE_MANIFEST_PATH, "utf8")) as {
-        routes: string[];
-      };
+      // Revision check happens inside the loader, BEFORE serverPaths is built.
+      const manifest = readServerRouteManifest();
       const serverPaths = new Set(
         manifest.routes.map((entry) => {
           const routePath = entry.slice(entry.indexOf("/")).replace(/\/:[A-Za-z0-9_]+/g, "/:param");

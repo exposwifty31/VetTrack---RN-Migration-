@@ -23,6 +23,19 @@ import * as ts from "typescript";
  * PropertyAccessExpression. Substring matching cannot tell a real dereference
  * from prose about one; that failure mode has bitten this project before.
  *
+ * PARSING IS PART OF THE CONTRACT, NOT AN IMPLEMENTATION DETAIL
+ * The same argument cuts against a careless AST walk. `ScriptKind` is chosen
+ * PER EXTENSION — `.tsx` parses as TSX, everything else as TS — because in a
+ * `.ts` file `<string>raw` is a legal type assertion while under TSX it is an
+ * unclosed JSX element, and the parser then recovers by discarding the rest of
+ * the file. Facts after that point are not reported as missing; they are simply
+ * never produced, which is indistinguishable from their not existing. A blanket
+ * ScriptKind.TSX was in force here until 2026-08-15 and was demonstrated to
+ * swallow a real `process.env.EXPO_PUBLIC_*` read with the whole suite green.
+ * Because choosing the right mode is necessary but not sufficient — a genuinely
+ * malformed file recovers the same way — every file's `parseDiagnostics` is
+ * collected and a non-empty set fails the suite outright.
+ *
  * SCOPE OF THE ENV SCAN
  *  - Shipped code only: every .ts/.tsx under src/ that is not a test, plus the
  *    root entry files App.tsx and index.ts (App.tsx dereferences
@@ -260,7 +273,29 @@ type SourceFacts = {
   envReads: Map<string, string[]>;
   /** Raw, un-normalized module specifiers as written in import/require. */
   importSpecifiers: Map<string, string[]>;
+  /** Files whose parse did NOT come back clean — see the guard test below. */
+  parseFailures: string[];
 };
+
+/**
+ * `SourceFile.parseDiagnostics` is marked `@internal` in TypeScript and is not
+ * present on the public `ts.SourceFile` type, so it is read through a narrow
+ * boundary cast — the same technique used for the node builtins above, and for
+ * the same reason: getting at what is needed without widening anything shared.
+ *
+ * The public alternative, `ts.createProgram(...).getSyntacticDiagnostics(file)`,
+ * was rejected: it needs a real CompilerHost over 200+ files and reports
+ * module-resolution failures that have nothing to do with whether a file
+ * parsed. The `?? []` makes a future TypeScript that drops the field degrade to
+ * "no failures" rather than throwing. Be clear about what that costs: the guard
+ * test then passes unconditionally and NOTHING else in this suite notices —
+ * the non-vacuity test above checks that files were scanned, not that they
+ * parsed, so it cannot cover this. A TypeScript upgrade that removes the field
+ * silently retires the guard; re-check this cast when the version moves.
+ */
+const parseDiagnosticsOf = (sourceFile: ts.SourceFile): readonly ts.Diagnostic[] =>
+  (sourceFile as unknown as { parseDiagnostics?: readonly ts.Diagnostic[] })
+    .parseDiagnostics ?? [];
 
 /** True when `node` is `process.env` written as a member expression. */
 function isProcessEnv(node: ts.Node): boolean {
@@ -287,15 +322,24 @@ function isWriteTarget(node: ts.Node): boolean {
 function analyzeSources(files: string[]): SourceFacts {
   const envReads = new Map<string, string[]>();
   const importSpecifiers = new Map<string, string[]>();
+  const parseFailures: string[] = [];
 
   for (const file of files) {
     const rel = path.relative(ROOT, file);
+    // A `.ts` file is NOT TSX, and the two grammars genuinely disagree. In .ts,
+    // `<string>raw` is a legal type assertion; parsed as TSX the same text is an
+    // unclosed JSX element, and everything after it is lost to parser recovery —
+    // an EXPO_PUBLIC_* read below that point simply never reaches this walk.
+    // Verified: a .ts file holding `<string>raw` followed by
+    // `process.env.EXPO_PUBLIC_X` reported ZERO env reads under a blanket
+    // ScriptKind.TSX and the whole suite stayed green.
+    const scriptKind = file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
     const sourceFile = ts.createSourceFile(
       file,
       fs.readFileSync(file, "utf8"),
       ts.ScriptTarget.Latest,
       /* setParentNodes */ true,
-      ts.ScriptKind.TSX,
+      scriptKind,
     );
 
     const recordEnv = (name: string) =>
@@ -341,9 +385,20 @@ function analyzeSources(files: string[]): SourceFacts {
     };
 
     visit(sourceFile);
+
+    // Picking the right ScriptKind is necessary but NOT sufficient. Any file
+    // that fails to parse for any other reason recovers silently and drops the
+    // facts after the error, exactly the same way — so record the failure
+    // rather than trusting the walk that ran over the wreckage.
+    const diagnostics = parseDiagnosticsOf(sourceFile);
+    if (diagnostics.length > 0) {
+      const first = ts.flattenDiagnosticMessageText(diagnostics[0]!.messageText, " ");
+      const more = diagnostics.length > 1 ? ` (+${diagnostics.length - 1} more)` : "";
+      parseFailures.push(`${rel}: ${first}${more}`);
+    }
   }
 
-  return { envReads, importSpecifiers };
+  return { envReads, importSpecifiers, parseFailures };
 }
 
 const facts = analyzeSources(shippedFiles);
@@ -397,6 +452,84 @@ function consumersFor(plugin: string): { specifier: string; files: string[] }[] 
 }
 
 // ---------------------------------------------------------------------------
+// Config-plugin-shipping packages, DISCOVERED rather than hand-listed
+// ---------------------------------------------------------------------------
+
+/**
+ * The allowlist above can only ever check packages someone already thought to
+ * put in it. This second layer is derived from the two real artifacts instead —
+ * what the code imports, crossed with what the installed package actually ships
+ * — so a native package in NEITHER app.json nor CAPABILITY_CONSUMERS is still
+ * caught.
+ *
+ * A package ships an Expo config plugin iff `app.plugin.js` exists at its
+ * package root: that is the exact file Expo's own config-plugin resolver looks
+ * for when it resolves a bare `"expo-camera"` string in app.json's `plugins`.
+ * Shipping one is precisely what makes a package able to inject native config —
+ * permission strings, entitlements, Info.plist and manifest edits. A package
+ * with no `app.plugin.js` has nothing for app.json to declare, so its absence
+ * from app.json cannot produce the missing-native-config defect this guards.
+ *
+ * `fs.existsSync` follows the pnpm symlink from `node_modules/<pkg>` into
+ * `.pnpm/<hash>/node_modules/<pkg>`, so this resolves on this repo's layout.
+ */
+
+/** "expo-camera/next" -> "expo-camera"; "@clerk/clerk-expo/x" -> "@clerk/clerk-expo". */
+function packageRootOf(specifier: string): string | null {
+  // Relative, absolute, and the "@/" -> src/* tsconfig alias are not packages.
+  if (
+    specifier.startsWith(".") ||
+    specifier.startsWith("/") ||
+    specifier.startsWith("@/")
+  ) {
+    return null;
+  }
+  const segments = specifier.split("/");
+  if (specifier.startsWith("@")) {
+    return segments.length >= 2 ? `${segments[0]}/${segments[1]}` : null;
+  }
+  return segments[0] ?? null;
+}
+
+const importedPackages: string[] = [
+  ...new Set(
+    importedSpecifiers
+      .map(packageRootOf)
+      .filter((pkg): pkg is string => pkg !== null),
+  ),
+].sort();
+
+const pluginShippingPackages = importedPackages.filter((pkg) =>
+  fs.existsSync(path.join(ROOT, "node_modules", pkg, "app.plugin.js")),
+);
+
+const filesImporting = (pkg: string): string[] => [
+  ...new Set(
+    importedSpecifiers
+      .filter((spec) => packageRootOf(spec) === pkg)
+      .flatMap((spec) => facts.importSpecifiers.get(spec) ?? []),
+  ),
+];
+
+/**
+ * Packages that ship an `app.plugin.js` but are deliberately NOT declared in
+ * app.json. Each entry is a written statement of why that specific plugin is
+ * unnecessary — not a blanket exemption, and not "it seems fine".
+ */
+const PLUGIN_NOT_REQUIRED: Record<string, string> = {
+  // Its config plugin is a NO-OP unless given props. withStatusBar() calls
+  // resolveProps(props) and returns the config UNCHANGED when that yields
+  // undefined, which is exactly what happens with no props; it writes
+  // UIStatusBarStyle / android:windowLightStatusBar only when `hidden` or
+  // `style` is passed (read from expo-status-bar@57.0.1
+  // plugin/build/withStatusBar.js, 2026-08-15). The runtime <StatusBar>
+  // component App.tsx imports works independently of the plugin, so declaring
+  // it bare in app.json would change nothing in the binary.
+  "expo-status-bar":
+    "plugin is a no-op without props; runtime <StatusBar> needs no native config",
+};
+
+// ---------------------------------------------------------------------------
 
 describe("manifest-vs-code contract", () => {
   it("the source scan found real files and real facts (guards a silently-empty walk)", () => {
@@ -405,6 +538,27 @@ describe("manifest-vs-code contract", () => {
     expect(shippedFiles.length).toBeGreaterThan(50);
     expect(expoPublicReads.length).toBeGreaterThan(0);
     expect(importedSpecifiers).toContain("react-native");
+  });
+
+  it("every shipped file parsed cleanly (parser recovery silently drops every fact after the error)", () => {
+    // A recovered parse is the quiet version of a broken scan: the walk still
+    // runs, still reports facts, and simply omits everything past the error —
+    // so assertions below pass on an incomplete picture rather than failing.
+    // This is the same argument as the header's "a comment is not a
+    // PropertyAccessExpression", carried one step further: a fact the parser
+    // never produced is indistinguishable from a fact that does not exist.
+    expect(facts.parseFailures).toEqual([]);
+  });
+
+  it("the config-plugin discovery found real packages (guards a vacuous Layer-2 pass)", () => {
+    // A wrong ROOT or a missing node_modules would discover zero
+    // plugin-shipping packages and make (b-derived) below pass without checking
+    // anything — the same vacuous-pass failure mode the source-scan guard above
+    // exists for. Both named packages ship an app.plugin.js and are imported by
+    // shipped code, so this is a fact about the repo, not about the assertion.
+    expect(pluginShippingPackages).toEqual(
+      expect.arrayContaining(["expo-camera", "react-native-nfc-manager"]),
+    );
   });
 
   it("no eas.json build profile uses `extends` (env resolution below assumes none)", () => {
@@ -496,9 +650,14 @@ describe("manifest-vs-code contract", () => {
   });
 
   /**
-   * The hard capability check. Paired with the allowlist-completeness test
-   * above, the two together assert: every app.json plugin is mapped to a named
-   * consumer AND that consumer is really imported by shipped code.
+   * The hard capability check — ONE of the two directions. Paired with the
+   * allowlist-completeness test above, these two assert: every app.json plugin
+   * is mapped to a named consumer AND that consumer is really imported by
+   * shipped code. That is the manifest→code direction only. The code→manifest
+   * direction — shipped code imports a native package that app.json never
+   * declares — is NOT covered by this test or the one above, and is checked by
+   * (b-reverse) and (b-derived) below; an earlier version of this header
+   * claimed the pair covered "the capability contract" and overstated it.
    *
    * NO EXEMPTION LIST, deliberately. A capability whose only consumer is native
    * or config-plugin code with no JS import is a real possibility, and this
@@ -520,5 +679,81 @@ describe("manifest-vs-code contract", () => {
           `${plugin} (no import of ${CAPABILITY_CONSUMERS[plugin]!.join(" | ")})`,
       );
     expect(orphaned).toEqual([]);
+  });
+
+  /**
+   * The MIRROR of (b), and the defect (b) structurally cannot see. (b) iterates
+   * `declaredPlugins`, so DELETING a declaration makes (b) — and the
+   * allowlist-completeness test — pass trivially by having one fewer thing to
+   * check. Verified: removing the `expo-camera` entry from app.json while
+   * expo-camera stayed imported left the entire suite green.
+   *
+   * The runtime consequence is invisible to every other check in this repo. The
+   * JS module still resolves and still imports, so nothing fails at build time;
+   * the config plugin simply never runs, so the permission strings,
+   * entitlements and Info.plist / manifest edits it would have injected are
+   * absent from the binary. The app then fails on device the first time it
+   * touches the capability — a camera prompt with no NSCameraUsageDescription
+   * is an immediate iOS crash.
+   *
+   * This layer is keyed on CAPABILITY_CONSUMERS, which lets it see aliases:
+   * `expo-secure-store` is never imported directly in this app, only
+   * `@clerk/clerk-expo/token-cache` is, so the import-derived (b-derived) below
+   * cannot require its declaration. This one can. The two are complementary,
+   * not redundant.
+   */
+  it("(b-reverse) every allowlisted capability whose consumer is imported is declared in app.json", () => {
+    const undeclared = Object.keys(CAPABILITY_CONSUMERS)
+      .filter((plugin) => !declaredPlugins.includes(plugin))
+      .map((plugin) => ({ plugin, consumers: consumersFor(plugin) }))
+      .filter(({ consumers }) => consumers.length > 0)
+      .map(
+        ({ plugin, consumers }) =>
+          `${plugin} (consumed via ${consumers.map((c) => c.specifier).join(", ")} in ${consumers.flatMap((c) => c.files).join(", ")}, but app.json declares no such plugin — its config plugin never runs and its native config is missing from the binary)`,
+      );
+    expect(undeclared).toEqual([]);
+  });
+
+  /**
+   * The hole CodeRabbit flagged in its own proposal: a reverse check keyed only
+   * on CAPABILITY_CONSUMERS cannot see a package that is in neither artifact.
+   * This closes it by DERIVING the candidate set instead of hand-listing it —
+   * every imported package that actually ships an `app.plugin.js` must be
+   * declared in app.json or carry a written reason it needs no declaration.
+   * Adding `expo-location` to package.json, importing it, and never touching
+   * app.json now fails here with no allowlist edit required.
+   *
+   * WHAT IS STILL NOT COVERED, stated rather than inherited silently:
+   *  - A plugin-shipping package consumed ONLY by native or config-plugin code
+   *    with no JS import is invisible to an import-derived scan. That is the
+   *    same deliberate gap (b) documents above, and the same answer applies:
+   *    it surfaces as a failure a human must justify in writing.
+   *  - A declaration that is PRESENT but mis-parameterized — wrong permission
+   *    string, wrong channel id — passes every check here. This suite proves a
+   *    capability is declared and used, never that its config is correct.
+   */
+  it("(b-derived) every imported package shipping a config plugin is declared in app.json or registered as not needing one", () => {
+    const undeclared = pluginShippingPackages
+      .filter((pkg) => !declaredPlugins.includes(pkg))
+      .filter((pkg) => !(pkg in PLUGIN_NOT_REQUIRED))
+      .map(
+        (pkg) =>
+          `${pkg} (imported by ${filesImporting(pkg).join(", ")} and ships node_modules/${pkg}/app.plugin.js, but app.json declares no plugin for it — add it to app.json plugins, or register it in PLUGIN_NOT_REQUIRED with the reason its plugin is unnecessary)`,
+      );
+    expect(undeclared).toEqual([]);
+  });
+
+  it("(b-derived-registry) every PLUGIN_NOT_REQUIRED entry is still an imported plugin-shipping package", () => {
+    // Same staleness rule as (a-registry-reverse). An entry excusing a package
+    // that is no longer imported, or that no longer ships a config plugin, is a
+    // standing exemption for a situation that stopped existing — which is how a
+    // registry quietly turns into a blanket exemption list.
+    const stale = Object.keys(PLUGIN_NOT_REQUIRED)
+      .filter((pkg) => !pluginShippingPackages.includes(pkg))
+      .map(
+        (pkg) =>
+          `${pkg} (registered in PLUGIN_NOT_REQUIRED but ${importedPackages.includes(pkg) ? "no longer ships an app.plugin.js" : "is no longer imported by shipped code"} — delete the entry)`,
+      );
+    expect(stale).toEqual([]);
   });
 });
