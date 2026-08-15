@@ -360,7 +360,19 @@ describe("endpoint-drift: emergency surface (real server truth via @vettrack/con
   it("covers the emergency surface non-vacuously", () => {
     // Guard against the failure mode where a broken extractor empties the scope
     // and makes the assertion below pass by checking nothing.
-    expect(inScope.length).toBeGreaterThanOrEqual(7);
+    //
+    // FLOOR, not a pin: this asserts the scope is populated, not that it has a
+    // particular size, so adding emergency call sites must never redden it.
+    //
+    // Was 7 until 2026-08-15. #62 deleted `realtime.outboxHead` and
+    // `realtime.replay` from src/lib/api.ts — both had zero call sites, and gap
+    // recovery runs over SSE `Last-Event-ID` instead — which removed the only
+    // two /api/realtime/* literals in production code and dropped the scope to
+    // 5. The guard fired on that merge exactly as designed: #62 and #63 were
+    // each green alone and red together, because one deleted the paths the
+    // other counted. If this number drops again, check whether the shrink was
+    // deliberate before lowering it.
+    expect(inScope.length).toBeGreaterThanOrEqual(5);
   });
 
   it("every RN emergency-surface path resolves to a real server route", () => {
