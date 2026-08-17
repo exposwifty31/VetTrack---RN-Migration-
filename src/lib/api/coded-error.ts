@@ -63,5 +63,9 @@ export async function requestJson<T>(path: string, init?: RequestInit): Promise<
     const message = typeof body.message === "string" ? body.message : undefined;
     throw new ApiCodedError(res.status, code, reason, message, body.details);
   }
+  // 204 No Content carries no body — reading it would throw. The root `api.ts`
+  // variant this normalizer replaces handled 204 explicitly (DELETE
+  // `push.unsubscribe`); preserve that so the collapse is behaviour-preserving.
+  if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }

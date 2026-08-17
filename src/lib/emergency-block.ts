@@ -67,6 +67,17 @@ const BUFFER_MAX = 200;
 let buffer: readonly EmergencyBlockBufferEntry[] = [];
 
 /**
+ * C5 — a monotonic tally of blocked emergency mutations per class. Distinct from
+ * the FIFO `buffer` above: the buffer keeps only the last BUFFER_MAX attempts, so
+ * on a device that blocks many emergency writes the earliest ones are evicted and
+ * the true volume is lost. This count is the fleet-visible signal that survives
+ * eviction. It is a bounded object (the endpoint-class union is closed) of plain
+ * integers — NOT a replay source — so it does not violate the no-persist doctrine
+ * that governs `buffer`. Process-lifetime only; never posted to any server.
+ */
+const counts: Partial<Record<EmergencyEndpointClass, number>> = {};
+
+/**
  * Read accessor for a future debug UI. Returns a detached snapshot (cloned
  * entries) so callers can never mutate the module-owned buffer.
  */
@@ -74,8 +85,17 @@ export function readEmergencyBlockBuffer(): readonly EmergencyBlockBufferEntry[]
   return buffer.map((entry) => ({ ...entry }));
 }
 
+/**
+ * C5 read accessor — a detached snapshot of the per-class blocked-mutation counts.
+ * Callers cannot mutate the module-owned tally.
+ */
+export function getEmergencyBlockCounts(): Readonly<Partial<Record<EmergencyEndpointClass, number>>> {
+  return { ...counts };
+}
+
 function recordEmergencyBlock(entry: EmergencyBlockBufferEntry): void {
   buffer = [...buffer, entry].slice(-BUFFER_MAX);
+  counts[entry.endpointClass] = (counts[entry.endpointClass] ?? 0) + 1;
 }
 
 /**
@@ -120,7 +140,10 @@ export function emergencyOfflineErrorFromFailedDispatch(
   return new EmergencyOfflineError(endpointClass, path, upperMethod);
 }
 
-/** Test-only — reset the process-lifetime buffer between cases. */
+/** Test-only — reset the process-lifetime buffer and C5 counts between cases. */
 export function _clearEmergencyBlockBufferForTests(): void {
   buffer = [];
+  for (const key of Object.keys(counts)) {
+    delete counts[key as EmergencyEndpointClass];
+  }
 }
