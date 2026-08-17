@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 
 import { useIdentity } from "@/app/useIdentity";
 import type { PushDeviceToken, PushPort } from "@/core/ports/push.port";
@@ -12,7 +13,7 @@ import {
 } from "./active-registration";
 import { getDefaultPushPort } from "./defaultPush";
 import { resolvePushNavTarget } from "./push-deep-link";
-import { recordPushPermission } from "./push-permission-status";
+import { getPushPermissionStatus, recordPushPermission } from "./push-permission-status";
 
 type AuthChangeSubscribe = (listener: (change: AuthChange) => void) => () => void;
 
@@ -68,6 +69,9 @@ export function PushBridge({
   const identityReady = identity.isSuccess && !!getCurrentUserId();
   const userId = identity.data?.id;
   const registeredToken = useRef<PushDeviceToken | null>(null);
+  // Bumped when a previously-DENIED permission is granted while the app runs, to
+  // re-run the registration effect below. See the app-active effect at the end.
+  const [permissionEpoch, setPermissionEpoch] = useState(0);
 
   // Foreground handler + tap navigation (ALERT-ONLY). getInitialResponseData covers
   // a cold start launched from a tap; navigate* queue the target until the container
@@ -193,7 +197,38 @@ export function PushBridge({
       cancelled = true;
       stopTokenListener();
     };
-  }, [port, identityReady, userId]);
+  }, [port, identityReady, userId, permissionEpoch]);
+
+  // Repair a denial without a cold start.
+  //
+  // SettingsScreen sends the user to `Linking.openSettings()` because that is
+  // the ONLY place the OS lets a denial be undone — but coming back does not
+  // restart the effect above. So the grant landed, the card kept reading
+  // "denied", and no token was registered for the rest of the session: the
+  // repair path this app offers led nowhere.
+  //
+  // Only a DENIAL is repairable this way. Re-running on every foreground would
+  // re-register pointlessly, and on Android 13+ could re-prompt. Bumping the
+  // epoch re-runs the registration effect above rather than duplicating its
+  // channel → permission → token → register sequence, which carries the
+  // rotation-ordering and cancellation contracts that are already tested.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      if (getPushPermissionStatus() !== "denied") return;
+      void port
+        .requestPermission()
+        .then((granted) => {
+          if (!granted) return; // still denied — nothing changed, stay quiet
+          recordPushPermission(true);
+          setPermissionEpoch((epoch) => epoch + 1);
+        })
+        .catch((err) => {
+          console.warn("[push] permission re-check failed (non-fatal):", err);
+        });
+    });
+    return () => subscription.remove();
+  }, [port]);
 
   // Take-once fallback deregister on "cleared" (see the header caveat — the
   // authenticated path already ran in the sign-out UI, making this a no-op).

@@ -32,6 +32,15 @@ export const INITIAL_OFFLINE_QUEUE_STATUS: OfflineQueueStatus = {
 
 export type OfflineQueueStatusCtx = { pending: number; now: number };
 
+/**
+ * Compile-time exhaustiveness for the event switch, without a `void` expression.
+ * The `never` parameter is what does the work: if a new `OfflineQueueEvent` kind
+ * is added and left unhandled, the call stops type-checking.
+ */
+function unreachableEvent(_event: never, fallback: OfflineQueueStatus): OfflineQueueStatus {
+  return fallback;
+}
+
 /** Pure fold — given the prior status, an event, and the live pending count/clock. */
 export function nextOfflineQueueStatus(
   prev: OfflineQueueStatus,
@@ -45,22 +54,29 @@ export function nextOfflineQueueStatus(
     case "item_permanent_failure":
       return { ...prev, pending, lastPermanentFailureAt: ctx.now };
     case "item_success":
-    case "replay_end":
-      // A drained queue makes any earlier pause / dropped-write stale.
+      // A write SUCCEEDED and left nothing behind, so any earlier pause or
+      // dropped-write notice is genuinely stale.
       if (pending === 0) {
         return { pending: 0, circuitOpenUntil: null, lastPermanentFailureAt: null };
       }
+      return { ...prev, pending };
+    case "replay_end":
+      // NOT a success signal, and it used to share the branch above. A
+      // permanent failure REMOVES the item, so the very next `replay_end` sees
+      // an empty queue — which meant the one sequence that matters most (last
+      // write dropped → pass ends) cleared the banner before the user could
+      // read it. An empty queue is not evidence that anything was delivered.
       return { ...prev, pending };
     case "enqueued":
     case "replay_start":
     case "item_retry":
     case "item_owner_mismatch":
       return { ...prev, pending };
-    default: {
-      const _exhaustive: never = event;
-      void _exhaustive;
-      return { ...prev, pending };
-    }
+    default:
+      // Exhaustiveness without a `void` expression (SonarCloud rejects that):
+      // passing a non-`never` here is a compile error, so a new event kind
+      // cannot be silently swallowed by this fallthrough.
+      return unreachableEvent(event, { ...prev, pending });
   }
 }
 

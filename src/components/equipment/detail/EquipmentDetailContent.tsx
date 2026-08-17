@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
+import { useT } from "@/types/tfn";
 
 import { useIdentity } from "@/app/useIdentity";
 import { Chip } from "@/components/ui/Chip";
@@ -47,7 +47,7 @@ import { WaitlistCard } from "./WaitlistCard";
 export type OpenScanConfirm = (params: RootStackParamList["ScanConfirm"]) => void;
 
 function HeaderCard({ detail }: Readonly<{ detail: EquipmentDetail }>) {
-  const { t } = useTranslation();
+  const t = useT();
   const verifiedAt = formatDateTime(detail.lastVerifiedAt);
   return (
     <SectionCard>
@@ -92,7 +92,7 @@ export function EquipmentDetailContent({
   equipmentId,
   onOpenScanConfirm,
 }: Readonly<{ equipmentId: string; onOpenScanConfirm: OpenScanConfirm }>) {
-  const { t } = useTranslation();
+  const t = useT();
   const queryClient = useQueryClient();
   const identity = useIdentity();
   useEquipmentRealtimeSync();

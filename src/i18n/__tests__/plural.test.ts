@@ -29,6 +29,7 @@ const PLURAL_KEYS = [
   "myEquipment.debt.breakdownCheckedOutLong",
   "myEquipment.debt.breakdownVeryStale",
   "myEquipment.debt.breakdownStale",
+  "offlineQueue.pending",
 ] as const;
 
 function lookup(resources: Record<string, unknown>, path: string): string {

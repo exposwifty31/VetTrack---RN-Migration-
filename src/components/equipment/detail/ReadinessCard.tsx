@@ -6,7 +6,6 @@
  */
 import { Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 
 import { Chip } from "@/components/ui/Chip";
 import { ErrorNote } from "@/components/ui/ErrorNote";
@@ -17,7 +16,7 @@ import type { EquipmentDeployability } from "@/types/api";
 
 import { KeyValueRow, SectionTitle } from "./DetailBits";
 
-type TFn = ReturnType<typeof useTranslation>["t"];
+import { useT, type TFn } from "@/types/tfn";
 
 // Known enum values render translated; an unknown server value falls through
 // as the raw literal, LTR-isolated (an identifier, never fabricated copy).
@@ -72,7 +71,7 @@ function EnumRow({
 }
 
 function BundleGateNotes({ gate }: Readonly<{ gate: EquipmentDeployability["bundleGate"] }>) {
-  const { t } = useTranslation();
+  const t = useT();
   return (
     <>
       {!gate.ok && gate.reason ? (
@@ -92,7 +91,7 @@ function BundleGateNotes({ gate }: Readonly<{ gate: EquipmentDeployability["bund
 }
 
 function ReadinessContent({ data }: Readonly<{ data: EquipmentDeployability }>) {
-  const { t } = useTranslation();
+  const t = useT();
   return (
     <View className="gap-2">
       <Chip
@@ -126,7 +125,7 @@ function ReadinessContent({ data }: Readonly<{ data: EquipmentDeployability }>) 
 }
 
 export function ReadinessCard({ equipmentId }: Readonly<{ equipmentId: string }>) {
-  const { t } = useTranslation();
+  const t = useT();
 
   const query = useQuery<EquipmentDeployability>({
     queryKey: equipmentKeys.deployability(equipmentId),

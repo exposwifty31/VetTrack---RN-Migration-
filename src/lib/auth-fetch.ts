@@ -279,6 +279,32 @@ function armRequestTimeout(callerSignal: AbortSignal | null | undefined): {
   };
 }
 
+/** The abort reason, or an AbortError-shaped Error when the runtime supplies none. */
+function abortReason(signal: AbortSignal): unknown {
+  const reason = (signal as { reason?: unknown }).reason;
+  return reason ?? Object.assign(new Error("Aborted"), { name: "AbortError" });
+}
+
+/**
+ * Settle `work` OR the abort, whichever comes first.
+ *
+ * The request budget has to cover every await between entry and exit, not just
+ * the fetch. Token resolution is the one that bites: `resolveAuthSnapshot()`
+ * calls Clerk's `getToken()`, which reads a keychain and can hit the network, so
+ * a stalled getter left authFetch pending forever with a fully-armed timeout
+ * sitting one line below it — the request never reached the fetch the timeout
+ * was guarding. The listener is removed on every path so a long-lived caller
+ * signal does not accumulate one per request.
+ */
+function withAbort<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(abortReason(signal));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(abortReason(signal));
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
+}
+
 /**
  * Authenticated fetch — attaches Bearer only for valid 3-segment JWTs.
  * Uses RN's global `fetch` (set EXPO_PUBLIC_USE_RN_FETCH=1; avoid expo/fetch races).
@@ -293,7 +319,8 @@ export async function authFetch(path: string, options: RequestInit = {}): Promis
       // MUST come from the same identity generation; see resolveAuthSnapshot's
       // doc for why a sequential resolveToken()-then-getCurrentUserId() read
       // (the pre-fix shape) is unsafe.
-      const snapshot = await resolveAuthSnapshot();
+      // Raced against `signal`: the budget must cover the token, not just the fetch.
+      const snapshot = await withAbort(resolveAuthSnapshot(), signal);
       if (!snapshot || !isValidJwt(snapshot.token)) {
         throw new AuthFetchError("AUTH_INVALID: invalid token");
       }

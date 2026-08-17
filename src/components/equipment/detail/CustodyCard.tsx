@@ -11,7 +11,6 @@
  */
 import { useState } from "react";
 import { Text, View } from "react-native";
-import { useTranslation } from "react-i18next";
 
 import { SectionCard } from "@/components/ui/SectionCard";
 import { formatDateTime } from "@/lib/datetime";
@@ -19,11 +18,11 @@ import { formatDateTime } from "@/lib/datetime";
 import { ltrIsolate, PrimaryButton, QuietButton, SectionTitle } from "./DetailBits";
 import type { CustodyView } from "./equipment-detail-derive";
 
+import { useT, type TFn } from "@/types/tfn";
+
 export type CustodyFeedback = Readonly<{ tone: "success" | "error"; message: string }> | null;
 
 type HeldView = Extract<CustodyView, { kind: "held" }>;
-
-type TFn = ReturnType<typeof useTranslation>["t"];
 
 function holderLabel(t: TFn, custody: HeldView): string {
   if (custody.byMe) return t("equipmentDetail.custody.heldByMe");
@@ -34,7 +33,7 @@ function holderLabel(t: TFn, custody: HeldView): string {
 }
 
 function HeldSummary({ custody }: Readonly<{ custody: HeldView }>) {
-  const { t } = useTranslation();
+  const t = useT();
   const since = formatDateTime(custody.sinceMs);
   const due = formatDateTime(custody.dueMs);
   return (
@@ -64,7 +63,7 @@ function ChargingPrompt({
   pending,
   onDirectReturn,
 }: Readonly<{ pending: boolean; onDirectReturn: (isPluggedIn: boolean) => void }>) {
-  const { t } = useTranslation();
+  const t = useT();
   return (
     <View className="gap-2.5 rounded-[20px] border border-border bg-surface-raised p-4">
       <Text className="font-rubik-medium text-[14px] text-foreground">
@@ -93,7 +92,7 @@ function HeldByMeActions({
   onDirectReturn: (isPluggedIn: boolean) => void;
   directReturnPending: boolean;
 }>) {
-  const { t } = useTranslation();
+  const t = useT();
   const [chargingPromptOpen, setChargingPromptOpen] = useState(false);
   return (
     <View className="mt-4 gap-2.5">
@@ -148,7 +147,7 @@ export function CustodyCard({
   directReturnPending,
   feedback,
 }: CustodyCardProps) {
-  const { t } = useTranslation();
+  const t = useT();
   return (
     <SectionCard>
       <SectionTitle title={t("equipmentDetail.custody.title")} />

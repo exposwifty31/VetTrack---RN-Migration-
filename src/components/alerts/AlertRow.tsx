@@ -15,7 +15,6 @@
  */
 import { memo } from "react";
 import { Text, View } from "react-native";
-import { useTranslation } from "react-i18next";
 
 import { PressableScale } from "@/components/PressableScale";
 import { Chip } from "@/components/ui/Chip";
@@ -23,7 +22,7 @@ import { alertTone, type AlertType, type AlertViewRow } from "@/lib/alerts-deriv
 import { formatDateTime } from "@/lib/datetime";
 import { haptics } from "@/lib/haptics";
 
-type TFn = ReturnType<typeof useTranslation>["t"];
+import { useT, type TFn } from "@/types/tfn";
 
 /** First-Strong Isolate / Pop Directional Isolate — wrap a name/email that may be
  *  Latin so it renders LTR inside the RTL sentence without leaking direction. */
@@ -139,7 +138,7 @@ export const AlertRow = memo(function AlertRow({
   onResolve,
 }: AlertRowProps) {
   // `t` from a hook keeps the row reactive to locale; parent memoizes callbacks.
-  const { t } = useTranslation();
+  const t = useT();
   const { alert } = row;
 
   return (

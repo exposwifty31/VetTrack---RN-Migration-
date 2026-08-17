@@ -50,3 +50,23 @@ describe("SignInScreen error handling", () => {
     expect(screen.queryByText(SENSITIVE)).toBeNull();
   });
 });
+
+describe("SignInScreen diagnostics", () => {
+  it("does not report a failure when only the DEV azp diagnostic throws", async () => {
+    // The diagnostic runs AFTER setActive() — the session is already live. A
+    // rejecting resolveToken() reaching the outer catch would paint "sign-in
+    // failed" over a sign-in that worked, and the user would retry a session
+    // they already have.
+    mockCreate.mockResolvedValue({ status: "complete", createdSessionId: "sess_1" });
+    const { resolveToken } = jest.requireMock("@/lib/auth-fetch") as {
+      resolveToken: jest.Mock;
+    };
+    resolveToken.mockRejectedValueOnce(new Error("keychain unavailable"));
+
+    await renderForm();
+    fireEvent.press(screen.getByTestId("signin-submit"));
+
+    await waitFor(() => expect(mockSetActive).toHaveBeenCalled());
+    expect(screen.queryByText(i18next.t("signIn.error"))).toBeNull();
+  });
+});

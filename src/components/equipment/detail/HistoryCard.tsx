@@ -5,7 +5,6 @@
  */
 import { Text, View } from "react-native";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 
 import { Chip } from "@/components/ui/Chip";
 import { ErrorNote } from "@/components/ui/ErrorNote";
@@ -18,9 +17,9 @@ import type { EquipmentLogItem, EquipmentLogsPage } from "@/types/api";
 import { ltrIsolate, QuietButton, SectionTitle } from "./DetailBits";
 import { statusTone } from "./equipment-detail-derive";
 
-const PAGE_SIZE = 20;
+import { useT, type TFn } from "@/types/tfn";
 
-type TFn = ReturnType<typeof useTranslation>["t"];
+const PAGE_SIZE = 20;
 
 function statusLabel(t: TFn, status: string): string {
   switch (status) {
@@ -46,7 +45,7 @@ function statusLabel(t: TFn, status: string): string {
 }
 
 function LogRow({ item }: Readonly<{ item: EquipmentLogItem }>) {
-  const { t } = useTranslation();
+  const t = useT();
   const when = formatDateTime(item.timestamp);
   return (
     <View className="gap-1 border-t border-border py-2.5">
@@ -71,7 +70,7 @@ function LogRow({ item }: Readonly<{ item: EquipmentLogItem }>) {
 export { statusLabel };
 
 export function HistoryCard({ equipmentId }: Readonly<{ equipmentId: string }>) {
-  const { t } = useTranslation();
+  const t = useT();
 
   const query = useInfiniteQuery({
     queryKey: equipmentKeys.logs(equipmentId),

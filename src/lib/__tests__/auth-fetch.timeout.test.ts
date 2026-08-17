@@ -4,7 +4,7 @@
  * AbortController timeout, and composes a caller-supplied signal so React-Query
  * / unmount cancellation still works.
  */
-import { authFetch, REQUEST_TIMEOUT_MS } from "../auth-fetch";
+import { authFetch, REQUEST_TIMEOUT_MS, setClerkTokenGetter } from "../auth-fetch";
 import { setCurrentUserId, setStoredBearerToken } from "../auth-store";
 
 const realFetch = globalThis.fetch;
@@ -70,5 +70,38 @@ describe("authFetch request timeout", () => {
   it("does not abort a request that resolves before the timeout", async () => {
     mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: "u1" }) } as unknown as Response);
     await expect(authFetch("/api/users/me")).resolves.toMatchObject({ status: 200 });
+  });
+
+  it("applies the abort budget to TOKEN RESOLUTION, not only to the fetch", async () => {
+    // The gap the first version of this timeout left. `armRequestTimeout` fires,
+    // but the await that precedes the fetch is `resolveAuthSnapshot()` -> Clerk's
+    // getToken(), which reads a keychain and may hit the network. A getter that
+    // never settles left authFetch pending forever with a fully-armed 15s budget
+    // sitting unused one line below it — the request never reached the fetch the
+    // budget was guarding.
+    setClerkTokenGetter(() => new Promise<string>(() => {})); // never settles
+    try {
+      const pending = authFetch("/api/users/me");
+      const assertion = expect(pending).rejects.toMatchObject({ name: "AbortError" });
+      await jest.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS);
+      await assertion;
+      expect(mockFetch).not.toHaveBeenCalled(); // never got past the token
+    } finally {
+      setClerkTokenGetter(null);
+    }
+  });
+
+  it("lets a caller cancel while the token getter is still stalled", async () => {
+    setClerkTokenGetter(() => new Promise<string>(() => {}));
+    try {
+      const caller = new AbortController();
+      const pending = authFetch("/api/users/me", { signal: caller.signal });
+      const assertion = expect(pending).rejects.toMatchObject({ name: "AbortError" });
+      await Promise.resolve();
+      caller.abort();
+      await assertion;
+    } finally {
+      setClerkTokenGetter(null);
+    }
   });
 });

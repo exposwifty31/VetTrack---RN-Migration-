@@ -70,11 +70,21 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
         if (__DEV__) {
           // Dev-only azp gating diagnostic (G1). NEVER surfaced to end users —
           // the server-authorization internals stay in the developer console.
-          await new Promise((r) => setTimeout(r, 0));
-          const token = await resolveToken();
-          if (token && isValidJwt(token)) {
-            const azp = decodeJwtPayload(token)?.azp;
-            console.debug(`[SignIn] azp ${typeof azp === "string" ? `present: ${azp}` : "absent"}`);
+          //
+          // Its own try/catch, and that is load-bearing: this runs AFTER
+          // setActive() has already established the session, so a rejecting
+          // resolveToken() reaching the outer catch would show "sign-in failed"
+          // over a sign-in that succeeded. A diagnostic must never be able to
+          // change the verdict on the thing it is diagnosing.
+          try {
+            await new Promise((r) => setTimeout(r, 0));
+            const token = await resolveToken();
+            if (token && isValidJwt(token)) {
+              const azp = decodeJwtPayload(token)?.azp;
+              console.debug(`[SignIn] azp ${typeof azp === "string" ? `present: ${azp}` : "absent"}`);
+            }
+          } catch (diagnosticError) {
+            console.debug("[SignIn] azp diagnostic failed", diagnosticError);
           }
         }
       } else {

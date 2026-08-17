@@ -454,7 +454,9 @@
   "offlineQueue": {
     "paused": "Sync paused — we'll retry automatically.",
     "failed": "Some changes couldn't be saved. Please try again.",
-    "pending": "{{count}} change(s) waiting to sync"
+    "pending": "{{count}} change(s) waiting to sync",
+    "pending_one": "1 change waiting to sync",
+    "pending_other": "{{count}} changes waiting to sync"
   },
   "signIn": {
     "title": "Sign in",
