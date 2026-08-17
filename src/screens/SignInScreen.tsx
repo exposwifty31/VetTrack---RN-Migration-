@@ -10,7 +10,9 @@ const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
 
 /**
  * Minimal Clerk email/password sign-in for G1 Slice 3.
- * After success, decodes the session JWT to report azp presence (gating check).
+ * Errors surface generic, localized copy — never raw provider messages. A
+ * DEV-only console diagnostic records azp presence (G1 gating check); server
+ * authorization internals are never rendered to end users.
  */
 export function SignInScreen(props: RootStackScreenProps<"SignIn">) {
   const { t } = useTranslation();
@@ -33,21 +35,19 @@ export function SignInScreen(props: RootStackScreenProps<"SignIn">) {
   return <ClerkSignInForm {...props} />;
 }
 
-function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
+export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
   const { t } = useTranslation();
   const { isLoaded, signIn, setActive } = useSignIn();
   const { isSignedIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [azpNote, setAzpNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   if (isSignedIn) {
     return (
       <View className="flex-1 gap-3 bg-background px-6 pt-6">
         <Text className="text-2xl font-bold text-foreground">{t("signIn.signedInTitle")}</Text>
-        {azpNote ? <Text className="text-[14px] text-muted">{azpNote}</Text> : null}
         <Pressable
           className="items-center rounded-xl bg-primary py-3.5 active:opacity-80"
           accessibilityRole="button"
@@ -63,32 +63,26 @@ function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
     if (!isLoaded || !signIn) return;
     setBusy(true);
     setError(null);
-    setAzpNote(null);
     try {
       const result = await signIn.create({ identifier: email.trim(), password });
       if (result.status === "complete" && result.createdSessionId) {
         await setActive({ session: result.createdSessionId });
-        // Bridge effect may not have flushed yet — pull via getToken on next tick.
-        await new Promise((r) => setTimeout(r, 0));
-        const token = await resolveToken();
-        if (token && isValidJwt(token)) {
-          const payload = decodeJwtPayload(token);
-          const azp = payload?.azp;
-          setAzpNote(
-            typeof azp === "string"
-              ? `azp present: ${azp} — add to resolveClerkAuthorizedParties if missing on server`
-              : "azp absent — server allowlist check likely no-op for Expo tokens (record in PROOF)",
-          );
-        } else {
-          setAzpNote(
-            "Signed in; getter token not ready — use resolveToken after bridge mounts to decode azp",
-          );
+        if (__DEV__) {
+          // Dev-only azp gating diagnostic (G1). NEVER surfaced to end users —
+          // the server-authorization internals stay in the developer console.
+          await new Promise((r) => setTimeout(r, 0));
+          const token = await resolveToken();
+          if (token && isValidJwt(token)) {
+            const azp = decodeJwtPayload(token)?.azp;
+            console.debug(`[SignIn] azp ${typeof azp === "string" ? `present: ${azp}` : "absent"}`);
+          }
         }
       } else {
         setError(t("signIn.incomplete", { status: result.status }));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (__DEV__) console.debug("[SignIn] sign-in failed", err);
+      setError(t("signIn.error"));
     } finally {
       setBusy(false);
     }
@@ -119,6 +113,7 @@ function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
       />
 
       <Pressable
+        testID="signin-submit"
         className="items-center rounded-xl bg-primary py-3.5 active:opacity-80"
         accessibilityRole="button"
         disabled={busy || !isLoaded}
@@ -134,7 +129,6 @@ function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
       </Pressable>
 
       {error ? <Text className="text-[14px] text-danger">{error}</Text> : null}
-      {azpNote ? <Text className="text-[14px] text-muted">{azpNote}</Text> : null}
     </View>
   );
 }

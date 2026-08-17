@@ -12,6 +12,7 @@ import {
 } from "./active-registration";
 import { getDefaultPushPort } from "./defaultPush";
 import { resolvePushNavTarget } from "./push-deep-link";
+import { recordPushPermission } from "./push-permission-status";
 
 type AuthChangeSubscribe = (listener: (change: AuthChange) => void) => () => void;
 
@@ -162,7 +163,18 @@ export function PushBridge({
       await port.ensureEmergencyChannel();
       if (cancelled) return;
       const granted = await port.requestPermission();
-      if (!granted || cancelled) return;
+      // `cancelled` is tested BEFORE recording, not folded into one condition:
+      // an unmount / identity swap mid-prompt must not leave a "denied" behind
+      // that Settings would then show forever — same reason it does not register
+      // a token here. Only a real OS answer is recorded.
+      if (cancelled) return;
+      // B7: a denial used to end in a bare `return`. Right as control flow —
+      // no permission, no token, nothing to register — and wrong as product
+      // behaviour, because ADR-009 makes this the Code Blue alert channel, so
+      // one "Don't Allow" silenced emergency alerting with nothing able to say
+      // so. Recording it is what lets SettingsScreen surface and repair it.
+      recordPushPermission(granted);
+      if (!granted) return;
       const token = await port.getDeviceToken();
       if (!token || cancelled) return;
       submitAllowed = true;

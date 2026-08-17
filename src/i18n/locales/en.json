@@ -250,7 +250,10 @@
     "notificationsPlaceholder": "Notification preferences are coming soon.",
     "about": "About",
     "version": "Version {{version}}",
-    "privacyPolicy": "Privacy Policy"
+    "privacyPolicy": "Privacy Policy",
+    "notificationsGranted": "Code Blue alerts can reach this device.",
+    "notificationsDeniedBody": "Notifications are turned off for VetTrack. Code Blue alerts cannot reach this device until you allow them in system settings.",
+    "openSystemSettings": "Open system settings"
   },
   "account": {
     "displayName": "Display name",
@@ -448,16 +451,22 @@
     "notFound": "Equipment not found.",
     "failed": "That didn't go through. Try again."
   },
+  "offlineQueue": {
+    "paused": "Sync paused — we'll retry automatically.",
+    "failed": "Some changes couldn't be saved. Please try again.",
+    "pending": "{{count}} change(s) waiting to sync"
+  },
   "signIn": {
     "title": "Sign in",
     "subtitle": "Clerk-Expo · SecureStore token cache",
     "email": "Email",
     "password": "Password",
     "submit": "Sign in",
-    "missingKey": "Set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in .env, rebuild, then sign in to decode azp against resolveClerkAuthorizedParties.",
+    "missingKey": "Sign-in is temporarily unavailable. Please try again later.",
     "signedInTitle": "Signed in",
     "goHome": "Go home",
-    "incomplete": "Sign-in incomplete: status={{status}}"
+    "incomplete": "Sign-in incomplete: status={{status}}",
+    "error": "Sign-in failed. Check your details and try again."
   },
   "apiSmoke": {
     "title": "API smoke",
