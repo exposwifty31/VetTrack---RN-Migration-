@@ -30,6 +30,21 @@ export type TFn = (key: string, options?: Record<string, unknown>) => string;
  * The single cast in the codebase for this. It is sound in the direction that
  * matters at runtime — i18next really does return a string for these calls; the
  * generic signature only says otherwise because of the widening above.
+ *
+ * WHEN TO USE THIS, and when NOT to — the rule, because it is not "always":
+ *
+ *   Use `useT()` when the component PASSES `t` across a function boundary — to
+ *   a helper, or down as a prop. That is what forces the generic signature to be
+ *   written down as a type, and writing it down is what triggers TS2589. All
+ *   eight current callers do exactly that (`t: TFn`).
+ *
+ *   Keep `useTranslation()` when `t` is only called inline in the component
+ *   body. Over seventy files do, none of them trip, and converting them would
+ *   trade real key-literal checking for a problem they do not have.
+ *
+ * So this is a seam for a specific shape, not a house style. If a component
+ * that calls `t` inline starts handing it to a helper, that is the moment it
+ * moves over — not before.
  */
 export function useT(): TFn {
   const { t } = useTranslation();
