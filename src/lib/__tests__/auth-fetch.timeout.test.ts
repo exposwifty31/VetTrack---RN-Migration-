@@ -100,6 +100,9 @@ describe("authFetch request timeout", () => {
       await Promise.resolve();
       caller.abort();
       await assertion;
+      // Rejection alone would still pass if a future change dispatched the fetch
+      // BEFORE the token resolved — the point is that cancellation stops it there.
+      expect(mockFetch).not.toHaveBeenCalled();
     } finally {
       setClerkTokenGetter(null);
     }

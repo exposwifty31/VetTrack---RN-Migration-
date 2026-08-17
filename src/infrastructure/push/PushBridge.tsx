@@ -72,6 +72,8 @@ export function PushBridge({
   // Bumped when a previously-DENIED permission is granted while the app runs, to
   // re-run the registration effect below. See the app-active effect at the end.
   const [permissionEpoch, setPermissionEpoch] = useState(0);
+  // One recovery check at a time — see the app-active effect at the end.
+  const recoveryInFlight = useRef(false);
 
   // Foreground handler + tap navigation (ALERT-ONLY). getInitialResponseData covers
   // a cold start launched from a tap; navigate* queue the target until the container
@@ -216,6 +218,13 @@ export function PushBridge({
     const subscription = AppState.addEventListener("change", (state) => {
       if (state !== "active") return;
       if (getPushPermissionStatus() !== "denied") return;
+      // Serialized: two `active` events can land before the first check settles
+      // — foreground → background → foreground is an ordinary gesture, and the
+      // OS permission dialog itself backgrounds the app. Unguarded, each success
+      // bumps the epoch and each bump re-runs registration, so the same device
+      // token is POSTed twice.
+      if (recoveryInFlight.current) return;
+      recoveryInFlight.current = true;
       void port
         .requestPermission()
         .then((granted) => {
@@ -225,6 +234,11 @@ export function PushBridge({
         })
         .catch((err) => {
           console.warn("[push] permission re-check failed (non-fatal):", err);
+        })
+        .finally(() => {
+          // Cleared on every path, so a rejected check does not wedge recovery
+          // shut for the rest of the session.
+          recoveryInFlight.current = false;
         });
     });
     return () => subscription.remove();

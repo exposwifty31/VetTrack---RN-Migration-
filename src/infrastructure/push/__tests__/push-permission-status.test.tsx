@@ -168,3 +168,54 @@ describe("repairing a denial without a cold start", () => {
     await view.unmount();
   });
 });
+
+describe("permission recovery is serialized", () => {
+  it("starts ONE recovery request even if the app foregrounds twice in a row", async () => {
+    // Two `active` events can land before the first requestPermission() settles
+    // (foreground → background → foreground is a normal gesture, and the OS
+    // dialog itself backgrounds the app). Each success bumps the epoch, and each
+    // bump re-runs registration — so the same device token gets POSTed twice.
+    let resolvePermission!: (granted: boolean) => void;
+    const gate = new Promise<boolean>((r) => {
+      resolvePermission = r;
+    });
+    let calls = 0;
+    const registered: PushDeviceToken[] = [];
+    const listeners: ((s: string) => void)[] = [];
+    jest.spyOn(AppState, "addEventListener").mockImplementation(((_e: string, cb: (s: string) => void) => {
+      listeners.push(cb);
+      return { remove: jest.fn() };
+    }) as never);
+
+    const port = makePort({
+      requestPermission: async () => {
+        calls += 1;
+        // First call (mount) denies; later calls are the recovery attempts.
+        return calls === 1 ? false : gate;
+      },
+      register: async (token) => {
+        registered.push(token);
+      },
+    });
+    const view = await render(<PushBridge port={port} onAuthChange={noAuthChange} />);
+    await act(async () => {});
+    expect(getPushPermissionStatus()).toBe("denied");
+
+    const afterMount = calls;
+    await act(async () => {
+      for (const cb of listeners) cb("active");
+      for (const cb of listeners) cb("active"); // second foreground, first still pending
+    });
+
+    expect(calls - afterMount).toBe(1);
+
+    await act(async () => {
+      resolvePermission(true);
+    });
+    await act(async () => {});
+
+    expect(registered).toEqual([TOKEN]); // exactly one registration, not two
+
+    await view.unmount();
+  });
+});

@@ -63,10 +63,22 @@ describe("SignInScreen diagnostics", () => {
     };
     resolveToken.mockRejectedValueOnce(new Error("keychain unavailable"));
 
-    await renderForm();
-    fireEvent.press(screen.getByTestId("signin-submit"));
+    // Waiting on setActive() alone is not enough: the diagnostic starts AFTER a
+    // zero-delay timer, so the assertion could run before a leaked rejection had
+    // a chance to call setError() — passing for the wrong reason. Wait for the
+    // diagnostic's own log, which only the isolated path emits.
+    const debugSpy = jest.spyOn(console, "debug").mockImplementation(() => {});
+    try {
+      await renderForm();
+      fireEvent.press(screen.getByTestId("signin-submit"));
 
-    await waitFor(() => expect(mockSetActive).toHaveBeenCalled());
-    expect(screen.queryByText(i18next.t("signIn.error"))).toBeNull();
+      await waitFor(() => expect(mockSetActive).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(debugSpy).toHaveBeenCalledWith("[SignIn] azp diagnostic failed", expect.any(Error)),
+      );
+      expect(screen.queryByText(i18next.t("signIn.error"))).toBeNull();
+    } finally {
+      debugSpy.mockRestore();
+    }
   });
 });
