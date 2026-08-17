@@ -35,6 +35,29 @@ export function SignInScreen(props: RootStackScreenProps<"SignIn">) {
   return <ClerkSignInForm {...props} />;
 }
 
+/**
+ * Dev-only azp gating diagnostic (G1). NEVER surfaced to end users — the
+ * server-authorization internals stay in the developer console.
+ *
+ * Extracted from `onSubmit`, and it swallows its own errors on purpose: this
+ * runs AFTER setActive() has established the session, so a rejecting
+ * resolveToken() propagating out would paint "sign-in failed" over a sign-in
+ * that worked. A diagnostic must never change the verdict on the thing it is
+ * diagnosing.
+ */
+async function logAzpDiagnostic(): Promise<void> {
+  try {
+    await new Promise((r) => setTimeout(r, 0));
+    const token = await resolveToken();
+    if (!token || !isValidJwt(token)) return;
+    const azp = decodeJwtPayload(token)?.azp;
+    const state = typeof azp === "string" ? `present: ${azp}` : "absent";
+    console.debug(`[SignIn] azp ${state}`);
+  } catch (diagnosticError) {
+    console.debug("[SignIn] azp diagnostic failed", diagnosticError);
+  }
+}
+
 export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
   const { t } = useTranslation();
   const { isLoaded, signIn, setActive } = useSignIn();
@@ -67,26 +90,7 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
       const result = await signIn.create({ identifier: email.trim(), password });
       if (result.status === "complete" && result.createdSessionId) {
         await setActive({ session: result.createdSessionId });
-        if (__DEV__) {
-          // Dev-only azp gating diagnostic (G1). NEVER surfaced to end users —
-          // the server-authorization internals stay in the developer console.
-          //
-          // Its own try/catch, and that is load-bearing: this runs AFTER
-          // setActive() has already established the session, so a rejecting
-          // resolveToken() reaching the outer catch would show "sign-in failed"
-          // over a sign-in that succeeded. A diagnostic must never be able to
-          // change the verdict on the thing it is diagnosing.
-          try {
-            await new Promise((r) => setTimeout(r, 0));
-            const token = await resolveToken();
-            if (token && isValidJwt(token)) {
-              const azp = decodeJwtPayload(token)?.azp;
-              console.debug(`[SignIn] azp ${typeof azp === "string" ? `present: ${azp}` : "absent"}`);
-            }
-          } catch (diagnosticError) {
-            console.debug("[SignIn] azp diagnostic failed", diagnosticError);
-          }
-        }
+        if (__DEV__) await logAzpDiagnostic();
       } else {
         setError(t("signIn.incomplete", { status: result.status }));
       }

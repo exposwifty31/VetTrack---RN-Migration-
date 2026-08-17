@@ -18,11 +18,11 @@ export function OfflineQueueBannerView({
   status,
   now,
   topInset = 0,
-}: {
+}: Readonly<{
   status: OfflineQueueStatus;
   now: number;
   topInset?: number;
-}) {
+}>) {
   const { t } = useTranslation();
 
   const circuitActive = status.circuitOpenUntil != null && status.circuitOpenUntil > now;
