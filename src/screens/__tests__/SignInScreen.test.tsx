@@ -82,3 +82,34 @@ describe("SignInScreen diagnostics", () => {
     }
   });
 });
+
+describe("SignInScreen submit contract (W-AUTH pin)", () => {
+  beforeEach(() => {
+    mockCreate.mockReset();
+    mockSetActive.mockReset();
+  });
+
+  it("renders the credential form and a successful submit shows no error", async () => {
+    mockCreate.mockResolvedValue({ status: "complete", createdSessionId: "sess_ok" });
+    await renderForm();
+
+    // The minimal form surface: email + password fields and the submit control.
+    await fireEvent.changeText(
+      screen.getByPlaceholderText(i18next.t("signIn.email")),
+      "  vet@example.com ",
+    );
+    await fireEvent.changeText(
+      screen.getByPlaceholderText(i18next.t("signIn.password")),
+      "hunter2!",
+    );
+    await fireEvent.press(screen.getByTestId("signin-submit"));
+
+    await waitFor(() => expect(mockSetActive).toHaveBeenCalledWith({ session: "sess_ok" }));
+    // Identifier is trimmed before dispatch; the password is passed verbatim.
+    expect(mockCreate).toHaveBeenCalledWith({
+      identifier: "vet@example.com",
+      password: "hunter2!",
+    });
+    expect(screen.queryByText(i18next.t("signIn.error"))).toBeNull();
+  });
+});
