@@ -11,6 +11,17 @@
  * records come from `ndef-lib` — the same code that decodes them on the way back
  * in — via `Ndef.uriRecord` / `Ndef.androidApplicationRecord` / `encodeMessage`.
  *
+ * THE AAR NAMES A PACKAGE, AND WHICH ONE MATTERS. `ANDROID_APP_PACKAGE` is
+ * `uk.vettrack.app` (@vettrack/shared constants.ts:13) — the PRODUCTION id, and
+ * the id this RN build itself ships under (app.json android.package and
+ * ios.bundleIdentifier are both `uk.vettrack.app`, verified). That collision is
+ * the premise of this task: installing the RN app REPLACES the Capacitor app, so
+ * whichever one owns the id is the one an AAR cold-tap opens. Never derive this
+ * from a build-variant id — a sticker is a physical artifact for the production
+ * fleet, the same rule the URL origin above follows. In-app reads do not depend
+ * on it either way: `useNfcAdvisoryScan` opens a FOREGROUND
+ * `requestTechnology` session, which pre-empts OS background dispatch entirely.
+ *
  * RECORD ORDER IS LOAD-BEARING. `useNfcAdvisoryScan.decodeRecord0` reads
  * `records[0].payload` and nothing else, deliberately: a hostile tag must not be
  * able to append a second URL record and smuggle a different id past record 0.

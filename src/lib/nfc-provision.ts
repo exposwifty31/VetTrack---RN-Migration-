@@ -145,6 +145,29 @@ async function withSession<T>(alertMessage: string | undefined, body: () => Prom
   }
 }
 
+/**
+ * Abandon whatever session is open, if any.
+ *
+ * The mount that started a session can go away WHILE the operator is still
+ * holding a sticker to the phone: the tablet two-pane renders the provisioning
+ * card inside `EquipmentDetailContent`, and `EquipmentListScreen` keys that pane
+ * on the selected equipment id — tapping another unit remounts it. An orphaned
+ * session is not merely untidy; presenting the NEXT unit's blank sticker to the
+ * PREVIOUS unit's still-live lock session reads `ReadWrite` and locks it, which
+ * on an NTAG215 is irreversible. It would also hold the single-flight guard and
+ * leave Android reader mode on for the rest of {@link NFC_SESSION_TIMEOUT_MS}.
+ *
+ * Cancelling makes the pending `requestTechnology` REJECT on both platforms —
+ * Android invokes the stored callback with ERR_CANCEL (NfcManager.java:113-127);
+ * iOS invalidates the tag session, and `tagReaderSession:didInvalidateWithError:`
+ * fires `techRequestCallback` with the error (NfcManager.m:218-224). That
+ * rejection unwinds `withSession`, which closes the session and clears the
+ * guard. Safe to call when nothing is in flight.
+ */
+export async function cancelNfcProvisioning(): Promise<void> {
+  await NfcManager.cancelTechnologyRequest().catch(() => {});
+}
+
 export type NfcWriteResult = {
   /**
    * The tag's physical UID as lowercase hex, or `null` when the tag exposes

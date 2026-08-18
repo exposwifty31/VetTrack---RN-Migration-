@@ -25,7 +25,7 @@
  * danger-toned block and its buttons are plain `Pressable` with `active:opacity`
  * — press-scale is never applied to a danger fill (the DetailBits rule).
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -37,6 +37,7 @@ import { api, equipmentKeys } from "@/lib/api";
 import { ApiCodedError } from "@/lib/api/coded-error";
 import { haptics } from "@/lib/haptics";
 import {
+  cancelNfcProvisioning,
   lockEquipmentStickerTag,
   NfcProvisionError,
   type NfcProvisionErrorCode,
@@ -176,6 +177,13 @@ export function NfcProvisionCard({ detail }: Readonly<{ detail: EquipmentDetail 
     // mis-tap this whole shape exists to prevent.
     onSettled: () => setArmed(false),
   });
+
+  // The tablet swaps this card out from under a live session: the two-pane
+  // detail is keyed on the selected equipment id (EquipmentListScreen), so
+  // tapping another unit REMOUNTS the card. Leaving the session open would let
+  // the next unit's blank sticker be locked by the previous unit's confirm —
+  // irreversible, and against a screen the operator can no longer see.
+  useEffect(() => () => void cancelNfcProvisioning(), []);
 
   const arm = useCallback(() => {
     haptics.tap();

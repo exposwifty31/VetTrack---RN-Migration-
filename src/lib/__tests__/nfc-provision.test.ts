@@ -25,6 +25,7 @@
 import NfcManager, { NdefStatus, NfcTech } from "react-native-nfc-manager";
 
 import {
+  cancelNfcProvisioning,
   lockEquipmentStickerTag,
   NFC_SESSION_TIMEOUT_MS,
   NfcProvisionError,
@@ -255,6 +256,57 @@ describe("a session that never sees a tag is bounded", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe("cancelNfcProvisioning", () => {
+  /**
+   * The real contract on BOTH platforms: cancelling makes the PENDING
+   * `requestTechnology` reject — Android invokes the stored callback with
+   * ERR_CANCEL (NfcManager.java:113-127), iOS invalidates the tag session and
+   * `tagReaderSession:didInvalidateWithError:` fires `techRequestCallback` with
+   * the error (NfcManager.m:218-224). Modelled here so the test exercises the
+   * mechanism the fix actually depends on rather than a convenient fiction.
+   */
+  function stageCancellableSession() {
+    let rejectRequest: (reason: Error) => void = () => {};
+    native.requestTechnology.mockImplementation(
+      () => new Promise<void>((_resolve, reject) => (rejectRequest = reject)),
+    );
+    native.cancelTechnologyRequest.mockImplementation(async () => {
+      rejectRequest(new Error("cancelled"));
+    });
+  }
+
+  it("breaks a session that is still waiting for a tag", async () => {
+    stageCancellableSession();
+
+    const pending = lockEquipmentStickerTag();
+    const assertion = expect(pending).rejects.toMatchObject({ code: "session_failed" });
+    await cancelNfcProvisioning();
+
+    await assertion;
+    expect(native.ndefHandler.makeReadOnly).not.toHaveBeenCalled();
+  });
+
+  it("releases the single-flight guard so the NEXT action is not stuck on busy", async () => {
+    // The tablet swaps the detail pane mid-session (EquipmentListScreen keys the
+    // pane on the selected id, forcing a remount). Without this release, the
+    // operator's next provisioning action on the newly-selected unit rejects
+    // `busy` for the remainder of NFC_SESSION_TIMEOUT_MS.
+    stageCancellableSession();
+    const abandoned = lockEquipmentStickerTag();
+    const abandonedAssertion = expect(abandoned).rejects.toThrow();
+    await cancelNfcProvisioning();
+    await abandonedAssertion;
+
+    resetNative();
+    stageStatuses(NdefStatus.ReadOnly);
+    await expect(lockEquipmentStickerTag()).resolves.toEqual({ alreadyLocked: true });
+  });
+
+  it("is safe to call when nothing is in flight", async () => {
+    await expect(cancelNfcProvisioning()).resolves.toBeUndefined();
   });
 });
 

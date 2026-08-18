@@ -43,12 +43,14 @@ jest.mock("@/lib/haptics", () => ({
 
 const mockWrite = jest.fn();
 const mockLock = jest.fn();
+const mockCancel = jest.fn();
 jest.mock("@/lib/nfc-provision", () => {
   const actual = jest.requireActual<typeof import("@/lib/nfc-provision")>("@/lib/nfc-provision");
   return {
     ...actual,
     writeEquipmentStickerTag: (...args: unknown[]) => mockWrite(...args),
     lockEquipmentStickerTag: (...args: unknown[]) => mockLock(...args),
+    cancelNfcProvisioning: (...args: unknown[]) => mockCancel(...args),
   };
 });
 
@@ -89,6 +91,7 @@ beforeEach(() => {
   mockWrite.mockReset().mockResolvedValue({ tagId: "04a2b3" });
   mockLock.mockReset().mockResolvedValue({ alreadyLocked: false });
   mockBindNfcTag.mockReset().mockResolvedValue({ id: "eq1" });
+  mockCancel.mockReset().mockResolvedValue(undefined);
   mockUseIdentity.mockReturnValue({ data: { id: "u1", role: "admin", effectiveRole: "admin" } });
   mockUseNfcSupported.mockReturnValue(true);
 });
@@ -275,6 +278,28 @@ describe("lock outcomes", () => {
     expect(await screen.findByTestId("nfc-provision-error")).toHaveTextContent(
       "equipmentDetail.nfc.errors.lock_failed",
     );
+  });
+});
+
+describe("unmount closes any open session", () => {
+  /**
+   * THE DESTRUCTIVE PATH THIS PREVENTS. The tablet two-pane renders this card
+   * inside `EquipmentDetailContent`, and `EquipmentListScreen` keys that pane on
+   * the selected equipment id — tapping another unit REMOUNTS it. Without a
+   * cleanup, an armed-and-confirmed lock session for unit A stays open after the
+   * operator taps unit B; presenting B's blank sticker to that still-live
+   * session reads `ReadWrite` and locks it. A blank locked NTAG215 is scrap, and
+   * the confirm the operator gave was for a screen that is no longer on display.
+   * On Android it also leaves reader mode on for the rest of the timeout.
+   */
+  it("cancels the provisioning session on unmount", async () => {
+    const view = await renderCard();
+
+    await act(async () => {
+      view.unmount();
+    });
+
+    expect(mockCancel).toHaveBeenCalledTimes(1);
   });
 });
 
