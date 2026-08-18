@@ -216,9 +216,16 @@ build to get them.
 For an app that carries Code Blue onto a ward device, sign the updates — without it,
 the integrity of what lands there rests entirely on transport plus Expo account
 control. But run this acceptance pass **unsigned first**: fewer moving parts, and a
-failure is unambiguous. Then enable signing and rebuild before anything reaches a
-ward. Once enabled, every `eas update` and every rollback command needs
-`--private-key-path`.
+failure is unambiguous. Once enabled, every `eas update` and every rollback command
+needs `--private-key-path`.
+
+**An unsigned pass does not transfer to a signed build.** The resolved app config is
+a fingerprint input, so adding `codeSigningCertificate` to `app.json` **changes the
+runtime version** — the signed binary is a different runtime, running a
+differently-configured updates client, with an untested rollback path. If you enable
+signing, **Steps 1–5 must be re-run against the signed build**, and the result log
+records which one was tested. A green log against an unsigned binary is not a
+sign-off for the binary that goes to the ward.
 
 ### P6 — `--environment production` on every publish, always
 
@@ -256,8 +263,10 @@ submission*". Do not rehearse this on `production`.
 eas build --platform ios --profile preview
 ```
 
-Install the resulting build on a real device (internal distribution link or
-`eas build:run`). Do the same for Android if that lane is in scope.
+Install the resulting build on a real device via the internal-distribution link on
+the build page (`eas build:view`). Note that `eas build:run` is **not** the tool
+here — it runs *simulator/emulator* builds only, per its own help. Do the same for
+Android if that lane is in scope.
 
 **Then, before publishing anything, record the baseline** from Settings → About:
 
@@ -440,6 +449,7 @@ On the device: check, apply, read the card.
 | Symptom | Meaning |
 | --- | --- |
 | `roll-back-to-embedded` errors on runtime version | The `$RT` lookup returned the wrong hash — read it from `eas update:list`, not from memory. |
+| The rollback publish is rejected because the channel is paused | Unverified branch — whether EAS accepts a publish to a paused channel was not tested here, and the first time you find out must not be during an incident. If it rejects: `eas channel:resume` first, then roll back, accepting a brief window in which new devices can still take the bad bundle. Record which behaviour you saw in the log below. |
 | Break persists after rollback + reload | The device did not fetch. Re-check; if it still persists, the rollback published to a different runtime or branch. |
 | App crashes on launch and cannot be recovered on-device | The unrecoverable case — see below. Reinstall the binary. |
 | Data looks wrong *after* a successful rollback | The local-state hazard below. Do not dismiss this; it is the reason this rehearsal exists. |
@@ -572,14 +582,20 @@ reintroducing the ambient mid-shift swap that `NEVER` exists to prevent.
 
 Fill this in. An empty log means the capability is unproven.
 
-| Step | Date | Platform | Build # | Result | Notes |
-| --- | --- | --- | --- | --- | --- |
-| 1 — build installed on channel | | | | ☐ PASS ☐ FAIL | baseline update ID: |
-| 2 — no-op published | | | | ☐ PASS ☐ FAIL | group ID: |
-| 3 — installed build took it | | | | ☐ PASS ☐ FAIL | time check→applied: |
-| 4 — broken update rolled back | | | | ☐ PASS ☐ FAIL | local state after rollback: |
-| 5 — incompatible runtime blocked | | | | ☐ PASS ☐ FAIL | fingerprint:compare output: |
+| Step | Date | Platform | Build # | Signed? | Result | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 — build installed on channel | | | | ☐ yes ☐ no | ☐ PASS ☐ FAIL | baseline update ID: |
+| 2 — no-op published | | | | ☐ yes ☐ no | ☐ PASS ☐ FAIL | group ID: |
+| 3 — installed build took it | | | | ☐ yes ☐ no | ☐ PASS ☐ FAIL | time check→applied: |
+| 4 — broken update rolled back | | | | ☐ yes ☐ no | ☐ PASS ☐ FAIL | local state after rollback: |
+| 5 — incompatible runtime blocked | | | | ☐ yes ☐ no | ☐ PASS ☐ FAIL | fingerprint:compare output: |
+
+The **Signed?** column is not bookkeeping. Enabling code signing changes the runtime
+version, so a pass recorded against an unsigned binary does not cover the signed one
+— see [P5](#p5--decide-code-signing-before-you-build-not-after). Run the table twice
+if you sign.
 
 **Signed off by:** ______________  **Date:** ____________
 
-Until every row reads PASS, OTA is configuration.
+Until every row reads PASS, against the binary you actually intend to ship, OTA is
+configuration.
