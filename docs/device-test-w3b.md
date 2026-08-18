@@ -272,7 +272,37 @@ Sizes → drag to **AX5**, the maximum. Android: Settings → Display → Font s
 
 **Expect:** text is visibly enlarged but **stops growing at roughly double**
 normal size. Every control stays on screen and reachable; nothing is clipped off
-the edge; the version line at the bottom is still readable.
+the edge.
+
+**Check these specific elements, not the screen as a whole.** The cap applies
+only to text rendered through the `AppText` wrapper, so a single unmigrated node
+is invisible against a screenful of capped ones:
+- **The version line at the bottom of Settings** — check it first. It is
+  `<AppText selectable>`, which routes through React Native's
+  `NativeSelectableText` branch rather than the normal `NativeText` path, and it
+  is the one element on this screen with **no automated coverage** asserting the
+  ceiling reaches it.
+- The section headings and row labels.
+- The language rows (`LanguageCard`, rendered inside Settings at
+  `SettingsScreen.tsx:48`) — Hebrew and English.
+
+If the version line grows past ~2x while the rows around it stop, the cap is not
+reaching the selectable branch. Record that specifically; it is a different
+defect from "the cap does not apply at all."
+
+**Then go to the Menu tab — this is the third capped surface and it is not on
+the Settings screen.** `AccountSection` (`MenuScreen.tsx:59`) carries the cap
+but was verified only by grep, never by a test: the automated adoption check
+walks the Settings tree, and Account renders under Menu. It is therefore the
+**least-evidenced** of the three files and the most worth a human eye.
+
+**Expect:** the display-name field, the locale toggle and the sign-out row all
+stop growing at ~2x, same as Settings.
+**Fail looks like:** Menu/Account text keeps growing while Settings text caps →
+the `AppText` migration did not take on that file, despite the grep. Record it
+as a separate finding from 1.6's Settings result.
+
+Result (Menu / Account): ☐ pass ☐ fail — ...................................
 **Fail looks like:** text that keeps growing past ~2x on this screen (the cap is
 not applying through Uniwind's `Text` wrapper — this is the single thing the
 jest coverage cannot prove, because jest renders RN's `Text` while the app
@@ -436,6 +466,27 @@ consistent, or discard it.
 
 Result: ☐ pass ☐ fail ☐ skipped — ..........................................
 
+### 2.7 — Program the sacrificial tags (do NOT lock them)
+
+Stage 3 needs an already-programmed tag: the lock refuses an unprogrammed one
+("This sticker cannot be locked. Program it first."). Doing that write **here**,
+while still in the reversible stage, means Stage 3 opens with a known-good tag
+and contains nothing but lock operations. If this write fails you are still in
+reversible territory and have lost nothing.
+
+**Do:** repeat step 2.1 (iPhone) or 2.3 (Pixel) against `SACRIFICIAL-1`, on any
+unit. **Stop there — do not touch "Lock sticker permanently" yet.**
+
+**Expect:** **"Sticker programmed"**, and the bound line updates.
+**Fail looks like:** as 2.1/2.3. Resolve it before entering Stage 3 — do not
+carry a half-written tag across the boundary.
+
+**Keep `SACRIFICIAL-1` physically separate from `SACRIFICIAL-2` from this point
+on.** Step 3.2 depends on you presenting the *same* tag twice, and once locked
+they are visually identical.
+
+Result: ☐ pass ☐ fail — tag programmed and set aside: ☐
+
 ---
 
 ## Stage 3 — IRREVERSIBLE. Sacrificial tags only.
@@ -459,11 +510,12 @@ Result: ☐ pass ☐ fail ☐ skipped — ......................................
 
 ### 3.1 — Lock a sacrificial tag
 
-**Do:** write `SACRIFICIAL-1` first by repeating step 2.1 or 2.3 (the lock needs
-a programmed tag — an unprogrammed one gives "This sticker cannot be locked.
-Program it first."). Then, on that same unit: tap **"Lock sticker permanently"**
-→ a red-bordered block appears reading **"Lock this sticker permanently?"** →
-read the body copy → tap **"Lock permanently"** → present `SACRIFICIAL-1`.
+Uses the tag programmed in 2.7. Nothing in this stage writes.
+
+**Do:** on the unit you programmed `SACRIFICIAL-1` against: tap **"Lock sticker
+permanently"** → a red-bordered block appears reading **"Lock this sticker
+permanently?"** → read the body copy → tap **"Lock permanently"** → present
+`SACRIFICIAL-1`.
 
 **Expect:** green text **"Sticker locked permanently"**, success haptic, and the
 confirm block **disarms itself** (it disarms on every outcome, pass or fail).
@@ -506,7 +558,17 @@ styling, not red. Success haptic.
   copy) → the status query is not detecting the existing lock. Lesser, but
   record it.
 
+> **Before recording ANY failure here, confirm you presented the same physical
+> tag as 3.1.** A locked tag is visually identical to an unlocked one, so this
+> cannot be done from memory — it depends on having kept `SACRIFICIAL-1`
+> physically separate since 2.7. Presenting `SACRIFICIAL-2` by mistake produces
+> **"This sticker cannot be locked. Program it first."** if it is blank, or
+> **"Sticker locked permanently"** if it happens to be programmed — and that
+> second one appears in the fail list above, so a wrong-tag slip would be
+> recorded as a code defect **and would destroy a second tag**.
+
 Result: ☐ pass ☐ fail — exact string shown: ................................
+Tag identity confirmed physically (not from memory): ☐
 
 ### 3.3 — Write to the locked tag (optional confirmation)
 
@@ -532,7 +594,7 @@ Result: ☐ pass ☐ fail — ..................................................
 |---|---|---|
 | 0 — Gate | 0.1–0.5 | ☐ pass ☐ fail |
 | 1 — Diagnostic (nothing written) | 1.1–1.7 | ☐ pass ☐ fail |
-| 2 — Reversible writes | 2.1–2.6 | ☐ pass ☐ fail |
+| 2 — Reversible writes | 2.1–2.7 | ☐ pass ☐ fail |
 | 3 — Irreversible | 3.1–3.3 | ☐ pass ☐ fail ☐ not reached |
 
 **Tags consumed:** ......  **Tags permanently locked:** ......
