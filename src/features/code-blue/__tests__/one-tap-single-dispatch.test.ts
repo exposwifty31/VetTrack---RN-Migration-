@@ -18,7 +18,21 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const source = readFileSync(join(__dirname, "..", "CodeBlueActions.tsx"), "utf8");
+const raw = readFileSync(join(__dirname, "..", "CodeBlueActions.tsx"), "utf8");
+
+/**
+ * Comments and string literals stripped before counting.
+ *
+ * The first version of this guard counted `start.mutate(` in the RAW file, so a
+ * future comment quoting the call would have failed it — and the sibling PR hit
+ * exactly that trap twice, with guards that forbade *mentioning* `npx` rather
+ * than *calling* it. A source-text guard has to look at code, not vocabulary.
+ */
+const source = raw
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/\/\/.*$/gm, "")
+  .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
+  .replace(/'(?:[^'\\\n]|\\.)*'/g, "''");
 
 describe("Code Blue start has exactly one dispatch point", () => {
   it("calls start.mutate in exactly one place — the token minter", () => {
@@ -32,6 +46,10 @@ describe("Code Blue start has exactly one dispatch point", () => {
   });
 
   it("mints through resolveOneTapStartToken, never a bare randomUUID per press", () => {
-    expect(source).toContain("resolveOneTapStartToken(tokenRef.current, Crypto.randomUUID)");
+    // Shape, not one exact expression: pinning the literal argument list made
+    // any reformatting — or a legitimate change to how the token ref is scoped —
+    // fail with a message that named neither cause.
+    expect(source).toMatch(/resolveOneTapStartToken\s*\(/);
+    expect(source).not.toMatch(/idempotencyToken:\s*Crypto\.randomUUID\(\)/);
   });
 });

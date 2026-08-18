@@ -46,9 +46,34 @@ describe("api.users.managers", () => {
     ]);
   });
 
-  it("degrades a missing/!Array `managers` field to an empty list, never throws", async () => {
-    mockAuthFetch.mockResolvedValue(makeResponse(200, {}));
+  it.each([
+    ["missing", {}],
+    ["not an array", { managers: "nope" }],
+    ["null", { managers: null }],
+  ])("degrades a %s `managers` field to an empty list, never throws", async (_label, body) => {
+    mockAuthFetch.mockResolvedValue(makeResponse(200, body));
     await expect(api.users.managers()).resolves.toEqual([]);
+  });
+
+  it("DROPS an unrenderable row instead of handing it to the picker", async () => {
+    // ManagerPicker calls `manager.name.trim()` and uses `manager.id` as a React
+    // key. One malformed row therefore throws during render and takes down the
+    // only affordance a technician has to start a Code Blue. Validate rows, not
+    // just the container.
+    mockAuthFetch.mockResolvedValue(
+      makeResponse(200, {
+        managers: [
+          { id: "u-1", name: "Dr. Cohen", role: "vet" },
+          { id: "u-2", name: null, role: "vet" },
+          { id: "", name: "No Id", role: "vet" },
+          null,
+          "not an object",
+        ],
+      }),
+    );
+    await expect(api.users.managers()).resolves.toEqual([
+      { id: "u-1", name: "Dr. Cohen", role: "vet" },
+    ]);
   });
 
   it("surfaces the server's coded 500 as an ApiCodedError (no silent empty list)", async () => {

@@ -50,8 +50,18 @@ export function useCodeBlueMutations() {
    * `retry: 0` matters MORE here than elsewhere: react-query retries reuse the
    * same variables, so an auto-retry would re-send the same token and burn the
    * fence's lease window without the operator ever seeing the outcome. Retry is
-   * an operator decision (press Start again), which re-sends the same token by
-   * design — see `resolveOneTapStartToken`.
+   * an operator decision — pressing the same affordance again (Start for a
+   * self-manager, the same candidate row for an initiator who nominates), which
+   * re-sends the same token by design. See `resolveOneTapStartToken`.
+   *
+   * KNOWN-UNWIRED, with a destination rather than a shrug: the response's
+   * `reservedCartId` and `pagingState` are typed and returned and NOTHING reads
+   * them. `reservedCartId: null` is the server saying no ready crash cart could
+   * be reserved — the session still starts, soft-reserve is advisory — and
+   * `pagingState` is the live state of the team page. Both belong to the
+   * arrest-screen slice that shows "cart 3 reserved · team paged", which does
+   * not exist yet. If that slice is dropped, drop these two fields with it
+   * rather than leaving a response shape nobody consumes.
    */
   const start = useMutation({
     retry: 0,

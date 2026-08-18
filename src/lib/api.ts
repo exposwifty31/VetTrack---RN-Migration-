@@ -120,8 +120,23 @@ export const api = {
      * usable after that error rather than dead-ending.
      */
     managers: async (): Promise<CodeBlueManager[]> => {
-      const body = await requestJson<{ managers?: CodeBlueManager[] }>("/api/users/managers");
-      return Array.isArray(body?.managers) ? body.managers : [];
+      // Row-level, not container-level. `Array.isArray` proves only that
+      // `managers` is an array; ManagerPicker then calls `manager.name.trim()`
+      // and uses `manager.id` as a React key, so ONE malformed row throws a
+      // TypeError during render and takes the picker down — on the arrest path,
+      // where the picker is the only way a technician can start. Unusable rows
+      // are dropped rather than rendered, the same doctrine `api.equipment.scan`
+      // applies below for the same reason.
+      const body = await requestJson<{ managers?: unknown }>("/api/users/managers");
+      if (!Array.isArray(body?.managers)) return [];
+      return body.managers.filter(
+        (row): row is CodeBlueManager =>
+          typeof row === "object" &&
+          row !== null &&
+          typeof (row as CodeBlueManager).id === "string" &&
+          (row as CodeBlueManager).id.length > 0 &&
+          typeof (row as CodeBlueManager).name === "string",
+      );
     },
   },
   /*

@@ -131,6 +131,30 @@ describe("useCodeBlueMutations — end is server-confirmed, never optimistic", (
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: codeBlueKeys.active() });
   });
 
+  it("a REPLAYED start still invalidates the active query", async () => {
+    // outcome: "replay" is the reason the fence exists — a double-press or a
+    // retry after a lost response returns the ORIGINAL sessionId instead of
+    // racing a second start. Every other success test uses "created", so if
+    // invalidation ever moved behind an outcome check, a replayed start would
+    // leave the screen session-less while the server holds a committed session.
+    jest
+      .mocked(codeBlueApi.oneTap)
+      .mockResolvedValue({ outcome: "replay", sessionId: "s-1", reservedCartId: null, pagingState: "sent" });
+    const { view, invalidateSpy, setQueryDataSpy } = await setup();
+
+    await act(async () => {
+      view.result.current.start.mutate({
+        idempotencyToken: "tok-1",
+        managerUserId: "u1",
+        managerUserName: "Dr. Cohen",
+      });
+    });
+    await waitFor(() => expect(view.result.current.start.isSuccess).toBe(true));
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: codeBlueKeys.active() });
+    expect(setQueryDataSpy).not.toHaveBeenCalled();
+  });
+
   it("start / addLogEntry / presence success also never call setQueryData", async () => {
     jest.mocked(codeBlueApi.oneTap).mockResolvedValue({ outcome: "created", sessionId: "s-1", reservedCartId: "cart-1", pagingState: "queued" });
     jest.mocked(codeBlueApi.addLogEntry).mockResolvedValue({ id: "log-1", duplicate: false });

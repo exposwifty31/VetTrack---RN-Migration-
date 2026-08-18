@@ -236,7 +236,7 @@
       "generic": "That didn't go through. Please try again.",
       "managerNotEligible": "That manager isn't currently eligible to run a Code Blue. Pick someone else.",
       "invalidManager": "That manager is no longer available. Pick someone else.",
-      "startPending": "Your Code Blue is still starting. Wait a moment, then press Start again — pressing again will not create a second one.",
+      "startPending": "Your Code Blue is still starting. Wait a moment, then try again — trying again will not create a second one.",
       "startSuperseded": "A newer start attempt took over. This screen will show the active Code Blue in a moment."
     }
   },

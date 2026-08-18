@@ -13,7 +13,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 
-import { CodeBlueActions } from "../CodeBlueActions";
+import { CodeBlueActions, codeBlueManagerKeys } from "../CodeBlueActions";
 import { useCodeBlueMutations } from "../useCodeBlueMutations";
 import { useIdentity } from "@/app/useIdentity";
 import { ApiCodedError } from "@/lib/api/coded-error";
@@ -57,7 +57,12 @@ function installQueryMock(session: Partial<UseQueryResult<ActiveCodeBlueResponse
   jest.mocked(useQuery).mockImplementation((options: unknown) => {
     const key = (options as { queryKey?: readonly unknown[] }).queryKey ?? [];
     const base = { data: undefined, isPending: false, isError: false, refetch: jest.fn() };
-    if (key[0] === "users") {
+    // Compare against the REAL key, not a "users" literal. The drift this
+    // avoids fails SILENTLY: if the key root changed, the manager query would
+    // fall through to the session branch and return `data: undefined`, which
+    // ManagerPicker turns into `?? []` — so the empty-roster test would still
+    // pass, for the wrong reason.
+    if (key[0] === codeBlueManagerKeys.all[0] && key[1] === codeBlueManagerKeys.all[1]) {
       return { ...base, ...managersResult } as never;
     }
     return {
