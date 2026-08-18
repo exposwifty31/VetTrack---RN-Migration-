@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -17,6 +17,31 @@ import { useIsTablet } from "@/lib/use-is-tablet";
 import type { RootStackScreenProps } from "../navigation/types";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+
+type SignInNavigation = RootStackScreenProps<"SignIn">["navigation"];
+
+/**
+ * Leave SignIn. SignIn is PUSHED OVER `Main` (BootstrapGate re-auth,
+ * MenuScreen sign-out), so the way off it is a POP, not a navigate.
+ *
+ * React Navigation 7 changed `navigate`: its StackRouter reuses an existing
+ * route only when that route is the CURRENT one, or when `popTo` sets
+ * `payload.pop` — otherwise it appends a brand-new route. So `navigate("Main")`
+ * from SignIn could never dismiss SignIn; it stacked a duplicate MainTabs
+ * underneath a screen that stayed put, which on device reads as a dead button
+ * (verified iPad sim 2026-08-19).
+ *
+ * `navigate` survives only as the cold-boot fallback: when SignIn is the sole
+ * route (deep link / first launch) there is nothing to pop to, and pushing Main
+ * is exactly right.
+ */
+function dismissToHome(navigation: SignInNavigation): void {
+  if (navigation.canGoBack()) {
+    navigation.goBack();
+    return;
+  }
+  navigation.navigate("Main");
+}
 
 /**
  * Branded sign-in (W-AUTH PR-B) — parity with web `signin.tsx`: VetTrack
@@ -37,7 +62,7 @@ export function SignInScreen(props: RootStackScreenProps<"SignIn">) {
         <Pressable
           className="items-center rounded-xl border border-border py-3.5 active:opacity-80"
           accessibilityRole="button"
-          onPress={() => props.navigation.navigate("Main")}
+          onPress={() => dismissToHome(props.navigation)}
         >
           <Text className="text-[15px] font-semibold text-foreground">{t("common.back")}</Text>
         </Pressable>
@@ -84,6 +109,20 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const ssoInFlightRef = useRef(false);
+  // Post-`finalize()` the session is live and a sign-in screen is dead UX, so
+  // dismiss without waiting for a button press. Gated on the TRANSITION, not on
+  // `isSignedIn` alone: BootstrapGate's re-auth path routes here with a session
+  // that may still be active (its `signOut()` failure is caught, not fatal), and
+  // auto-dismissing on mount would bounce the user straight back to the gate
+  // they came from — the form has to stay reachable. Latched so a re-render
+  // cannot pop twice.
+  const pendingAutoDismissRef = useRef(!flow.isSignedIn);
+  useEffect(() => {
+    if (!flow.isSignedIn || !pendingAutoDismissRef.current) return;
+    if (!navigation.canGoBack()) return; // cold boot: the button is the affordance
+    pendingAutoDismissRef.current = false;
+    navigation.goBack();
+  }, [flow.isSignedIn, navigation]);
 
   if (flow.isSignedIn) {
     return (
@@ -92,7 +131,7 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
         <PressableScale
           className="items-center rounded-xl bg-primary py-3.5"
           accessibilityRole="button"
-          onPress={() => navigation.navigate("Main")}
+          onPress={() => dismissToHome(navigation)}
         >
           <Text className="text-[15px] font-semibold text-primary-foreground">{t("signIn.goHome")}</Text>
         </PressableScale>
