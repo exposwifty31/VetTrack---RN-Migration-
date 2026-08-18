@@ -9,9 +9,10 @@
  *
  * Detection is PARSED, never grepped (CodeRabbit round 2; vettrack
  * xlsx-write-only-guard precedent): module specifiers are collected from the
- * TypeScript AST — static import/export declarations, `import type`
- * ImportTypeNodes, dynamic `import(...)`, and `require(...)` — so a dynamic
- * require is caught and a commented-out import line is ignored. Verified
+ * TypeScript AST — static import/export declarations, `import X = require()`
+ * ImportEqualsDeclarations, `import type` ImportTypeNodes, dynamic
+ * `import(...)`, and `require(...)` — so a dynamic require is caught and a
+ * commented-out import line is ignored. Verified
  * red/green at introduction: a planted `require("@clerk/expo")` in a screen
  * failed the suite; a planted block-comment import did not.
  */
@@ -50,6 +51,13 @@ function moduleSpecifiersOf(source: string, fileName: string): string[] {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
       const spec = lit(node.moduleSpecifier);
       if (spec !== undefined) specifiers.push(spec);
+    } else if (ts.isImportEqualsDeclaration(node)) {
+      // import X = require("mod") — TS-only syntax a require()-CallExpression
+      // walk never sees (the reference is an ExternalModuleReference node).
+      if (ts.isExternalModuleReference(node.moduleReference)) {
+        const spec = lit(node.moduleReference.expression);
+        if (spec !== undefined) specifiers.push(spec);
+      }
     } else if (ts.isImportTypeNode(node)) {
       // import("mod") in TYPE position: typeof import("@clerk/expo")
       if (ts.isLiteralTypeNode(node.argument)) {
@@ -115,6 +123,9 @@ describe("Clerk import boundary", () => {
     ).toContain("@clerk/expo/token-cache");
     expect(
       moduleSpecifiersOf('type T = typeof import("@clerk/expo");', "plant-type.ts"),
+    ).toContain("@clerk/expo");
+    expect(
+      moduleSpecifiersOf('import Clerk = require("@clerk/expo");', "plant-import-equals.ts"),
     ).toContain("@clerk/expo");
     // ...while a commented-out import is NOT.
     expect(
