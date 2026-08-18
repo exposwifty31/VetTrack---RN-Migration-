@@ -2,7 +2,7 @@
  * App-wide `AuthSessionPort` instance + a sign-out seam, mirroring the token
  * seam in `auth-fetch.ts` (`setClerkTokenGetter`). Components under
  * `src/{screens,features,components}/**` sign out through this PORT — they never
- * import `@clerk/clerk-expo` directly (the coding-guideline / hexagonal boundary).
+ * import `@clerk/expo` directly (the coding-guideline / hexagonal boundary).
  *
  * `ClerkTokenBridge` (the one place already under `ClerkProvider`) registers the
  * live Clerk `signOut` via `setSessionSignOut`; in dev-bypass no key is present,

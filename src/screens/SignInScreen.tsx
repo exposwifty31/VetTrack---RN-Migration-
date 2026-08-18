@@ -1,8 +1,8 @@
-import { useAuth, useSignIn } from "@clerk/clerk-expo";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { useSignInFlow } from "@/infrastructure/auth/useSignInFlow";
 import { decodeJwtPayload, isValidJwt, resolveToken } from "@/lib/auth-fetch";
 import type { RootStackScreenProps } from "../navigation/types";
 
@@ -40,7 +40,7 @@ export function SignInScreen(props: RootStackScreenProps<"SignIn">) {
  * server-authorization internals stay in the developer console.
  *
  * Extracted from `onSubmit`, and it swallows its own errors on purpose: this
- * runs AFTER setActive() has established the session, so a rejecting
+ * runs AFTER signIn.finalize() has established the session, so a rejecting
  * resolveToken() propagating out would paint "sign-in failed" over a sign-in
  * that worked. A diagnostic must never change the verdict on the thing it is
  * diagnosing.
@@ -60,14 +60,16 @@ async function logAzpDiagnostic(): Promise<void> {
 
 export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
   const { t } = useTranslation();
-  const { isLoaded, signIn, setActive } = useSignIn();
-  const { isSignedIn } = useAuth();
+  // Port adapter (PR #75 review): the SignInFlowPort owns Clerk's hooks and
+  // the v4 password->status->finalize mechanism; this screen only maps
+  // outcomes to state/copy and never imports Clerk.
+  const flow = useSignInFlow();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (isSignedIn) {
+  if (flow.isSignedIn) {
     return (
       <View className="flex-1 gap-3 bg-background px-6 pt-6">
         <Text className="text-2xl font-bold text-foreground">{t("signIn.signedInTitle")}</Text>
@@ -83,16 +85,18 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
   }
 
   const onSubmit = async () => {
-    if (!isLoaded || !signIn) return;
+    if (!flow.ready) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await signIn.create({ identifier: email.trim(), password });
-      if (result.status === "complete" && result.createdSessionId) {
-        await setActive({ session: result.createdSessionId });
+      const outcome = await flow.submitPassword(email.trim(), password);
+      if (outcome.kind === "complete") {
         if (__DEV__) await logAzpDiagnostic();
+      } else if (outcome.kind === "incomplete") {
+        setError(t("signIn.incomplete", { status: outcome.status }));
       } else {
-        setError(t("signIn.incomplete", { status: result.status }));
+        if (__DEV__) console.debug("[SignIn] sign-in failed", outcome.cause);
+        setError(t("signIn.error"));
       }
     } catch (err) {
       if (__DEV__) console.debug("[SignIn] sign-in failed", err);
@@ -130,7 +134,7 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
         testID="signin-submit"
         className="items-center rounded-xl bg-primary py-3.5 active:opacity-80"
         accessibilityRole="button"
-        disabled={busy || !isLoaded}
+        disabled={busy || !flow.ready}
         onPress={() => {
           void onSubmit();
         }}

@@ -14,6 +14,11 @@ module.exports = defineConfig([
       "dist/*",
       ".vendor/*",
       ".worktrees/*",
+      // Sibling agent checkouts (jest already ignores <rootDir>/.claude/ via
+      // modulePathIgnorePatterns; eslint needs its own entry — surfaced when
+      // the @clerk/clerk-expo -> @clerk/expo swap made a sibling worktree's
+      // imports unresolvable in THIS tree's node_modules).
+      ".claude/*",
       "node_modules/*",
       "**/*.d.ts",
       "babel.config.js",

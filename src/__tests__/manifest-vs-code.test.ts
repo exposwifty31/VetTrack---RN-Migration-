@@ -431,11 +431,11 @@ const CAPABILITY_CONSUMERS: Record<string, readonly string[]> = {
   "expo-camera": ["expo-camera"],
   // NOT consumed directly. Clerk's token cache is the only thing in this app
   // that writes the keychain, and it does so through expo-secure-store. The
-  // entry is the exact "@clerk/clerk-expo/token-cache" subpath, NOT the bare
-  // "@clerk/clerk-expo" package: the bare package is imported anyway for
+  // entry is the exact "@clerk/expo/token-cache" subpath, NOT the bare
+  // "@clerk/expo" package: the bare package is imported anyway for
   // ClerkProvider, so matching at package level would keep passing even if the
   // token cache were removed and the entitlement left stranded.
-  "expo-secure-store": ["expo-secure-store", "@clerk/clerk-expo/token-cache"],
+  "expo-secure-store": ["expo-secure-store", "@clerk/expo/token-cache"],
   "expo-web-browser": ["expo-web-browser"],
   "expo-font": ["expo-font", "@expo-google-fonts/rubik"],
   "expo-splash-screen": ["expo-splash-screen"],
@@ -476,7 +476,7 @@ function consumersFor(plugin: string): { specifier: string; files: string[] }[] 
  * `.pnpm/<hash>/node_modules/<pkg>`, so this resolves on this repo's layout.
  */
 
-/** "expo-camera/next" -> "expo-camera"; "@clerk/clerk-expo/x" -> "@clerk/clerk-expo". */
+/** "expo-camera/next" -> "expo-camera"; "@clerk/expo/x" -> "@clerk/expo". */
 function packageRootOf(specifier: string): string | null {
   // Relative, absolute, and the "@/" -> src/* tsconfig alias are not packages.
   if (
@@ -529,6 +529,22 @@ const PLUGIN_NOT_REQUIRED: Record<string, string> = {
   // it bare in app.json would change nothing in the binary.
   "expo-status-bar":
     "plugin is a no-op without props; runtime <StatusBar> needs no native config",
+  // W-AUTH decision (PR feat/w-auth-1-clerk-expo-v4): the @clerk/expo config
+  // plugin exists to make the NATIVE components (@clerk/expo/native AuthView
+  // etc.) buildable — it force-raises the iOS deployment target to 17.0
+  // (CLERK_MIN_IOS_VERSION in its app.plugin.js; the app ships 16.4), adds a
+  // Sign-in-with-Apple entitlement for the NATIVE Apple flow, and edits
+  // android build.gradle for the clerk-android SDK. This app uses JS-only
+  // custom flows + browser SSO (useSSO), which need none of that; the native
+  // module is additionally excluded from autolinking in package.json
+  // ("expo"."autolinking"."exclude") because its ClerkExpo pod both requires
+  // iOS 17.0 and crashes RN 0.86's spm.rb post-install hook. The JS side
+  // degrades gracefully: dist/specs/NativeClerkModule uses
+  // requireOptionalNativeModule("ClerkExpo") and provider/nativeClientSync
+  // no-ops when it resolves null. Registering the plugin would break the
+  // iOS build for zero functional gain.
+  "@clerk/expo":
+    "plugin serves native components only (forces iOS 17.0); JS custom flows + useSSO need no native config, module excluded from autolinking",
 };
 
 // ---------------------------------------------------------------------------
@@ -732,7 +748,7 @@ describe("manifest-vs-code contract", () => {
    *
    * This layer is keyed on CAPABILITY_CONSUMERS, which lets it see aliases:
    * `expo-secure-store` is never imported directly in this app, only
-   * `@clerk/clerk-expo/token-cache` is, so the import-derived (b-derived) below
+   * `@clerk/expo/token-cache` is, so the import-derived (b-derived) below
    * cannot require its declaration. This one can. The two are complementary,
    * not redundant.
    */
