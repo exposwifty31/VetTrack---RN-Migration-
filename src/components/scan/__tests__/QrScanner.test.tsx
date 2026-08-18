@@ -1,9 +1,26 @@
 /**
- * Locks the camera mount-failure contract (CodeRabbit PR #58): when CameraView
- * reports `onMountError`, the scanner must replace the (black) preview with the
- * localized `scan.cameraUnavailable` state instead of leaving a dead frame.
+ * Locks three QrScanner contracts:
+ *
+ * 1. Mount failure (CodeRabbit PR #58): when CameraView reports `onMountError`,
+ *    the scanner must replace the (black) preview with the localized
+ *    `scan.cameraUnavailable` state instead of leaving a dead frame.
+ * 2. Lifecycle gate (W3B/F3): the camera session is held only while the screen
+ *    is focused AND the app is foregrounded. Navigation focus alone is not
+ *    enough — backgrounding a focused Scan screen never changes focus, so the
+ *    camera would keep its session and can hang on resume.
+ * 3. Torch (W3B/F3, Capacitor parity with `applyConstraints({advanced:[{torch}]})`):
+ *    off on mount, toggled by an explicit control, and the operator's choice
+ *    survives the background→foreground remount (a dark ward is still dark on
+ *    resume).
+ *
+ * AppState is auto-mocked by the jest-expo preset (`AppState.currentState` is a
+ * mock constructor, not "active"), so every test drives it the way
+ * OfflineQueueBridge.test.tsx does: assign `currentState` and capture the
+ * listener registered by the REAL `useAppActive` hook — the hook is deliberately
+ * NOT mocked, so these tests exercise it end to end.
  */
-import { act, render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { AppState, type AppStateStatus } from "react-native";
 
 import QrScanner from "../QrScanner";
 
@@ -27,11 +44,41 @@ jest.mock("expo-camera", () => {
   };
 });
 
-describe("QrScanner active gate", () => {
-  beforeEach(() => {
-    cameraProps = null;
-  });
+let appStateListener: ((state: AppStateStatus) => void) | null = null;
 
+beforeEach(() => {
+  cameraProps = null;
+  appStateListener = null;
+  AppState.currentState = "active";
+  jest.spyOn(AppState, "addEventListener").mockImplementation(((
+    _event: string,
+    handler: (state: AppStateStatus) => void,
+  ) => {
+    appStateListener = handler;
+    return { remove: jest.fn() };
+  }) as unknown as typeof AppState.addEventListener);
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+/** RNTL 14 runs an async act environment — a press must be flushed inside it. */
+async function pressTorch() {
+  await act(async () => {
+    fireEvent.press(screen.getByTestId("torch-toggle"));
+  });
+}
+
+/** Drive the captured AppState listener the way the OS would. */
+async function emitAppState(state: AppStateStatus) {
+  expect(appStateListener).toBeInstanceOf(Function);
+  await act(async () => {
+    appStateListener?.(state);
+  });
+}
+
+describe("QrScanner active gate", () => {
   it("does not render CameraView while inactive (Android has no `active` prop — unmount is the only real stop)", async () => {
     await render(<QrScanner onScanned={jest.fn()} hint="hint" active={false} />);
 
@@ -52,11 +99,82 @@ describe("QrScanner active gate", () => {
   });
 });
 
-describe("QrScanner mount failure", () => {
-  beforeEach(() => {
-    cameraProps = null;
+describe("QrScanner app-lifecycle gate", () => {
+  it("releases the camera when the app backgrounds even though navigation focus never changed", async () => {
+    await render(<QrScanner onScanned={jest.fn()} hint="hint" active />);
+    expect(screen.getByTestId("camera-view")).toBeTruthy();
+
+    await emitAppState("background");
+
+    expect(screen.queryByTestId("camera-view")).toBeNull();
   });
 
+  it("reacquires the camera on foreground (listener is driven, not merely registered)", async () => {
+    await render(<QrScanner onScanned={jest.fn()} hint="hint" active />);
+
+    await emitAppState("background");
+    expect(screen.queryByTestId("camera-view")).toBeNull();
+
+    await emitAppState("active");
+    expect(screen.getByTestId("camera-view")).toBeTruthy();
+  });
+
+  it("stays dark on foreground while the screen is unfocused (both halves of the gate are required)", async () => {
+    await render(<QrScanner onScanned={jest.fn()} hint="hint" active={false} />);
+
+    await emitAppState("background");
+    await emitAppState("active");
+
+    expect(screen.queryByTestId("camera-view")).toBeNull();
+  });
+});
+
+describe("QrScanner torch", () => {
+  it("starts with the torch off", async () => {
+    await render(<QrScanner onScanned={jest.fn()} hint="hint" active />);
+
+    expect(cameraProps?.enableTorch).toBe(false);
+  });
+
+  it("toggles the torch on and back off", async () => {
+    await render(<QrScanner onScanned={jest.fn()} hint="hint" active />);
+
+    await pressTorch();
+    expect(cameraProps?.enableTorch).toBe(true);
+    expect(screen.getByTestId("torch-toggle").props.accessibilityState).toMatchObject({
+      checked: true,
+    });
+
+    await pressTorch();
+    expect(cameraProps?.enableTorch).toBe(false);
+    expect(screen.getByTestId("torch-toggle").props.accessibilityState).toMatchObject({
+      checked: false,
+    });
+  });
+
+  it("keeps the torch on across a background→foreground remount", async () => {
+    await render(<QrScanner onScanned={jest.fn()} hint="hint" active />);
+    await pressTorch();
+    expect(cameraProps?.enableTorch).toBe(true);
+
+    await emitAppState("background");
+    await emitAppState("active");
+
+    expect(screen.getByTestId("camera-view")).toBeTruthy();
+    expect(cameraProps?.enableTorch).toBe(true);
+  });
+
+  it("hides the torch control while no camera session is held", async () => {
+    await render(<QrScanner onScanned={jest.fn()} hint="hint" active />);
+    expect(screen.getByTestId("torch-toggle")).toBeTruthy();
+
+    await emitAppState("background");
+
+    expect(screen.queryByTestId("torch-toggle")).toBeNull();
+  });
+});
+
+describe("QrScanner mount failure", () => {
   it("renders the localized unavailable state when the camera fails to mount", async () => {
     await render(<QrScanner onScanned={jest.fn()} hint="hint" active />);
 
@@ -71,5 +189,63 @@ describe("QrScanner mount failure", () => {
 
     expect(screen.queryByTestId("camera-view")).toBeNull();
     expect(screen.getByText("scan.cameraUnavailable")).toBeTruthy();
+  });
+});
+
+describe("stale-closure gate (review: a queued event fired after the flip)", () => {
+  it("drops a barcode event delivered from a pre-background closure", async () => {
+    // The native module holds the closure from the render it was mounted in.
+    // Before the ref fix the handler read the CAPTURED `cameraActive` — true at
+    // capture time — so an event queued across the flip fired `onScanned` for a
+    // camera the user had already left. The in-flight guard was decorative.
+    const onScanned = jest.fn();
+    await render(<QrScanner active onScanned={onScanned} hint="hint" />);
+
+    const staleHandler = cameraProps?.onBarcodeScanned as (r: { data: string }) => void;
+    expect(staleHandler).toBeInstanceOf(Function);
+
+    await emitAppState("background"); // the gate flips; the camera unmounts
+
+    staleHandler({ data: "vt-equipment:123" }); // the queued event lands late
+    expect(onScanned).not.toHaveBeenCalled();
+  });
+
+  it("drops a queued barcode event after the camera fails to mount", async () => {
+    // `mountFailed` swaps the view but is NOT part of the activity gate —
+    // `active && appActive` are both still true, so without an explicit clear
+    // the ref stays `true` and a queued event fires for a camera that never
+    // actually worked.
+    const onScanned = jest.fn();
+    await render(<QrScanner active onScanned={onScanned} hint="hint" />);
+
+    const staleHandler = cameraProps?.onBarcodeScanned as (r: { data: string }) => void;
+    const mountError = cameraProps?.onMountError as () => void;
+    await act(async () => {
+      mountError();
+    });
+
+    staleHandler({ data: "vt-equipment:123" });
+    expect(onScanned).not.toHaveBeenCalled();
+  });
+
+  it("stays closed after mount failure even across a background→foreground cycle", async () => {
+    // The imperative clear in onMountError is not enough on its own: the layout
+    // effect re-runs on any `cameraActive` change and, if `mountFailed` is not
+    // part of the derived gate, sets the ref back to true — reopening the door
+    // for a retained callback on a camera that never worked.
+    const onScanned = jest.fn();
+    await render(<QrScanner active onScanned={onScanned} hint="hint" />);
+
+    const staleHandler = cameraProps?.onBarcodeScanned as (r: { data: string }) => void;
+    const mountError = cameraProps?.onMountError as () => void;
+    await act(async () => {
+      mountError();
+    });
+
+    await emitAppState("background");
+    await emitAppState("active"); // the effect re-runs here
+
+    staleHandler({ data: "vt-equipment:123" });
+    expect(onScanned).not.toHaveBeenCalled();
   });
 });

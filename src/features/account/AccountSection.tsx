@@ -12,7 +12,7 @@
  * isolate.
  */
 import { useState, useSyncExternalStore } from "react";
-import { ActivityIndicator, Alert, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUniwind } from "uniwind";
@@ -33,6 +33,7 @@ import {
   subscribeAuthSession,
 } from "@/infrastructure/auth/authSession";
 import { deregisterActivePushRegistration } from "@/infrastructure/push/active-registration";
+import { AppText, AppTextInput } from "@/theme/ScaledText";
 import { AURORA_COLORS, dangerColor } from "@/theme/colors";
 
 /** FSI…PDI isolate so a Latin display name sits correctly in an RTL row. */
@@ -97,16 +98,16 @@ function DisplayNameCard() {
   if (!editing) {
     return (
       <SectionCard>
-        <Text className="font-rubik text-[12.5px] text-text-tertiary">
+        <AppText className="font-rubik text-[12.5px] text-text-tertiary">
           {t("account.displayName")}
-        </Text>
+        </AppText>
         <View className="mt-1 flex-row items-center justify-between gap-3">
-          <Text
+          <AppText
             className={currentName ? "font-rubik-medium text-[16px] text-foreground" : "font-rubik text-[16px] text-muted"}
             numberOfLines={1}
           >
             {currentName ? isolate(currentName) : t("account.displayNamePlaceholder")}
-          </Text>
+          </AppText>
           <PressableScale
             accessibilityRole="button"
             disabled={!userId}
@@ -117,9 +118,9 @@ function DisplayNameCard() {
               setEditing(true);
             }}
           >
-            <Text className={userId ? "font-rubik-semibold text-[14px] text-foreground" : "font-rubik-semibold text-[14px] text-muted"}>
+            <AppText className={userId ? "font-rubik-semibold text-[14px] text-foreground" : "font-rubik-semibold text-[14px] text-muted"}>
               {t("account.edit")}
-            </Text>
+            </AppText>
           </PressableScale>
         </View>
       </SectionCard>
@@ -128,10 +129,10 @@ function DisplayNameCard() {
 
   return (
     <SectionCard>
-      <Text className="font-rubik text-[12.5px] text-text-tertiary">
+      <AppText className="font-rubik text-[12.5px] text-text-tertiary">
         {t("account.displayName")}
-      </Text>
-      <TextInput
+      </AppText>
+      <AppTextInput
         className="mt-2 min-h-[44px] rounded-md border border-border bg-background px-3 py-2.5 font-rubik text-[16px] text-foreground"
         value={value}
         onChangeText={setValue}
@@ -146,14 +147,14 @@ function DisplayNameCard() {
         }}
       />
       {value.length > 0 && !isValidDisplayName(value) ? (
-        <Text className="mt-1.5 font-rubik text-[12.5px] text-danger">
+        <AppText className="mt-1.5 font-rubik text-[12.5px] text-danger">
           {t("account.displayNameInvalid")}
-        </Text>
+        </AppText>
       ) : null}
       {mutation.isError ? (
-        <Text className="mt-1.5 font-rubik text-[12.5px] text-danger">
+        <AppText className="mt-1.5 font-rubik text-[12.5px] text-danger">
           {t("account.updateError")}
-        </Text>
+        </AppText>
       ) : null}
       <View className="mt-3 flex-row items-center justify-end gap-2">
         <PressableScale
@@ -162,7 +163,7 @@ function DisplayNameCard() {
           className="min-h-[44px] justify-center rounded-md border border-border bg-surface px-5"
           onPress={() => setEditing(false)}
         >
-          <Text className="font-rubik-semibold text-[15px] text-foreground">{t("common.cancel")}</Text>
+          <AppText className="font-rubik-semibold text-[15px] text-foreground">{t("common.cancel")}</AppText>
         </PressableScale>
         <PressableScale
           accessibilityRole="button"
@@ -177,7 +178,7 @@ function DisplayNameCard() {
           {mutation.isPending ? (
             <ActivityIndicator color={AURORA_COLORS.foreground} />
           ) : (
-            <Text
+            <AppText
               className={
                 canSave
                   ? "font-rubik-semibold text-[15px] text-primary-foreground"
@@ -185,7 +186,7 @@ function DisplayNameCard() {
               }
             >
               {t("account.save")}
-            </Text>
+            </AppText>
           )}
         </PressableScale>
       </View>
@@ -233,7 +234,7 @@ function SignOutCard({ onSignedOut }: Readonly<{ onSignedOut: () => void }>) {
       {busy ? (
         <ActivityIndicator color={dangerColor(theme)} />
       ) : (
-        <Text className="font-rubik-semibold text-[15px] text-danger">{t("account.signOut")}</Text>
+        <AppText className="font-rubik-semibold text-[15px] text-danger">{t("account.signOut")}</AppText>
       )}
     </PressableScale>
   );
@@ -314,9 +315,9 @@ function DeleteAccountCard({ onDeleted }: Readonly<{ onDeleted: () => void }>) {
       {mutation.isPending ? (
         <ActivityIndicator color={dangerColor(theme)} />
       ) : (
-        <Text className="font-rubik-semibold text-[15px] text-danger">
+        <AppText className="font-rubik-semibold text-[15px] text-danger">
           {t("account.deleteAccount")}
-        </Text>
+        </AppText>
       )}
     </PressableScale>
   );

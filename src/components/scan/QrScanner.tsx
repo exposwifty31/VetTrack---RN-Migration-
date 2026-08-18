@@ -8,10 +8,12 @@
  * Permission-denied fails LOUD — an explicit message + action (request, or open
  * Settings once the OS won't re-prompt), never a silent black frame.
  */
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Linking, Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { CameraView, useCameraPermissions } from "expo-camera";
+
+import { useAppActive } from "@/hooks/useAppActive";
 
 type QrScannerProps = Readonly<{
   /** Raw decoded QR string (a canonical URL or a bare id) handed to the caller. */
@@ -24,6 +26,11 @@ type QrScannerProps = Readonly<{
    * unmounted while inactive — its `active` prop is iOS-only, so unmounting is
    * the only way to actually release the Android camera session; it also stops
    * a code still in frame from re-firing and stacking confirm screens.
+   *
+   * Focus is only HALF the gate: backgrounding the app never changes navigation
+   * focus, so this prop stays true and the camera would keep its session (and
+   * the torch) alive off-screen and can hang on resume. `useAppActive()` is
+   * ANDed in below, so the session is held only while focused AND foregrounded.
    */
   active: boolean;
 }>;
@@ -31,12 +38,43 @@ type QrScannerProps = Readonly<{
 export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
   const { t } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
-  // onBarcodeScanned fires continuously; debounce to one hand-off per ~2s so a
-  // single code can't push ScanConfirm repeatedly (re-arms after returning).
-  const lastFireRef = useRef(0);
+  const appActive = useAppActive();
+  // Focus AND foreground — see the `active` prop doc above.
+  const cameraActive = active && appActive;
   // Camera preview failed to start (onMountError) — fail LOUD with a localized
   // state instead of a silent black frame, same doctrine as permission-denied.
   const [mountFailed, setMountFailed] = useState(false);
+  // The SESSION gate, not just the activity gate: `mountFailed` must be part of
+  // the derived value, or the layout effect re-running on a background→
+  // foreground transition sets the ref back to true for a camera that never
+  // worked. (The imperative clear in onMountError still exists — it closes the
+  // synchronous window between the native callback and this re-render.)
+  const cameraSessionActive = cameraActive && !mountFailed;
+  // The native module holds the closure from the render it was mounted in, so
+  // a queued barcode event can fire with a STALE gate captured as true after
+  // the flip. The ref always carries the latest value; the handler reads it
+  // instead of the captured one.
+  const cameraActiveRef = useRef(cameraSessionActive);
+  // Layout effect, not passive: a queued native event can run after the
+  // inactive commit but BEFORE a passive effect flushes, and would read the
+  // ref's previous `true` in exactly the window the ref exists to close.
+  useLayoutEffect(() => {
+    cameraActiveRef.current = cameraSessionActive;
+    return () => {
+      // On unmount nothing should fire regardless of what the gate last said.
+      cameraActiveRef.current = false;
+    };
+  }, [cameraSessionActive]);
+  // onBarcodeScanned fires continuously; debounce to one hand-off per ~2s so a
+  // single code can't push ScanConfirm repeatedly (re-arms after returning).
+  const lastFireRef = useRef(0);
+  // Torch is a declarative expo-camera prop (Camera.types.d.ts:392, no @platform
+  // tag — iOS CameraSessionManager.swift:180, Android ExpoCameraView.kt:351).
+  // The choice is deliberately KEPT across the background→foreground remount:
+  // the camera session drops (so the LED is physically off while away) but a
+  // dark ward is still dark on resume, and re-arming beats making the operator
+  // re-find the control one-handed.
+  const [torchOn, setTorchOn] = useState(false);
 
   if (!permission) {
     // Permission state still resolving — brief neutral frame.
@@ -81,16 +119,24 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
 
   return (
     <View className="flex-1">
-      {active ? (
+      {cameraSessionActive ? (
         <CameraView
           style={{ flex: 1 }}
           facing="back"
-          onMountError={() => setMountFailed(true)}
+          enableTorch={torchOn}
+          onMountError={() => {
+            // `mountFailed` swaps the view but is not part of the activity
+            // gate — clear the ref too, or a queued event fires for a camera
+            // that never worked.
+            cameraActiveRef.current = false;
+            setMountFailed(true);
+          }}
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
           onBarcodeScanned={(result) => {
-            // Defends against an event already in flight while `active` flips
-            // false (the unmount above is the primary gate).
-            if (!active) return;
+            // Read through the ref, not the captured value: the closure the
+            // native module holds is from an earlier render, so the captured
+            // `cameraActive` can be true after the gate flipped false.
+            if (!cameraActiveRef.current) return;
             const now = Date.now();
             if (now - lastFireRef.current < 2000) return;
             lastFireRef.current = now;
@@ -108,6 +154,33 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
           {hint}
         </Text>
       </View>
+      {/* Sibling of the viewfinder overlay, NOT a child — that overlay is
+          pointerEvents="none" and would swallow the tap. Offered only while a
+          session is actually held; expo-camera 57 exposes no torch-capability
+          query, so a torchless device silently no-ops in native (guarded by
+          `device.hasTorch`, CameraSessionManager.swift:181). */}
+      {cameraSessionActive ? (
+        <View className="absolute bottom-8 self-center">
+          <Pressable
+            testID="torch-toggle"
+            accessibilityRole="togglebutton"
+            accessibilityLabel={t("scan.torch")}
+            accessibilityState={{ checked: torchOn }}
+            className={`min-h-[44px] min-w-[44px] items-center justify-center rounded-full px-5 py-3 active:opacity-80 ${
+              torchOn ? "bg-white" : "bg-black/50"
+            }`}
+            onPress={() => setTorchOn((prev) => !prev)}
+          >
+            <Text
+              className={`text-[14px] font-rubik-semibold ${
+                torchOn ? "text-black" : "text-white"
+              }`}
+            >
+              {t("scan.torch")}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }

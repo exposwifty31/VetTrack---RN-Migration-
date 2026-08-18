@@ -396,6 +396,25 @@ export const api = {
       ),
 
     /**
+     * PATCH /:id {nfcTagId} — bind a freshly-programmed sticker's physical UID
+     * to this equipment row. Deliberately NOT a general `update`: the route
+     * accepts ~20 columns (`patchEquipmentSchema`), and a wrapper that could
+     * aim at `status` or `roomId` is a wider surface than provisioning needs.
+     *
+     * The UID column carries a GLOBAL unique index, so a sticker already bound
+     * to other equipment (possibly in another clinic) returns 409 CONFLICT with
+     * `reason: "NFC_TAG_ALREADY_BOUND"` — the caller must report that as a BIND
+     * failure, not a write failure: the tag itself was programmed correctly and
+     * re-writing it fixes nothing.
+     */
+    bindNfcTag: (equipmentId: string, nfcTagId: string) =>
+      requestJson<EquipmentRow>(`/api/equipment/${encodeURIComponent(equipmentId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ nfcTagId }),
+        headers: { "x-request-id": Crypto.randomUUID() },
+      }),
+
+    /**
      * POST /:id/scan {status, note?, photoUrl?} — the status-report path.
      * Report-issue = status "issue"; the server 400s (ISSUE_NOTE_REQUIRED)
      * when the note is empty, so the UI requires it before submitting.

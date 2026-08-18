@@ -13,7 +13,7 @@
  */
 import { useState } from "react";
 import Constants from "expo-constants";
-import { Linking, ScrollView, Text, View } from "react-native";
+import { Linking, ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import * as WebBrowser from "expo-web-browser";
 import { Uniwind } from "uniwind";
@@ -26,6 +26,7 @@ import {
   resolveInitialTheme,
   type ThemeMode,
 } from "@/features/account/theme-resolver";
+import { AppText } from "@/theme/ScaledText";
 import { usePushPermissionStatus } from "@/infrastructure/push/push-permission-status";
 
 /** Store-required policy page (from the shared app metadata; opened in-app). */
@@ -49,19 +50,19 @@ export function SettingsScreen() {
         <NotificationsCard />
 
         <SectionCard>
-          <Text className="font-rubik text-[12.5px] text-text-tertiary">{t("settings.about")}</Text>
+          <AppText className="font-rubik text-[12.5px] text-text-tertiary">{t("settings.about")}</AppText>
           <PressableScale
             accessibilityRole="link"
             className="mt-2 min-h-[44px] flex-row items-center"
             onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_POLICY_URL)}
           >
-            <Text className="font-rubik-medium text-[16px] text-foreground">
+            <AppText className="font-rubik-medium text-[16px] text-foreground">
               {t("settings.privacyPolicy")}
-            </Text>
+            </AppText>
           </PressableScale>
-          <Text className="mt-1 font-rubik text-[12.5px] text-text-tertiary" selectable>
+          <AppText className="mt-1 font-rubik text-[12.5px] text-text-tertiary" selectable>
             {t("settings.version", { version })}
-          </Text>
+          </AppText>
         </SectionCard>
       </View>
     </ScrollView>
@@ -91,30 +92,30 @@ function NotificationsCard() {
 
   return (
     <SectionCard>
-      <Text className="font-rubik text-[12.5px] text-text-tertiary">
+      <AppText className="font-rubik text-[12.5px] text-text-tertiary">
         {t("settings.notifications")}
-      </Text>
+      </AppText>
       {status === "denied" ? (
         <>
-          <Text className="mt-2 font-rubik text-[15px] text-danger">
+          <AppText className="mt-2 font-rubik text-[15px] text-danger">
             {t("settings.notificationsDeniedBody")}
-          </Text>
+          </AppText>
           <PressableScale
             accessibilityRole="button"
             className="mt-3 min-h-[44px] items-center justify-center rounded-md border border-border bg-surface px-4"
             onPress={() => void Linking.openSettings()}
           >
-            <Text className="font-rubik-semibold text-[15px] text-foreground">
+            <AppText className="font-rubik-semibold text-[15px] text-foreground">
               {t("settings.openSystemSettings")}
-            </Text>
+            </AppText>
           </PressableScale>
         </>
       ) : (
-        <Text className="mt-2 font-rubik text-[15px] text-muted">
+        <AppText className="mt-2 font-rubik text-[15px] text-muted">
           {status === "granted"
             ? t("settings.notificationsGranted")
             : t("settings.notificationsPlaceholder")}
-        </Text>
+        </AppText>
       )}
     </SectionCard>
   );
@@ -141,7 +142,7 @@ function AppearanceCard() {
 
   return (
     <SectionCard>
-      <Text className="font-rubik text-[12.5px] text-text-tertiary">{t("settings.appearance")}</Text>
+      <AppText className="font-rubik text-[12.5px] text-text-tertiary">{t("settings.appearance")}</AppText>
       <View className="mt-2 flex-row gap-2">
         <ThemeOption
           label={t("settings.themeLight")}
@@ -160,7 +161,7 @@ function AppearanceCard() {
         />
       </View>
       {persistFailed ? (
-        <Text className="mt-2 font-rubik text-[12.5px] text-danger">{t("settings.themeError")}</Text>
+        <AppText className="mt-2 font-rubik text-[12.5px] text-danger">{t("settings.themeError")}</AppText>
       ) : null}
     </SectionCard>
   );
@@ -182,7 +183,7 @@ function ThemeOption({
       }
       onPress={onPress}
     >
-      <Text
+      <AppText
         className={
           selected
             ? "font-rubik-semibold text-[14px] text-foreground"
@@ -190,7 +191,7 @@ function ThemeOption({
         }
       >
         {label}
-      </Text>
+      </AppText>
     </PressableScale>
   );
 }
