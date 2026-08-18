@@ -74,8 +74,11 @@ const DEBUG_LAUNCHERS = [
 
 /**
  * G2Measure has no other UI entry point; it is reached ONLY when a measurement
- * build sets EXPO_PUBLIC_ENABLE_MEASURE="true" (the G3 exit-pass). To re-enable
- * it on a release artifact, set that env in the eas.json production profile.
+ * build sets EXPO_PUBLIC_ENABLE_MEASURE="true" (the G3 exit-pass). Build one with
+ * the eas.json `measure` profile: internal distribution, so the screen never
+ * reaches the store, but pinned to the `production` EAS environment so the
+ * artifact still gets the API origin and Clerk key it needs to run at all.
+ * Do NOT set it in the `production` profile — that ships the screen to users.
  */
 const MEASURE_ENTRY = { route: "G2Measure", labelKey: "nav.g2Measure" } as const satisfies MenuEntry;
 
