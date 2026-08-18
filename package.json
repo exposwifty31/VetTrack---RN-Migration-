@@ -71,7 +71,9 @@
     "vendor:vettrack": "node scripts/vendor-vettrack.mjs",
     "preinstall": "node scripts/vendor-vettrack.mjs",
     "postinstall": "patch-package",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0",
+    "release:preflight": "node scripts/release-preflight.mjs",
+    "release:preflight:offline": "node scripts/release-preflight.mjs --offline"
   },
   "jest": {
     "preset": "jest-expo",

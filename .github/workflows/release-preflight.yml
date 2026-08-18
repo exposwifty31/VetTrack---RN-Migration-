@@ -1,0 +1,71 @@
+name: Release preflight
+
+# The EAS-BACKED half of the release-config gate: environment drift, build-number
+# collision, and Android App Links. The offline half runs on every PR inside
+# ci.yml; this half is separate and owner-triggered for two reasons.
+#
+#   1. It needs an EXPO_TOKEN secret, and GitHub never exposes secrets to a fork
+#      pull request. Wiring it into ci.yml would fail every external PR.
+#   2. It asserts against LIVE remote state — the EAS environment store, the EAS
+#      build history, and a production HTTPS document — none of which a code
+#      change in a PR can affect. Running it per-commit would add noise, not
+#      signal, and a check whose result is unrelated to the diff is a check people
+#      learn to ignore.
+#
+# DORMANT UNTIL THE OWNER ADDS THE SECRET, AND HONEST ABOUT IT. With no
+# EXPO_TOKEN this job FAILS and prints the exact command to create one; it does
+# NOT skip. A "skip when unauthenticated" branch would skip on every run and
+# report green while checking nothing.
+#
+#   gh secret set EXPO_TOKEN --repo exposwifty31/VetTrack---RN-Migration-
+#   (token from https://expo.dev/settings/access-tokens)
+#
+# Run it before a production build or store submission:
+#   gh workflow run release-preflight.yml
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release-preflight-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: reads the repo, talks to EAS with a token, nothing else.
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: EAS env drift + build numbers + app links
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # No git push happens here; don't leave the token in .git/config where
+          # a lifecycle script could read it.
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # Identical to ci.yml's install, and for the same reasons: --ignore-scripts
+      # so no dependency lifecycle script auto-executes (githubactions:S6505),
+      # with this repo's two REQUIRED first-party scripts run explicitly.
+      # vendor-vettrack must precede the install so the @vettrack/* file: deps
+      # resolve. The preflight itself only needs `typescript` (a devDependency)
+      # to walk the source AST.
+      - name: Install
+        run: |
+          node scripts/vendor-vettrack.mjs
+          npm ci --ignore-scripts
+          ./node_modules/.bin/patch-package
+
+      # Never passes --include-sensitive or --include-file-content, parses
+      # `eas env:list` for NAMES only, and prints only names derived from this
+      # repo's own source scan. No value can reach the run log.
+      - name: Release preflight (full)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npm run release:preflight

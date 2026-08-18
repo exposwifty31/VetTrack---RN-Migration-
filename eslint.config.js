@@ -27,6 +27,18 @@ module.exports = defineConfig([
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },
   {
+    // scripts/ runs in Node, not in the app runtime. eslint-config-expo supplies
+    // the React Native globals, which do not include CommonJS's __dirname /
+    // __filename — `eslint . --max-warnings=0` reports them as no-undef in
+    // scripts/release-config/*.js. Declared here rather than with an
+    // `/* eslint-env node */` comment, which flat config no longer honors (it
+    // warns today and becomes an error in ESLint 10).
+    files: ["scripts/**/*.js", "scripts/**/*.mjs"],
+    languageOptions: {
+      globals: { __dirname: "readonly", __filename: "readonly" },
+    },
+  },
+  {
     // react-hooks/immutability (a React Compiler rule) treats all values as
     // immutable, but a Reanimated shared value — `useSharedValue().value = withSpring(...)`
     // — is a legitimately-mutable external store; `.value =` is its documented API

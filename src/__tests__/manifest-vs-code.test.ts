@@ -193,43 +193,46 @@ const declaredEnv = collectDeclaredEnv();
  * Variables supplied by EAS's server-side environment store — the mechanism
  * described in the CORRECTION block at the top of this file.
  *
- * NOTHING IN THIS TEST CAN CONFIRM AN ENTRY HERE. Reading the real store needs
+ * THE TABLES MOVED; THE REASONING DID NOT. Both registries now live in
+ * scripts/release-config/env-contract.js, because scripts/release-preflight.mjs
+ * enforces the same facts against the LIVE EAS store and a second copy here
+ * would be precisely the rot this suite exists to catch — two halves green while
+ * asserting different things.
+ *
+ * THE EXPO_PUBLIC_ FILTER BELOW IS LOAD-BEARING, NOT COSMETIC. The shared table
+ * also carries GOOGLE_SERVICES_JSON, which app.config.js reads to set
+ * android.googleServicesFile. This suite's scan covers src/ + App.tsx + index.ts
+ * and does not look at app.config.js at all — demonstrated 2026-08-18, a probe
+ * file reading process.env.GOOGLE_SERVICES_JSON left all 14 tests green — so
+ * handing the registry in unfiltered would fail (a-registry-reverse) for a
+ * non-defect. The preflight is what covers that name.
+ *
+ * NOTHING IN THIS TEST CAN CONFIRM AN ENTRY. Reading the real store needs
  * network and EAS auth, which do not belong in a unit test. An entry is a
  * written, checked-in statement that a human ran `npx eas env:list <env>` and
- * saw the variable. The value is that a human must do so and record it; the
- * assertion's job is to stop a variable being read with NO statement anywhere.
- *
- * Re-verify with: npx eas env:list production
+ * saw the variable; `npm run release:preflight` is what actually verifies it.
  */
-const PROVIDED_BY_EAS_ENVIRONMENT: Record<string, string> = {
-  // "production" EAS environment ONLY. Verified absent from "development" and
-  // "preview" — both listed zero variables (eas env:list, 2026-08-15). A
-  // dev-client or preview build therefore does NOT receive this, and
-  // resolveApiUrl() throws on the first /api/ call. That is expected off
-  // production, where .env supplies it locally; it is not a production defect.
-  EXPO_PUBLIC_API_ORIGIN: "EAS environment: production only",
-  // "production" EAS environment ONLY, same caveat: absent from "development"
-  // and "preview" (eas env:list, 2026-08-15).
-  EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: "EAS environment: production only",
+const envContract = require("../../scripts/release-config/env-contract.js") as {
+  expoPublicEasEnvironmentRegistry(): Record<string, string>;
+  expoPublicIntentionallyUnset(): Record<string, string>;
+  deriveShippedPublicEnvReads(): {
+    reads: Map<string, string[]>;
+    parseFailures: string[];
+  };
 };
+
+const PROVIDED_BY_EAS_ENVIRONMENT: Record<string, string> =
+  envContract.expoPublicEasEnvironmentRegistry();
 
 /**
  * Variables whose ABSENCE is the correct default state. Nothing supplies these
  * in any build profile or any EAS environment, and that is deliberate — every
  * read site already handles unset. Registered explicitly so assertion (a) stays
- * exhaustive rather than carrying a silent exemption.
+ * exhaustive rather than carrying a silent exemption. Same shared source, same
+ * EXPO_PUBLIC_ projection, for the reason given above.
  */
-const INTENTIONALLY_UNSET: Record<string, string> = {
-  // Opt-in dev-auth seam, inert unless explicitly enabled; resolveDevAuth()
-  // additionally gates on __DEV__, so a store build cannot install it. Setting
-  // this in a production profile would itself be the defect.
-  EXPO_PUBLIC_DEV_AUTH: "opt-in, inert when unset — src/lib/dev-auth.ts",
-  // Set by hand only on a G2/G3 measurement build (1000 / measured refresh Hz).
-  // getFrameBudgetMs() returns null when unset and the measurement surfaces
-  // fail loud rather than guess 60 Hz, so unset is correct off a measure build.
-  EXPO_PUBLIC_FRAME_BUDGET_MS:
-    "measurement builds only — src/lib/instrumentation/perf.ts",
-};
+const INTENTIONALLY_UNSET: Record<string, string> =
+  envContract.expoPublicIntentionallyUnset();
 
 /** name -> the registry accounting for it, for the exactly-one-of check. */
 const registeredOutsideEasJson: [string, string][] = [
@@ -652,6 +655,18 @@ describe("manifest-vs-code contract", () => {
           `${name} (registered in ${registry}, read by no shipped code — delete the entry)`,
       );
     expect(stale).toEqual([]);
+  });
+
+  it("(a-shared-scan) the shared env-contract scan reports exactly what this suite's scan reports", () => {
+    // scripts/release-config/env-contract.js re-implements the AST walk so the
+    // CI preflight can run it outside jest, and two implementations of one fact
+    // is a rot risk in its own right. This is the assertion that keeps them one
+    // fact: if it fails they have diverged, and the fix is the divergence, never
+    // a relaxation here. (The registries themselves are NOT duplicated — they
+    // are imported from that module above.)
+    const shared = envContract.deriveShippedPublicEnvReads();
+    expect(shared.parseFailures).toEqual([]);
+    expect([...shared.reads.keys()].sort()).toEqual([...expoPublicReads].sort());
   });
 
   it("(a-reverse) every EXPO_PUBLIC_* declared in eas.json is actually read by shipped code", () => {
