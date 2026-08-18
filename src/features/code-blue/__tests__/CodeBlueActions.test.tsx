@@ -770,22 +770,17 @@ describe("CodeBlueActions — one-tap conflict reasons render distinctly", () =>
     mockMutations({ start: { isError: true, error } });
   }
 
-  it("ACTIVE_LEASE -> 'still starting, press again' copy", async () => {
-    renderWithStartError(new ApiCodedError(409, "CODE_BLUE_START_CONFLICT", "ACTIVE_LEASE"));
+  // One shape, three server reasons. Parameterised rather than copied: the
+  // point of this block is that the SAME 409 code splits by `reason`, and three
+  // near-identical bodies hide that the reason is the only variable.
+  it.each([
+    ["ACTIVE_LEASE", "codeBlue.errors.startPending", "your own attempt is still landing — press again"],
+    ["FENCE_SUPERSEDED", "codeBlue.errors.startSuperseded", "a newer attempt took the fence"],
+    ["ACTIVE_SESSION_EXISTS", "codeBlue.errors.conflict", "someone else won — join theirs"],
+  ])("409 %s -> %s (%s)", async (reason, expectedKey) => {
+    renderWithStartError(new ApiCodedError(409, "CODE_BLUE_START_CONFLICT", reason));
     await render(<CodeBlueActions />);
-    expect(screen.getByText("codeBlue.errors.startPending")).toBeTruthy();
-  });
-
-  it("FENCE_SUPERSEDED -> 'a newer attempt took over' copy", async () => {
-    renderWithStartError(new ApiCodedError(409, "CODE_BLUE_START_CONFLICT", "FENCE_SUPERSEDED"));
-    await render(<CodeBlueActions />);
-    expect(screen.getByText("codeBlue.errors.startSuperseded")).toBeTruthy();
-  });
-
-  it("ACTIVE_SESSION_EXISTS -> the existing conflict copy", async () => {
-    renderWithStartError(new ApiCodedError(409, "CODE_BLUE_START_CONFLICT", "ACTIVE_SESSION_EXISTS"));
-    await render(<CodeBlueActions />);
-    expect(screen.getByText("codeBlue.errors.conflict")).toBeTruthy();
+    expect(screen.getByText(expectedKey)).toBeTruthy();
   });
 
   it("400 INVALID_MANAGER -> its own copy, not the generic banner", async () => {

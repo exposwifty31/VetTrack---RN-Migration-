@@ -48,39 +48,40 @@ function startConflictKey(reason: string | null): OneTapStartErrorKey {
   }
 }
 
-/** Coded one-tap start error -> translated copy key. */
+/**
+ * Coded one-tap start error -> translated copy key.
+ *
+ * ONE code is handled here, and the shape says why: `CODE_BLUE_START_CONFLICT`
+ * is the only response whose meaning depends on the route it came from, because
+ * its `reason` classifies a fence outcome that only one-tap has. Everything else
+ * — including codes this slice once mapped itself — delegates, so there is a
+ * single definition of what each server error says.
+ *
+ * Two codes were deliberately REMOVED from here during the reconcile with the
+ * manager-picker slice, and both removals are load-bearing:
+ *
+ *   INVALID_MANAGER — mapped here to "Your account can't be set as the Code
+ *     Blue manager; ask a vet to start it". True only while self-designation
+ *     was the sole start path. With a picker on screen the 400 is about the vet
+ *     the initiator PICKED, so that copy names the wrong actor and gives an
+ *     instruction the user is already following. The shared mapper says "That
+ *     manager is no longer available. Pick someone else."
+ *
+ *   INSUFFICIENT_ROLE / ACCESS_DENIED — mapped here to `codeBlue.errors.
+ *     forbidden`, a key the picker slice then retired (it named the CALLER for
+ *     errors the server raises about the MANAGER). Keeping a local case would
+ *     now render a translation key that exists in neither locale. The shared
+ *     mapper reads `reason` before `code`, which is what resolves both:
+ *     requireClinicalUser sends {code: ACCESS_DENIED, reason: INSUFFICIENT_ROLE}
+ *     and requireClinicalAuthority inverts the two.
+ */
 export function oneTapStartErrorKey(error: unknown): OneTapStartErrorKey {
-  if (error instanceof ApiCodedError) {
-    switch (error.code) {
-      case "CODE_BLUE_START_CONFLICT":
-        return startConflictKey(error.reason);
-      // INVALID_MANAGER is deliberately NOT handled here. It falls through to
-      // the shared mapper, which reads "That manager is no longer available.
-      // Pick someone else." Written alone, this slice returned a
-      // `startInvalidManager` key saying "Your account can't be set as the
-      // manager — ask a vet to start it", which was true only while the sole
-      // start path was self-designation. Once the manager picker exists the
-      // 400 is about the person the initiator PICKED, and that copy names the
-      // wrong actor and gives an instruction the user is already carrying out.
-      // Same defect class the picker slice fixed on the end path.
-      // INSUFFICIENT_ROLE / ACCESS_DENIED are deliberately NOT handled here
-      // either. Written alone, this slice mapped both to `codeBlue.errors.
-      // forbidden` because the shared mapper of the day did not cover them.
-      // The manager-picker slice then retired that key outright — it named the
-      // CALLER for errors the server raises about the nominated MANAGER — and
-      // taught the shared mapper to read `reason` before `code`, which is what
-      // resolves these two: requireClinicalUser sends
-      // {code: ACCESS_DENIED, reason: INSUFFICIENT_ROLE} and
-      // requireClinicalAuthority sends
-      // {code: INSUFFICIENT_ROLE, reason: INSUFFICIENT_CLINICAL_AUTHORITY}.
-      // Both land on `notClinical`. Keeping a local case here would have
-      // rendered a translation key that no longer exists in either locale.
-      default:
-        break;
-    }
+  if (error instanceof ApiCodedError && error.code === "CODE_BLUE_START_CONFLICT") {
+    return startConflictKey(error.reason);
   }
-  // EmergencyOfflineError, MANAGER_NOT_CODE_BLUE_ELIGIBLE, INTERNAL_ERROR,
-  // and every non-Error value: one shared definition, not a second copy.
+  // EmergencyOfflineError, INVALID_MANAGER, MANAGER_NOT_CODE_BLUE_ELIGIBLE,
+  // INSUFFICIENT_ROLE, INTERNAL_ERROR, and every non-Error value: one shared
+  // definition, not a second copy.
   return codeBlueMutationErrorKey(error);
 }
 
