@@ -60,9 +60,13 @@ import {
   codeBlueMutationErrorKey,
   computeElapsedMsForLog,
   resolveLogDraftIdempotencyKey,
-  type CodeBlueMutationErrorKey,
   type LogDraftIdempotencyEntry,
 } from "./code-blue-actions-derive";
+import {
+  oneTapStartErrorKey,
+  resolveOneTapStartToken,
+  type OneTapStartErrorKey,
+} from "./one-tap-derive";
 import { useCodeBlueMutations } from "./useCodeBlueMutations";
 
 const OUTCOMES: readonly CodeBlueSessionOutcome[] = ["rosc", "died", "transferred", "ongoing"];
@@ -92,7 +96,7 @@ function ActionButton({
   );
 }
 
-function ErrorBanner({ errorKey }: Readonly<{ errorKey: CodeBlueMutationErrorKey }>) {
+function ErrorBanner({ errorKey }: Readonly<{ errorKey: OneTapStartErrorKey }>) {
   const { t } = useTranslation();
   const isOffline = errorKey === "codeBlue.errors.offline";
   return (
@@ -105,12 +109,22 @@ function ErrorBanner({ errorKey }: Readonly<{ errorKey: CodeBlueMutationErrorKey
   );
 }
 
-/** Renders a mutation's error as an `ErrorBanner`, or nothing when it isn't errored. */
+/**
+ * Renders a mutation's error as an `ErrorBanner`, or nothing when it isn't
+ * errored. `mapError` defaults to the shared mapper; the START action passes
+ * `oneTapStartErrorKey` so the one-tap-only codes (the three distinct 409
+ * `CODE_BLUE_START_CONFLICT` reasons, `INVALID_MANAGER`) get their own copy
+ * instead of collapsing into the generic banner.
+ */
 function MutationErrorBanner({
   mutation,
-}: Readonly<{ mutation: Readonly<{ isError: boolean; error: unknown }> }>) {
+  mapError = codeBlueMutationErrorKey,
+}: Readonly<{
+  mutation: Readonly<{ isError: boolean; error: unknown }>;
+  mapError?: (error: unknown) => OneTapStartErrorKey;
+}>) {
   if (!mutation.isError) return null;
-  return <ErrorBanner errorKey={codeBlueMutationErrorKey(mutation.error)} />;
+  return <ErrorBanner errorKey={mapError(mutation.error)} />;
 }
 
 /**
@@ -140,6 +154,17 @@ function NoSessionActions({
   start: Mutations["start"];
 }>) {
   const { t } = useTranslation();
+  /**
+   * J1 — the idempotency fence. ONE token per start GESTURE, minted on the
+   * first press and re-sent verbatim on every retry of that same gesture: the
+   * server keys its durable `vt_code_blue_start_claims` row on it, so a
+   * double-press or a retry after a lost response REPLAYS the original session
+   * instead of racing a second start. Minting per press would defeat the fence
+   * and reintroduce exactly the double-start the legacy `/sessions` route
+   * suffered from. Cleared only on a genuine success, so the NEXT Code Blue
+   * gets a fresh claim rather than replaying the committed one.
+   */
+  const tokenRef = useRef<string | null>(null);
   return (
     <View className="gap-2 px-5 pb-3" testID="code-blue-actions">
       {eligible ? (
@@ -148,7 +173,16 @@ function NoSessionActions({
           disabled={start.isPending || !managerUserName}
           onPress={() => {
             if (!currentUserId || !managerUserName) return;
-            start.mutate({ managerUserId: currentUserId, managerUserName });
+            const idempotencyToken = resolveOneTapStartToken(tokenRef.current, Crypto.randomUUID);
+            tokenRef.current = idempotencyToken;
+            start.mutate(
+              { idempotencyToken, managerUserId: currentUserId, managerUserName },
+              {
+                onSuccess: () => {
+                  tokenRef.current = null;
+                },
+              },
+            );
           }}
         />
       ) : (
@@ -156,7 +190,7 @@ function NoSessionActions({
           {t("codeBlue.actions.startRequiresVet")}
         </Text>
       )}
-      <MutationErrorBanner mutation={start} />
+      <MutationErrorBanner mutation={start} mapError={oneTapStartErrorKey} />
     </View>
   );
 }

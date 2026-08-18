@@ -27,15 +27,35 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { codeBlueApi, codeBlueKeys } from "@/lib/api/code-blue";
-import type { EndSessionRequest, LogEntryRequest, StartCodeBlueRequest } from "@/types/code-blue";
+import type { EndSessionRequest, LogEntryRequest, OneTapStartRequest } from "@/types/code-blue";
 
 export function useCodeBlueMutations() {
   const queryClient = useQueryClient();
   const invalidateActive = () => queryClient.invalidateQueries({ queryKey: codeBlueKeys.active() });
 
+  /**
+   * J1 — start goes through `POST /api/code-blue/one-tap`, NOT the legacy
+   * `POST /sessions`. There is deliberately ONE start mutation here rather than
+   * a one-tap/legacy pair, so no future call site can accidentally pick the
+   * unfenced path. (`codeBlueApi.start` survives as a raw fn for the future
+   * equipment-initiated start, which needs `equipmentId` — a field one-tap has
+   * no place for.)
+   *
+   * What repointing buys, all of which the legacy route lacks: a durable
+   * idempotency claim (a double-press or a retry after a lost response replays
+   * the SAME session instead of racing a second start), server-chosen nearest
+   * READY crash cart, a CAS soft-reservation of it, and the team page committed
+   * in the same transaction as the session.
+   *
+   * `retry: 0` matters MORE here than elsewhere: react-query retries reuse the
+   * same variables, so an auto-retry would re-send the same token and burn the
+   * fence's lease window without the operator ever seeing the outcome. Retry is
+   * an operator decision (press Start again), which re-sends the same token by
+   * design — see `resolveOneTapStartToken`.
+   */
   const start = useMutation({
     retry: 0,
-    mutationFn: (payload: StartCodeBlueRequest) => codeBlueApi.start(payload),
+    mutationFn: (payload: OneTapStartRequest) => codeBlueApi.oneTap(payload),
     onSuccess: invalidateActive,
   });
 

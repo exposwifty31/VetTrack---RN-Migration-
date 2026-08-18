@@ -222,7 +222,10 @@
     },
     "errors": {
       "offline": "No connection — this action needs the internet and was not saved. Try again once you're back online.",
-      "conflict": "An active Code Blue already exists.",
+      "conflict": "An active Code Blue already exists. Join the one that's running.",
+      "startPending": "Your Code Blue is still starting. Wait a moment, then press Start again — pressing again will not create a second one.",
+      "startSuperseded": "A newer start attempt took over. This screen will show the active Code Blue in a moment.",
+      "startInvalidManager": "Your account can't be set as the Code Blue manager. Ask a vet to start it.",
       "notFound": "This session could not be found.",
       "forbidden": "You're not allowed to do that for this session.",
       "generic": "That didn't go through. Please try again."

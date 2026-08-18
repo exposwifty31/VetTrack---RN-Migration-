@@ -29,6 +29,7 @@ jest.mock("@/lib/api/code-blue", () => {
     codeBlueApi: {
       active: jest.fn(),
       start: jest.fn(),
+      oneTap: jest.fn(),
       addLogEntry: jest.fn(),
       end: jest.fn(),
       presence: jest.fn(),
@@ -56,12 +57,16 @@ afterEach(() => jest.clearAllMocks());
 
 describe("useCodeBlueMutations — offline fails loud, untouched", () => {
   it("start: EmergencyOfflineError from the api layer surfaces as-is on the mutation", async () => {
-    const offlineErr = new EmergencyOfflineError("start", "/api/code-blue/sessions", "POST");
-    jest.mocked(codeBlueApi.start).mockRejectedValue(offlineErr);
+    const offlineErr = new EmergencyOfflineError("start", "/api/code-blue/one-tap", "POST");
+    jest.mocked(codeBlueApi.oneTap).mockRejectedValue(offlineErr);
     const { view, invalidateSpy } = await setup();
 
     await act(async () => {
-      view.result.current.start.mutate({ managerUserId: "u1", managerUserName: "Dr. Cohen" });
+      view.result.current.start.mutate({
+        idempotencyToken: "tok-1",
+        managerUserId: "u1",
+        managerUserName: "Dr. Cohen",
+      });
     });
     await waitFor(() => expect(view.result.current.start.isError).toBe(true));
 
@@ -127,13 +132,17 @@ describe("useCodeBlueMutations — end is server-confirmed, never optimistic", (
   });
 
   it("start / addLogEntry / presence success also never call setQueryData", async () => {
-    jest.mocked(codeBlueApi.start).mockResolvedValue({ id: "s-1", startedAt: "2026-08-10T12:00:00.000Z" });
+    jest.mocked(codeBlueApi.oneTap).mockResolvedValue({ outcome: "created", sessionId: "s-1", reservedCartId: "cart-1", pagingState: "queued" });
     jest.mocked(codeBlueApi.addLogEntry).mockResolvedValue({ id: "log-1", duplicate: false });
     jest.mocked(codeBlueApi.presence).mockResolvedValue({ ok: true });
     const { view, setQueryDataSpy, invalidateSpy } = await setup();
 
     await act(async () => {
-      view.result.current.start.mutate({ managerUserId: "u1", managerUserName: "Dr. Cohen" });
+      view.result.current.start.mutate({
+        idempotencyToken: "tok-1",
+        managerUserId: "u1",
+        managerUserName: "Dr. Cohen",
+      });
     });
     await waitFor(() => expect(view.result.current.start.isSuccess).toBe(true));
 
@@ -177,31 +186,45 @@ describe("useCodeBlueMutations — explicit retry:0 doctrine anchor", () => {
   }
 
   it("start: a single network failure is never retried even under a hostile queryClient default", async () => {
-    jest.mocked(codeBlueApi.start).mockRejectedValue(new Error("boom"));
+    jest.mocked(codeBlueApi.oneTap).mockRejectedValue(new Error("boom"));
     const { view } = await setupHostile();
 
     await act(async () => {
-      view.result.current.start.mutate({ managerUserId: "u1", managerUserName: "Dr. Cohen" });
+      view.result.current.start.mutate({
+        idempotencyToken: "tok-1",
+        managerUserId: "u1",
+        managerUserName: "Dr. Cohen",
+      });
     });
     await waitFor(() => expect(view.result.current.start.isError).toBe(true));
     // Give a would-be retry's delay a chance to fire before asserting.
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(codeBlueApi.start).toHaveBeenCalledTimes(1);
+    expect(codeBlueApi.oneTap).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("useCodeBlueMutations — happy path wiring", () => {
-  it("start calls codeBlueApi.start with the given payload", async () => {
-    jest.mocked(codeBlueApi.start).mockResolvedValue({ id: "s-1", startedAt: "2026-08-10T12:00:00.000Z" });
+  it("start calls codeBlueApi.oneTap (NOT the legacy /sessions) forwarding the idempotency token", async () => {
+    jest.mocked(codeBlueApi.oneTap).mockResolvedValue({ outcome: "created", sessionId: "s-1", reservedCartId: "cart-1", pagingState: "queued" });
     const { view } = await setup();
 
     await act(async () => {
-      view.result.current.start.mutate({ managerUserId: "u1", managerUserName: "Dr. Cohen" });
+      view.result.current.start.mutate({
+        idempotencyToken: "tok-1",
+        managerUserId: "u1",
+        managerUserName: "Dr. Cohen",
+      });
     });
     await waitFor(() => expect(view.result.current.start.isSuccess).toBe(true));
 
-    expect(codeBlueApi.start).toHaveBeenCalledWith({ managerUserId: "u1", managerUserName: "Dr. Cohen" });
+    expect(codeBlueApi.oneTap).toHaveBeenCalledWith({
+      idempotencyToken: "tok-1",
+      managerUserId: "u1",
+      managerUserName: "Dr. Cohen",
+    });
+    // The downgrade this slice exists to prevent: the legacy unfenced start.
+    expect(codeBlueApi.start).not.toHaveBeenCalled();
   });
 
   it("addLogEntry calls codeBlueApi.addLogEntry with sessionId + payload", async () => {
