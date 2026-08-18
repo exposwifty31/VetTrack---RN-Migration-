@@ -4,6 +4,12 @@
  * over the safe-storage seam (session kind — mirrors web sessionStorage:
  * never a URL param, never part of a shareable link).
  */
+import {
+  REQUESTED_ROLE_STORAGE_KEY,
+  readCarriedRole,
+  writeCarriedRole,
+} from "../requested-role-store";
+
 const mockStore = new Map<string, string>();
 const mockStorageState = { throws: false };
 
@@ -23,12 +29,6 @@ jest.mock("@/lib/safe-storage", () => ({
     return true;
   },
 }));
-
-import {
-  REQUESTED_ROLE_STORAGE_KEY,
-  readCarriedRole,
-  writeCarriedRole,
-} from "../requested-role-store";
 
 beforeEach(() => {
   mockStore.clear();
