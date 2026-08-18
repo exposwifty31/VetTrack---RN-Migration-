@@ -136,7 +136,15 @@ function QueryErrorState({ onRetry }: Readonly<{ onRetry: () => void }>) {
   );
 }
 
-/** Manager-candidate list key — see `api.users.managers` for the advisory caveat. */
+/**
+ * Manager-candidate list key — see `api.users.managers` for the advisory caveat.
+ *
+ * Shares the `"users"` root with `IDENTITY_QUERY_KEY` (`["users","me"]`). Benign
+ * today, but a future root-prefixed `invalidateQueries(["users"])` — or a
+ * persister, of which this app has NONE (verified in `lib/api/code-blue.ts`'s
+ * header) — would sweep both. If persistence ever lands, this key stays OUT of
+ * the include-list for the same reason `codeBlueKeys.active()` does.
+ */
 export const codeBlueManagerKeys = {
   all: ["users", "code-blue-managers"] as const,
 };
@@ -153,6 +161,11 @@ export const codeBlueManagerKeys = {
  */
 function ManagerPicker({ start }: Readonly<{ start: Mutations["start"] }>) {
   const { t } = useTranslation();
+  // Deliberately inherits `createAppQueryClient` defaults (`retry: 1`,
+  // `staleTime: 5_000` — src/lib/query-client.ts), NOT react-query's own
+  // `retry: 3` + backoff: on an arrest path a failed fetch must reach the
+  // error state fast, and a 5s staleTime keeps the roster fresh per arrest.
+  // Do not raise either here.
   const managersQuery = useQuery({
     queryKey: codeBlueManagerKeys.all,
     queryFn: () => api.users.managers(),
