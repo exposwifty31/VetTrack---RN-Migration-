@@ -22,6 +22,17 @@ export interface BootstrapViewInput {
    * must be sign-out-and-sign-in.
    */
   isAuthError?: boolean;
+  /**
+   * Sticky latch: the gate has already rendered children this mount. A
+   * transient flap (failed background refetch, session flag flicker during
+   * token refresh — observed on iPad rotation, 2026-08-19) must NOT swap a
+   * live Home for the reauth screen: the swap unmounts the whole tab tree and
+   * left a leaked native view eating the top-bar's touches. Once latched, only
+   * a SETTLED auth failure (isAuthError) may flip the gate back.
+   */
+  wasReady?: boolean;
+  /** The identity query still holds data (stale-while-error) to render from. */
+  hasData?: boolean;
 }
 
 export type BootstrapView =
@@ -35,6 +46,12 @@ export function resolveBootstrapView(input: BootstrapViewInput): BootstrapView {
   const ready =
     input.isSuccess && input.hasUserId && hasRoleAtLeast(input.effectiveRole, "student");
   if (ready) return { kind: "ready" };
+
+  // Sticky readiness: latched + data on hand + no settled auth error → stay
+  // ready through the flap instead of unmounting a live screen tree.
+  if (input.wasReady === true && input.hasData === true && input.isAuthError !== true) {
+    return { kind: "ready" };
+  }
 
   const canSignIn = !input.hasActiveSession;
   const canReauth = input.hasActiveSession && input.isAuthError === true;

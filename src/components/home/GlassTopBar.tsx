@@ -61,7 +61,17 @@ export function GlassTopBar({
       }}
       className="overflow-hidden rounded-full border border-[rgba(167,139,250,0.20)] light:border-border"
     >
-      <BlurView intensity={40} tint={light ? "light" : "dark"} style={StyleSheet.absoluteFill} />
+      {/* Decorative only — after a rotation, iOS UIVisualEffectView re-lays its
+          internal subviews and can begin swallowing touches for its whole
+          frame (visuals unchanged, buttons dead — reproduced iPad sim
+          2026-08-19, portrait→landscape→portrait). A blur layer must never
+          participate in hit-testing. */}
+      <BlurView
+        pointerEvents="none"
+        intensity={40}
+        tint={light ? "light" : "dark"}
+        style={StyleSheet.absoluteFill}
+      />
       <View
         className="flex-row items-center bg-glass py-1 pe-1.5 ps-2.5"
         style={{ boxShadow: light ? undefined : "inset 0 1px 1px rgba(255,255,255,0.10)" }}
