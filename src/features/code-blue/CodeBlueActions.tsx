@@ -33,10 +33,15 @@
  * extraction itself.
  *
  * Scope decisions for this slice (documented for the Lead — see PR body):
- *   - Start self-designates the current user as manager and is gated to the
- *     "vet" role client-side (the only role that is both a valid initiator
- *     AND a valid manager per server/routes/code-blue.ts). Nominating a
- *     DIFFERENT manager needs a user-picker; out of scope here.
+ *   - Start is gated on the TWO unconditional server gates separately (see the
+ *     block comment in `code-blue-actions-derive.ts`): a vet self-designates as
+ *     manager in one tap; a senior_technician/technician may initiate but must
+ *     NOMINATE a vet/admin from GET /api/users/managers. Anyone outside the
+ *     server's initiator allow-list sees the explanation and no affordance.
+ *   - The candidate list is ADVISORY, not authoritative — it filters on
+ *     permanent role only, so a clinic running the manager evaluator in
+ *     `enforce` mode can still 403. The picker therefore stays mounted under
+ *     the error banner so a different manager can be nominated immediately.
  *   - Log entries are freeform "note" category only; an equipment picker for
  *     "equipment" category entries is a future slice.
  */
@@ -47,16 +52,19 @@ import { useTranslation } from "react-i18next";
 import * as Crypto from "expo-crypto";
 
 import { useIdentity } from "@/app/useIdentity";
+import { api } from "@/lib/api";
 import { codeBlueApi, codeBlueKeys } from "@/lib/api/code-blue";
 import type {
   ActiveCodeBlueResponse,
+  CodeBlueManager,
   CodeBlueSession,
   CodeBlueSessionOutcome,
 } from "@/types/code-blue";
 
 import {
   canEndCodeBlue,
-  canStartCodeBlue,
+  canInitiateCodeBlue,
+  canSelfManageCodeBlue,
   codeBlueMutationErrorKey,
   computeElapsedMsForLog,
   resolveLogDraftIdempotencyKey,
@@ -128,35 +136,129 @@ function QueryErrorState({ onRetry }: Readonly<{ onRetry: () => void }>) {
   );
 }
 
-function NoSessionActions({
-  eligible,
+/** Manager-candidate list key — see `api.users.managers` for the advisory caveat. */
+export const codeBlueManagerKeys = {
+  all: ["users", "code-blue-managers"] as const,
+};
+
+/**
+ * Nomination path for an initiator who cannot be their own manager
+ * (senior_technician / technician). One tap per candidate: the row IS the
+ * commit, so an arrest never costs a select-then-confirm round trip.
+ *
+ * The list stays mounted through a failed start — a 403
+ * MANAGER_NOT_CODE_BLUE_ELIGIBLE (gate 3, per-clinic `enforce`) or a 400
+ * INVALID_MANAGER (gate 2, candidate deactivated since the fetch) is a
+ * "pick someone else" signal, not a dead end.
+ */
+function ManagerPicker({ start }: Readonly<{ start: Mutations["start"] }>) {
+  const { t } = useTranslation();
+  const managersQuery = useQuery({
+    queryKey: codeBlueManagerKeys.all,
+    queryFn: () => api.users.managers(),
+  });
+
+  if (managersQuery.isPending) {
+    return (
+      <Text className="text-center font-rubik text-[13px] text-text-tertiary">
+        {t("codeBlue.actions.managersLoading")}
+      </Text>
+    );
+  }
+  if (managersQuery.isError) {
+    return (
+      <>
+        <Text className="text-center font-rubik text-[13px] text-danger">
+          {t("codeBlue.actions.managersLoadError")}
+        </Text>
+        <ActionButton label={t("common.retry")} onPress={() => void managersQuery.refetch()} />
+      </>
+    );
+  }
+
+  const managers: readonly CodeBlueManager[] = managersQuery.data ?? [];
+  if (managers.length === 0) {
+    return (
+      <Text className="text-center font-rubik text-[13px] text-text-tertiary">
+        {t("codeBlue.actions.managersEmpty")}
+      </Text>
+    );
+  }
+
+  return (
+    <>
+      <Text className="font-rubik-semibold text-[15px] text-text-primary">
+        {t("codeBlue.actions.pickManager")}
+      </Text>
+      <Text className="font-rubik text-[13px] text-text-tertiary">
+        {t("codeBlue.actions.pickManagerHint")}
+      </Text>
+      {managers.map((manager) => (
+        <ActionButton
+          key={manager.id}
+          label={manager.name}
+          testID={`code-blue-manager-${manager.id}`}
+          disabled={start.isPending || !manager.name.trim()}
+          onPress={() => {
+            // Server `startSessionSchema` requires managerUserName.min(1) — a
+            // nameless row would 400 on shape before reaching either gate.
+            const managerUserName = manager.name.trim();
+            if (!managerUserName) return;
+            start.mutate({ managerUserId: manager.id, managerUserName });
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+function StartAffordance({
+  canSelfManage,
+  canInitiate,
   managerUserName,
   currentUserId,
   start,
 }: Readonly<{
-  eligible: boolean;
+  canSelfManage: boolean;
+  canInitiate: boolean;
   managerUserName: string;
   currentUserId: string | null;
   start: Mutations["start"];
 }>) {
   const { t } = useTranslation();
+  if (canSelfManage) {
+    return (
+      <ActionButton
+        label={start.isPending ? t("codeBlue.actions.starting") : t("codeBlue.actions.start")}
+        disabled={start.isPending || !managerUserName}
+        onPress={() => {
+          if (!currentUserId || !managerUserName) return;
+          start.mutate({ managerUserId: currentUserId, managerUserName });
+        }}
+      />
+    );
+  }
+  if (canInitiate) return <ManagerPicker start={start} />;
+  return (
+    <Text className="text-center font-rubik text-[13px] text-text-tertiary">
+      {t("codeBlue.actions.startNotEligible")}
+    </Text>
+  );
+}
+
+function NoSessionActions(
+  props: Readonly<{
+    canSelfManage: boolean;
+    canInitiate: boolean;
+    managerUserName: string;
+    currentUserId: string | null;
+    start: Mutations["start"];
+  }>,
+) {
   return (
     <View className="gap-2 px-5 pb-3" testID="code-blue-actions">
-      {eligible ? (
-        <ActionButton
-          label={start.isPending ? t("codeBlue.actions.starting") : t("codeBlue.actions.start")}
-          disabled={start.isPending || !managerUserName}
-          onPress={() => {
-            if (!currentUserId || !managerUserName) return;
-            start.mutate({ managerUserId: currentUserId, managerUserName });
-          }}
-        />
-      ) : (
-        <Text className="text-center font-rubik text-[13px] text-text-tertiary">
-          {t("codeBlue.actions.startRequiresVet")}
-        </Text>
-      )}
-      <MutationErrorBanner mutation={start} />
+      <StartAffordance {...props} />
+      <MutationErrorBanner mutation={props.start} />
     </View>
   );
 }
@@ -335,6 +437,11 @@ export function CodeBlueActions() {
   const response: ActiveCodeBlueResponse | undefined = sessionQuery.data;
   const session = response?.session ?? null;
   const currentUserId = identity.data?.id ?? null;
+  // PERMANENT role, deliberately NOT `effectiveRole` (which most other surfaces
+  // in this app read): server gate 2 is `inArray(users.role, …)`, and gate 1's
+  // break-glass (`allowPermanentClinicalRoleForEmergency`) admits a clinical
+  // identity with no active shift. Reading `effectiveRole` here would
+  // under-offer Start to exactly the off-shift responder break-glass exists for.
   const currentRole = identity.data?.role ?? null;
 
   if (!session) {
@@ -344,7 +451,8 @@ export function CodeBlueActions() {
     const managerUserName = (identity.data?.displayName ?? identity.data?.name ?? "").trim();
     return (
       <NoSessionActions
-        eligible={canStartCodeBlue(currentRole)}
+        canSelfManage={canSelfManageCodeBlue(currentRole)}
+        canInitiate={canInitiateCodeBlue(currentRole)}
         managerUserName={managerUserName}
         currentUserId={currentUserId}
         start={mutations.start}

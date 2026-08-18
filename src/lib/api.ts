@@ -23,6 +23,7 @@ import type {
   QuickScanToggleResult,
   ScanResult,
 } from "@/types/api";
+import type { CodeBlueManager } from "@/types/code-blue";
 
 /**
  * W2b (H6): the throwing JSON normalizer is now the SINGLE shared `requestJson`
@@ -103,6 +104,24 @@ export const api = {
       const me = await requestJson<MeUser>("/api/users/me");
       if (me.id) setCurrentUserId(me.id);
       return me;
+    },
+    /**
+     * Code Blue manager candidates (GET /api/users/managers,
+     * server/routes/users.ts:1186). `requireAuth` only — deliberately no role
+     * floor, since any clinical initiator may need to nominate. The server
+     * filters to `role IN ('vet','admin')` + active + not-deleted, scoped to
+     * the caller's clinic, ordered by name.
+     *
+     * ADVISORY, NOT AUTHORITATIVE: the filter is on PERMANENT role only. A
+     * clinic running the Code Blue manager evaluator in `enforce` mode can
+     * still reject a listed candidate with 403
+     * MANAGER_NOT_CODE_BLUE_ELIGIBLE on their check-in-derived OPERATIONAL
+     * role, which this endpoint does not see. Callers must keep the picker
+     * usable after that error rather than dead-ending.
+     */
+    managers: async (): Promise<CodeBlueManager[]> => {
+      const body = await requestJson<{ managers?: CodeBlueManager[] }>("/api/users/managers");
+      return Array.isArray(body?.managers) ? body.managers : [];
     },
   },
   /*

@@ -73,6 +73,19 @@ export type ActiveCodeBlueResponse = Readonly<{
   linkedEquipment: readonly unknown[];
 }>;
 
+/**
+ * One row of GET /api/users/managers — a candidate for `managerUserId`.
+ * Server select list is exactly `{ id, name, role }` (server/routes/users.ts:1189).
+ * `role` is the PERMANENT `vt_users.role` and is always "vet" or "admin" by
+ * the route's own filter; kept on the type so the picker can label the row
+ * without a second lookup.
+ */
+export type CodeBlueManager = Readonly<{
+  id: string;
+  name: string;
+  role: string;
+}>;
+
 /** POST /api/code-blue/sessions body — mirrors `startSessionSchema`. */
 export type StartCodeBlueRequest = Readonly<{
   managerUserId: string;

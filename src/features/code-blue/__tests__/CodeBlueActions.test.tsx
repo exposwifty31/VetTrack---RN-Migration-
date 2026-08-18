@@ -18,7 +18,7 @@ import { useCodeBlueMutations } from "../useCodeBlueMutations";
 import { useIdentity } from "@/app/useIdentity";
 import { ApiCodedError } from "@/lib/api/coded-error";
 import { EmergencyOfflineError } from "@/lib/emergency-block";
-import type { ActiveCodeBlueResponse } from "@/types/code-blue";
+import type { ActiveCodeBlueResponse, CodeBlueManager } from "@/types/code-blue";
 import type { MeUser } from "@/types/api";
 
 jest.mock("react-i18next", () => ({
@@ -39,15 +39,41 @@ jest.mock("@/app/useIdentity", () => ({ useIdentity: jest.fn() }));
 
 jest.mock("../useCodeBlueMutations", () => ({ useCodeBlueMutations: jest.fn() }));
 
+/**
+ * The action bar now issues TWO queries: the shared active-session read and
+ * (initiator-but-not-self-manager only) the manager-candidate list. A single
+ * `mockReturnValue` would hand the session result to both, so the mock
+ * dispatches on the queryKey root instead.
+ */
+type ManagersQueryStub = {
+  data?: readonly CodeBlueManager[];
+  isPending?: boolean;
+  isError?: boolean;
+};
+
+let managersResult: ManagersQueryStub = { data: [], isPending: false, isError: false };
+
+function installQueryMock(session: Partial<UseQueryResult<ActiveCodeBlueResponse, Error>>) {
+  jest.mocked(useQuery).mockImplementation((options: unknown) => {
+    const key = (options as { queryKey?: readonly unknown[] }).queryKey ?? [];
+    const base = { data: undefined, isPending: false, isError: false, refetch: jest.fn() };
+    if (key[0] === "users") {
+      return { ...base, ...managersResult } as never;
+    }
+    return {
+      ...base,
+      dataUpdatedAt: Date.parse("2026-08-10T12:00:00.000Z"),
+      ...session,
+    } as never;
+  });
+}
+
 function mockSessionQuery(overrides: Partial<UseQueryResult<ActiveCodeBlueResponse, Error>>) {
-  jest.mocked(useQuery).mockReturnValue({
-    data: undefined,
-    isPending: false,
-    isError: false,
-    dataUpdatedAt: Date.parse("2026-08-10T12:00:00.000Z"),
-    refetch: jest.fn(),
-    ...overrides,
-  } as unknown as UseQueryResult<ActiveCodeBlueResponse, Error>);
+  installQueryMock(overrides);
+}
+
+function mockManagersQuery(overrides: ManagersQueryStub) {
+  managersResult = { data: [], isPending: false, isError: false, ...overrides };
 }
 
 function mockIdentity(overrides: Partial<MeUser> | null, pending = false) {
@@ -89,6 +115,10 @@ function mockMutations(overrides: {
     presence: fakeMutation(overrides.presence),
   } as unknown as ReturnType<typeof useCodeBlueMutations>);
 }
+
+beforeEach(() => {
+  managersResult = { data: [], isPending: false, isError: false };
+});
 
 const NO_ACTIVE: ActiveCodeBlueResponse = {
   session: null,
@@ -144,7 +174,7 @@ describe("CodeBlueActions", () => {
     mockSessionQuery({ data: { session: null } as unknown as ActiveCodeBlueResponse });
     await render(<CodeBlueActions />);
     expect(screen.queryByTestId("code-blue-actions")).toBeNull();
-    expect(screen.queryByText("codeBlue.actions.startRequiresVet")).toBeNull();
+    expect(screen.queryByText("codeBlue.actions.startNotEligible")).toBeNull();
   });
 
   it("CodeRabbit PR #49 (Minor): renders nothing when identity SETTLED without data (no error) — the other half of the guard", async () => {
@@ -156,7 +186,7 @@ describe("CodeBlueActions", () => {
     mockSessionQuery({ data: { session: null } as unknown as ActiveCodeBlueResponse });
     await render(<CodeBlueActions />);
     expect(screen.queryByTestId("code-blue-actions")).toBeNull();
-    expect(screen.queryByText("codeBlue.actions.startRequiresVet")).toBeNull();
+    expect(screen.queryByText("codeBlue.actions.startNotEligible")).toBeNull();
   });
 
   it("CodeRabbit PR #49 (Major): never offers Start when the active-session query itself FAILED — a failed read is 'unknown', not 'no session', and must not risk a double-start", async () => {
@@ -166,7 +196,7 @@ describe("CodeBlueActions", () => {
 
     await render(<CodeBlueActions />);
     expect(screen.queryByText("codeBlue.actions.start")).toBeNull();
-    expect(screen.queryByText("codeBlue.actions.startRequiresVet")).toBeNull();
+    expect(screen.queryByText("codeBlue.actions.startNotEligible")).toBeNull();
     expect(screen.getByText("codeBlue.loadError")).toBeTruthy();
 
     fireEvent.press(screen.getByText("common.retry"));
@@ -201,13 +231,71 @@ describe("CodeBlueActions", () => {
       expect(startMutate).not.toHaveBeenCalled();
     });
 
-    it("a non-vet clinical role sees an explanation instead of a Start button", async () => {
+    it("a senior_technician — a valid INITIATOR but not a valid MANAGER — gets the picker, and starts by nominating", async () => {
       mockIdentity({ id: "user-2", role: "senior_technician", name: "Tech Levi" });
+      mockManagersQuery({
+        data: [
+          { id: "u-vet", name: "Dr. Cohen", role: "vet" },
+          { id: "u-admin", name: "Ops Admin", role: "admin" },
+        ],
+      });
+      mockSessionQuery({ data: NO_ACTIVE });
+      const startMutate = jest.fn();
+      mockMutations({ start: { mutate: startMutate } });
+
+      await render(<CodeBlueActions />);
+      expect(screen.queryByText("codeBlue.actions.startNotEligible")).toBeNull();
+      expect(screen.getByText("codeBlue.actions.pickManager")).toBeTruthy();
+
+      fireEvent.press(screen.getByText("Dr. Cohen"));
+
+      // NEVER self-designates — that is a guaranteed 400 INVALID_MANAGER.
+      expect(startMutate).toHaveBeenCalledWith({
+        managerUserId: "u-vet",
+        managerUserName: "Dr. Cohen",
+      });
+    });
+
+    it("keeps the picker on screen after a 403 MANAGER_NOT_CODE_BLUE_ELIGIBLE so a different manager can be nominated", async () => {
+      mockIdentity({ id: "user-2", role: "technician", name: "Tech Levi" });
+      mockManagersQuery({
+        data: [
+          { id: "u-vet", name: "Dr. Cohen", role: "vet" },
+          { id: "u-admin", name: "Ops Admin", role: "admin" },
+        ],
+      });
+      mockSessionQuery({ data: NO_ACTIVE });
+      mockMutations({
+        start: {
+          isError: true,
+          error: new ApiCodedError(403, "MANAGER_NOT_CODE_BLUE_ELIGIBLE"),
+        },
+      });
+
+      await render(<CodeBlueActions />);
+      expect(screen.getByText("codeBlue.errors.managerNotEligible")).toBeTruthy();
+      expect(screen.getByText("Dr. Cohen")).toBeTruthy();
+      expect(screen.getByText("Ops Admin")).toBeTruthy();
+    });
+
+    it("tells an initiator when NO eligible manager exists rather than offering an unusable Start", async () => {
+      mockIdentity({ id: "user-2", role: "technician", name: "Tech Levi" });
+      mockManagersQuery({ data: [] });
+      mockSessionQuery({ data: NO_ACTIVE });
+
+      await render(<CodeBlueActions />);
+      expect(screen.getByText("codeBlue.actions.managersEmpty")).toBeTruthy();
+      expect(screen.queryByText("codeBlue.actions.start")).toBeNull();
+    });
+
+    it("a role outside the server's initiator allow-list (student) sees the explanation, never a picker", async () => {
+      mockIdentity({ id: "user-3", role: "student", name: "Student Bar" });
       mockSessionQuery({ data: NO_ACTIVE });
 
       await render(<CodeBlueActions />);
       expect(screen.queryByText("codeBlue.actions.start")).toBeNull();
-      expect(screen.getByText("codeBlue.actions.startRequiresVet")).toBeTruthy();
+      expect(screen.queryByText("codeBlue.actions.pickManager")).toBeNull();
+      expect(screen.getByText("codeBlue.actions.startNotEligible")).toBeTruthy();
     });
 
     it("shows the LOUD offline banner (not the generic one) when start fails offline", async () => {

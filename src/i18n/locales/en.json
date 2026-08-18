@@ -204,7 +204,12 @@
     "actions": {
       "start": "Start Code Blue",
       "starting": "Starting…",
-      "startRequiresVet": "Only a vet can start and self-manage a Code Blue right now.",
+      "startNotEligible": "Only clinical staff can start a Code Blue.",
+      "pickManager": "Choose the resuscitation manager",
+      "pickManagerHint": "You can start a Code Blue, but a vet or admin must run it.",
+      "managersLoading": "Loading eligible managers…",
+      "managersEmpty": "No vet or admin is available to manage right now.",
+      "managersLoadError": "Couldn't load the list of eligible managers.",
       "addLog": "Add to log",
       "logging": "Adding…",
       "logPlaceholder": "What just happened?",
@@ -225,7 +230,9 @@
       "conflict": "An active Code Blue already exists.",
       "notFound": "This session could not be found.",
       "forbidden": "You're not allowed to do that for this session.",
-      "generic": "That didn't go through. Please try again."
+      "generic": "That didn't go through. Please try again.",
+      "managerNotEligible": "That manager isn't currently eligible to run a Code Blue. Pick someone else.",
+      "invalidManager": "That manager is no longer available. Pick someone else."
     }
   },
   "menu": {

@@ -7,27 +7,49 @@ import { EmergencyOfflineError } from "@/lib/emergency-block";
 
 import {
   canEndCodeBlue,
-  canStartCodeBlue,
+  canInitiateCodeBlue,
+  canSelfManageCodeBlue,
   codeBlueMutationErrorKey,
   computeElapsedMsForLog,
   resolveLogDraftIdempotencyKey,
 } from "../code-blue-actions-derive";
 
-describe("canStartCodeBlue", () => {
-  it("allows a vet to self-designate as manager and start", () => {
-    expect(canStartCodeBlue("vet")).toBe(true);
+describe("canSelfManageCodeBlue — the INTERSECTION of the two server gates", () => {
+  it("allows a vet: the only role that is BOTH a valid initiator AND a valid manager", () => {
+    expect(canSelfManageCodeBlue("vet")).toBe(true);
   });
 
-  it("denies non-vet clinical roles (no self-manager eligibility)", () => {
-    expect(canStartCodeBlue("senior_technician")).toBe(false);
-    expect(canStartCodeBlue("technician")).toBe(false);
-    expect(canStartCodeBlue("student")).toBe(false);
-    expect(canStartCodeBlue("admin")).toBe(false);
+  it("denies senior_technician/technician — valid initiators, but NOT valid managers", () => {
+    expect(canSelfManageCodeBlue("senior_technician")).toBe(false);
+    expect(canSelfManageCodeBlue("technician")).toBe(false);
   });
 
-  it("denies an unresolved role", () => {
-    expect(canStartCodeBlue(undefined)).toBe(false);
-    expect(canStartCodeBlue(null)).toBe(false);
+  it("denies admin — a valid MANAGER, but blocked at the initiator gate (allowSystemAdmin: false)", () => {
+    expect(canSelfManageCodeBlue("admin")).toBe(false);
+  });
+
+  it("denies student and an unresolved role", () => {
+    expect(canSelfManageCodeBlue("student")).toBe(false);
+    expect(canSelfManageCodeBlue(undefined)).toBe(false);
+    expect(canSelfManageCodeBlue(null)).toBe(false);
+  });
+});
+
+describe("canInitiateCodeBlue — server gate 1 (requireClinicalAuthority allow-list)", () => {
+  it("allows every clinical role the server lets POST /sessions", () => {
+    expect(canInitiateCodeBlue("vet")).toBe(true);
+    expect(canInitiateCodeBlue("senior_technician")).toBe(true);
+    expect(canInitiateCodeBlue("technician")).toBe(true);
+  });
+
+  it("denies admin — allowSystemAdmin:false excludes system-admin identity from the emergency gate", () => {
+    expect(canInitiateCodeBlue("admin")).toBe(false);
+  });
+
+  it("denies student and an unresolved role", () => {
+    expect(canInitiateCodeBlue("student")).toBe(false);
+    expect(canInitiateCodeBlue(undefined)).toBe(false);
+    expect(canInitiateCodeBlue(null)).toBe(false);
   });
 });
 
@@ -106,7 +128,10 @@ describe("codeBlueMutationErrorKey", () => {
       "codeBlue.errors.forbidden",
     );
     expect(codeBlueMutationErrorKey(new ApiCodedError(403, "MANAGER_NOT_CODE_BLUE_ELIGIBLE"))).toBe(
-      "codeBlue.errors.forbidden",
+      "codeBlue.errors.managerNotEligible",
+    );
+    expect(codeBlueMutationErrorKey(new ApiCodedError(400, "INVALID_MANAGER"))).toBe(
+      "codeBlue.errors.invalidManager",
     );
     expect(codeBlueMutationErrorKey(new ApiCodedError(403, "MANAGER_INACTIVE"))).toBe(
       "codeBlue.errors.forbidden",

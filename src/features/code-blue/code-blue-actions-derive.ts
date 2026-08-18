@@ -7,16 +7,50 @@ import { ApiCodedError } from "@/lib/api/coded-error";
 import { EmergencyOfflineError } from "@/lib/emergency-block";
 
 /**
- * Client-side Start eligibility. The server allows any clinical role (vet /
- * senior_technician / technician) to POST /sessions, but `managerUserId` must
- * reference an active vet or admin (server/routes/code-blue.ts). This slice
- * scopes Start to self-designating as manager — the only role that is BOTH a
- * valid initiator AND a valid manager is "vet". A senior_technician/technician
- * can still be present and log/end via other affordances; nominating a
- * different manager is a future manager-picker slice, not built here.
+ * POST /api/code-blue/sessions carries THREE independent server gates. Two are
+ * unconditional; the client must model both, because they do not have the same
+ * allow-list and the difference is the whole reason a picker exists.
+ *
+ *   Gate 1 — INITIATOR (the caller). `requireClinicalUser` + then
+ *     `requireClinicalAuthority({ allow: ["vet","senior_technician",
+ *     "technician"], allowSystemAdmin: false,
+ *     allowPermanentClinicalRoleForEmergency: true })`
+ *     (server/routes/code-blue.ts:288-305). Break-glass: a clinical identity
+ *     may open a Code Blue with NO active shift, so PERMANENT role — not
+ *     `effectiveRole` — is the right client-side approximation here.
+ *     Denies 403 INSUFFICIENT_ROLE.
+ *
+ *   Gate 2 — MANAGER (the nominated `managerUserId`). An unconditional DB
+ *     check on the manager's PERMANENT role:
+ *     `inArray(users.role, ["vet","admin"])` + `status = "active"` + same
+ *     clinic (server/routes/code-blue.ts:361-377). Denies 400 INVALID_MANAGER.
+ *     Same reason `role` and not `effectiveRole`: gate 2 reads `users.role`.
+ *
+ *   Gate 3 — MANAGER OPERATIONAL ROLE. `evaluateCodeBlueManagerForRoute`,
+ *     per-clinic `off | shadow | enforce`, default `off`. In `enforce` it can
+ *     deny 403 MANAGER_NOT_CODE_BLUE_ELIGIBLE on the manager's check-in-derived
+ *     operational role — which GET /api/users/managers does not filter on. The
+ *     picker list is therefore advisory, never authoritative; the UI must let
+ *     the user pick again after that 403.
+ *
+ * `canSelfManageCodeBlue` is the INTERSECTION of gates 1 and 2 — the only role
+ * that can start while naming itself manager is "vet" (admin passes gate 2 but
+ * is excluded from gate 1). `canInitiateCodeBlue` is gate 1 alone: a
+ * senior_technician/technician may start, but MUST nominate someone else.
  */
-export function canStartCodeBlue(role: string | null | undefined): boolean {
+export function canSelfManageCodeBlue(role: string | null | undefined): boolean {
   return role === "vet";
+}
+
+/** Gate 1 alone — see the block above. Mirrors the server's `allow` list verbatim. */
+const CODE_BLUE_INITIATOR_ROLES: ReadonlySet<string> = new Set([
+  "vet",
+  "senior_technician",
+  "technician",
+]);
+
+export function canInitiateCodeBlue(role: string | null | undefined): boolean {
+  return typeof role === "string" && CODE_BLUE_INITIATOR_ROLES.has(role);
 }
 
 /** Manager-only close-out gate — mirrors the server's persisted-manager check. */
@@ -65,6 +99,8 @@ export type CodeBlueMutationErrorKey =
   | "codeBlue.errors.conflict"
   | "codeBlue.errors.notFound"
   | "codeBlue.errors.forbidden"
+  | "codeBlue.errors.managerNotEligible"
+  | "codeBlue.errors.invalidManager"
   | "codeBlue.errors.generic";
 
 /**
@@ -83,9 +119,15 @@ export function codeBlueMutationErrorKey(error: unknown): CodeBlueMutationErrorK
       case "SESSION_NOT_FOUND":
         return "codeBlue.errors.notFound";
       case "MANAGER_ONLY":
-      case "MANAGER_NOT_CODE_BLUE_ELIGIBLE":
       case "MANAGER_INACTIVE":
         return "codeBlue.errors.forbidden";
+      // Gates 3 and 2 on the NOMINATED manager — not on the caller. The
+      // generic "you're not allowed" copy names the wrong actor and leaves a
+      // picker user with no idea that picking someone else would work.
+      case "MANAGER_NOT_CODE_BLUE_ELIGIBLE":
+        return "codeBlue.errors.managerNotEligible";
+      case "INVALID_MANAGER":
+        return "codeBlue.errors.invalidManager";
       default:
         return "codeBlue.errors.generic";
     }
