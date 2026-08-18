@@ -48,7 +48,7 @@
  *   - Log entries are freeform "note" category only; an equipment picker for
  *     "equipment" category entries is a future slice.
  */
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -71,9 +71,13 @@ import {
   codeBlueMutationErrorKey,
   computeElapsedMsForLog,
   resolveLogDraftIdempotencyKey,
-  type CodeBlueMutationErrorKey,
   type LogDraftIdempotencyEntry,
 } from "./code-blue-actions-derive";
+import {
+  oneTapStartErrorKey,
+  resolveOneTapStartToken,
+  type OneTapStartErrorKey,
+} from "./one-tap-derive";
 import { useCodeBlueMutations } from "./useCodeBlueMutations";
 
 const OUTCOMES: readonly CodeBlueSessionOutcome[] = ["rosc", "died", "transferred", "ongoing"];
@@ -103,7 +107,7 @@ function ActionButton({
   );
 }
 
-function ErrorBanner({ errorKey }: Readonly<{ errorKey: CodeBlueMutationErrorKey }>) {
+function ErrorBanner({ errorKey }: Readonly<{ errorKey: OneTapStartErrorKey }>) {
   const { t } = useTranslation();
   const isOffline = errorKey === "codeBlue.errors.offline";
   return (
@@ -116,12 +120,22 @@ function ErrorBanner({ errorKey }: Readonly<{ errorKey: CodeBlueMutationErrorKey
   );
 }
 
-/** Renders a mutation's error as an `ErrorBanner`, or nothing when it isn't errored. */
+/**
+ * Renders a mutation's error as an `ErrorBanner`, or nothing when it isn't
+ * errored. `mapError` defaults to the shared mapper; the START action passes
+ * `oneTapStartErrorKey` so the one-tap-only codes (the three distinct 409
+ * `CODE_BLUE_START_CONFLICT` reasons, `INVALID_MANAGER`) get their own copy
+ * instead of collapsing into the generic banner.
+ */
 function MutationErrorBanner({
   mutation,
-}: Readonly<{ mutation: Readonly<{ isError: boolean; error: unknown }> }>) {
+  mapError = codeBlueMutationErrorKey,
+}: Readonly<{
+  mutation: Readonly<{ isError: boolean; error: unknown }>;
+  mapError?: (error: unknown) => OneTapStartErrorKey;
+}>) {
   if (!mutation.isError) return null;
-  return <ErrorBanner errorKey={codeBlueMutationErrorKey(mutation.error)} />;
+  return <ErrorBanner errorKey={mapError(mutation.error)} />;
 }
 
 /**
@@ -162,7 +176,14 @@ export const codeBlueManagerKeys = {
  * INVALID_MANAGER (gate 2, candidate deactivated since the fetch) is a
  * "pick someone else" signal, not a dead end.
  */
-function ManagerPicker({ start }: Readonly<{ start: Mutations["start"] }>) {
+/** Dispatch a Code Blue start. Supplied by {@link NoSessionActions}, which owns
+ *  the idempotency token — no call site mints or forwards one itself. */
+type StartCodeBlue = (managerUserId: string, managerUserName: string) => void;
+
+function ManagerPicker({
+  start,
+  onStart,
+}: Readonly<{ start: Mutations["start"]; onStart: StartCodeBlue }>) {
   const { t } = useTranslation();
   // Deliberately inherits `createAppQueryClient` defaults (`retry: 1`,
   // `staleTime: 5_000` — src/lib/query-client.ts), NOT react-query's own
@@ -231,7 +252,7 @@ function ManagerPicker({ start }: Readonly<{ start: Mutations["start"] }>) {
             // nameless row would 400 on shape before reaching either gate.
             const managerUserName = manager.name.trim();
             if (!managerUserName) return;
-            start.mutate({ managerUserId: manager.id, managerUserName });
+            onStart(manager.id, managerUserName);
           }}
         />
       ))}
@@ -245,12 +266,14 @@ function StartAffordance({
   managerUserName,
   currentUserId,
   start,
+  onStart,
 }: Readonly<{
   canSelfManage: boolean;
   canInitiate: boolean;
   managerUserName: string;
   currentUserId: string | null;
   start: Mutations["start"];
+  onStart: StartCodeBlue;
 }>) {
   const { t } = useTranslation();
   // BOTH gates, not gate 2 alone: `canSelfManage` is the permanent role
@@ -264,12 +287,12 @@ function StartAffordance({
         disabled={start.isPending || !managerUserName}
         onPress={() => {
           if (!currentUserId || !managerUserName) return;
-          start.mutate({ managerUserId: currentUserId, managerUserName });
+          onStart(currentUserId, managerUserName);
         }}
       />
     );
   }
-  if (canInitiate) return <ManagerPicker start={start} />;
+  if (canInitiate) return <ManagerPicker start={start} onStart={onStart} />;
   return (
     <Text className="text-center font-rubik text-[13px] text-text-tertiary">
       {t("codeBlue.actions.startNotEligible")}
@@ -286,10 +309,53 @@ function NoSessionActions(
     start: Mutations["start"];
   }>,
 ) {
+  const { start } = props;
+
+  /**
+   * J1 — the idempotency fence. ONE token per start GESTURE, minted on the
+   * first press and re-sent verbatim on every retry of that gesture: the
+   * server keys its durable `vt_code_blue_start_claims` row on it, so a
+   * double-press or a retry after a lost response REPLAYS the original session
+   * instead of racing a second start.
+   */
+  const tokenRef = useRef<string | null>(null);
+
+  /**
+   * RECONCILE (J1 x manager-picker): the ONLY place a start is dispatched.
+   *
+   * The two slices landed in parallel. J1 moved `start` onto
+   * POST /api/code-blue/one-tap, where `idempotencyToken` is REQUIRED
+   * (`oneTapStartSchema`, `.strict()`), and minted the token at its single
+   * call site. The picker slice meanwhile split that site in two — self-manage
+   * and nominate-a-manager. Each branch was green alone; together, both picker
+   * call sites would have posted without a token and 400'd, including the
+   * nominate path that is the whole point of the picker.
+   *
+   * Passing one callback down rather than patching two `start.mutate` calls is
+   * deliberate: a call site that cannot see `start` cannot forget the token.
+   * Same shape as the emergency-push fix — remove the branch, don't remember it.
+   */
+  const startCodeBlue = useCallback(
+    (managerUserId: string, managerUserName: string) => {
+      if (!managerUserId || !managerUserName) return;
+      const idempotencyToken = resolveOneTapStartToken(tokenRef.current, Crypto.randomUUID);
+      tokenRef.current = idempotencyToken;
+      start.mutate(
+        { idempotencyToken, managerUserId, managerUserName },
+        {
+          onSuccess: () => {
+            tokenRef.current = null;
+          },
+        },
+      );
+    },
+    [start],
+  );
+
   return (
     <View className="gap-2 px-5 pb-3" testID="code-blue-actions">
-      <StartAffordance {...props} />
-      <MutationErrorBanner mutation={props.start} />
+      <StartAffordance {...props} onStart={startCodeBlue} />
+      <MutationErrorBanner mutation={props.start} mapError={oneTapStartErrorKey} />
     </View>
   );
 }

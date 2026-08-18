@@ -194,10 +194,15 @@ describe("codeBlueMutationErrorKey — START-path codes", () => {
     ).toBe("codeBlue.errors.notClinical");
   });
 
-  it("maps CODE_BLUE_START_CONFLICT (409, 'retry with the SAME token') distinctly from ACTIVE_SESSION_EXISTS ('one already exists')", () => {
-    expect(
-      codeBlueMutationErrorKey(new ApiCodedError(409, "CODE_BLUE_START_CONFLICT", "OWNER_IN_FLIGHT")),
-    ).toBe("codeBlue.errors.startConflict");
+  // REMOVED IN RECONCILE: a test asserting CODE_BLUE_START_CONFLICT with reason
+  // "OWNER_IN_FLIGHT" -> a dedicated `startConflict` key. The server emits
+  // exactly three reasons for that code (server/lib/code-blue-one-tap.ts:247,
+  // 275, 295 -> uppercased at routes/code-blue.ts:643): ACTIVE_LEASE,
+  // FENCE_SUPERSEDED, ACTIVE_SESSION_EXISTS. "OWNER_IN_FLIGHT" exists nowhere
+  // in the server — it was an invented example, so the test pinned copy for a
+  // response that cannot arrive. The one-tap mapper now splits the three real
+  // reasons, each covered above/below.
+  it("maps a bare ACTIVE_SESSION_EXISTS to the join-the-running-one copy", () => {
     expect(codeBlueMutationErrorKey(new ApiCodedError(409, "ACTIVE_SESSION_EXISTS"))).toBe(
       "codeBlue.errors.conflict",
     );

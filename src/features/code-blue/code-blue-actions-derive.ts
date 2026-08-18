@@ -187,7 +187,6 @@ export function resolveLogDraftIdempotencyKey(
 export type CodeBlueMutationErrorKey =
   | "codeBlue.errors.offline"
   | "codeBlue.errors.conflict"
-  | "codeBlue.errors.startConflict"
   | "codeBlue.errors.notFound"
   | "codeBlue.errors.notClinical"
   | "codeBlue.errors.managerNotEligible"
@@ -224,7 +223,10 @@ export type CodeBlueMutationErrorKey =
 const CODE_BLUE_ERROR_KEYS: ReadonlyMap<string, CodeBlueMutationErrorKey> = new Map([
   // Start path.
   ["ACTIVE_SESSION_EXISTS", "codeBlue.errors.conflict"],
-  ["CODE_BLUE_START_CONFLICT", "codeBlue.errors.startConflict"],
+  // CODE_BLUE_START_CONFLICT is NOT mapped here. It is emitted only by
+  // POST /api/code-blue/one-tap, whose own mapper splits it three ways by
+  // `reason` (ACTIVE_LEASE / FENCE_SUPERSEDED / else) because each demands a
+  // different operator action. A single entry here would be unreachable.
   // Gate 1 denial. The envelope carries code INSUFFICIENT_ROLE with reason
   // INSUFFICIENT_CLINICAL_AUTHORITY (server/middleware/authority.ts:302-306),
   // so BOTH spellings are listed and `reason` is consulted first below.
@@ -249,9 +251,9 @@ const CODE_BLUE_ERROR_KEYS: ReadonlyMap<string, CodeBlueMutationErrorKey> = new 
  *
  * `reason` is consulted before `code` because it is the finer-grained of the
  * two: gate 1 sends the generic code INSUFFICIENT_ROLE with the specific
- * reason. Where `reason` is unmapped (CODE_BLUE_START_CONFLICT carries a
- * retry-classification reason such as OWNER_IN_FLIGHT) the lookup falls
- * through to `code`.
+ * reason. Where `reason` is unmapped the lookup falls through to `code` —
+ * e.g. the ACCESS_DENIED tenancy/account reasons, which are not start-specific
+ * and land on the generic banner.
  */
 export function codeBlueMutationErrorKey(error: unknown): CodeBlueMutationErrorKey {
   if (error instanceof EmergencyOfflineError) return "codeBlue.errors.offline";

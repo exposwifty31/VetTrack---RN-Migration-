@@ -5,7 +5,8 @@
  *   - GET /api/code-blue/sessions/active  requireAuth (student+) — returns
  *     the current active session (or `session: null`) + log entries +
  *     presence + crash-cart status. Reads are universal.
- *   - POST /api/code-blue/sessions              — start (G4-5)
+ *   - POST /api/code-blue/one-tap               — orchestrated start (J1)
+ *   - POST /api/code-blue/sessions              — legacy/equipment start (G4-5)
  *   - POST /api/code-blue/sessions/:id/logs      — add log entry (G4-5)
  *   - PATCH /api/code-blue/sessions/:id/end      — end session (G4-5)
  *   - PATCH /api/code-blue/sessions/:id/presence — presence heartbeat (G4-5)
@@ -35,6 +36,8 @@ import type {
   EndSessionResponse,
   LogEntryRequest,
   LogEntryResponse,
+  OneTapStartRequest,
+  OneTapStartResponse,
   PresenceResponse,
   StartCodeBlueRequest,
   StartCodeBlueResponse,
@@ -83,7 +86,34 @@ export const codeBlueApi = {
   active: (): Promise<ActiveCodeBlueResponse> =>
     requestJson<ActiveCodeBlueResponse>("/api/code-blue/sessions/active"),
 
-  /** POST /api/code-blue/sessions — start a live session. Online-only (emergency-blocked offline). */
+  /**
+   * POST /api/code-blue/one-tap — THE canonical start path (J1).
+   *
+   * `payload.idempotencyToken` is the durable fence: the server keys a
+   * `vt_code_blue_start_claims` row on it and commits that claim inside the
+   * same transaction as the session insert, so re-sending the SAME token after
+   * a lost response replays the original session (`outcome: "replay"`) instead
+   * of racing a second start. The token is minted per start GESTURE by the
+   * caller (`resolveOneTapStartToken`), never per attempt — minting per attempt
+   * would defeat the fence.
+   *
+   * On the emergency offline-block manifest as class "start" (verified in the
+   * vendored `@vettrack/contracts` at the pinned VETTRACK_SHA), so an offline
+   * attempt throws `EmergencyOfflineError` and is never queued — identical
+   * doctrine to the other four mutations above.
+   */
+  oneTap: (payload: OneTapStartRequest): Promise<OneTapStartResponse> =>
+    requestJson<OneTapStartResponse>("/api/code-blue/one-tap", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  /**
+   * POST /api/code-blue/sessions — the LEGACY start. Retained, not deleted:
+   * it is the only path that accepts an `equipmentId` to link at start, which
+   * one-tap has no field for (one-tap links its own reserved cart instead).
+   * NOT used by the start button — see `useCodeBlueMutations`. Online-only.
+   */
   start: (payload: StartCodeBlueRequest): Promise<StartCodeBlueResponse> =>
     requestJson<StartCodeBlueResponse>("/api/code-blue/sessions", {
       method: "POST",
