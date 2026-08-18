@@ -22,26 +22,45 @@ const mockSignIn: { status: string; password: jest.Mock; finalize: jest.Mock } =
   finalize: mockFinalize,
 };
 
-const mockClerkState: { signIn: typeof mockSignIn | null; isSignedIn: boolean } = {
+type MockFieldError = { code: string; message: string } | null;
+const mockClerkState: {
+  signIn: typeof mockSignIn | null;
+  isSignedIn: boolean;
+  isLoaded: boolean;
+  fetchStatus: "idle" | "fetching";
+  fields: { identifier: MockFieldError; password: MockFieldError };
+} = {
   signIn: mockSignIn,
   isSignedIn: false,
+  isLoaded: true,
+  fetchStatus: "idle",
+  fields: { identifier: null, password: null },
 };
+
+const mockStartSSOFlow = jest.fn();
+const mockSsoSetActive = jest.fn();
 
 jest.mock("@clerk/expo", () => ({
   useSignIn: () => ({
     signIn: mockClerkState.signIn,
-    errors: { fields: { identifier: null, password: null }, raw: null, global: null },
-    fetchStatus: "idle",
+    errors: { fields: mockClerkState.fields, raw: null, global: null },
+    fetchStatus: mockClerkState.fetchStatus,
   }),
-  useAuth: () => ({ isSignedIn: mockClerkState.isSignedIn, isLoaded: true }),
+  useAuth: () => ({ isSignedIn: mockClerkState.isSignedIn, isLoaded: mockClerkState.isLoaded }),
+  useSSO: () => ({ startSSOFlow: mockStartSSOFlow }),
 }));
 
 beforeEach(() => {
   mockPassword.mockReset();
   mockFinalize.mockReset();
+  mockStartSSOFlow.mockReset();
+  mockSsoSetActive.mockReset();
   mockSignIn.status = "needs_first_factor";
   mockClerkState.signIn = mockSignIn;
   mockClerkState.isSignedIn = false;
+  mockClerkState.isLoaded = true;
+  mockClerkState.fetchStatus = "idle";
+  mockClerkState.fields = { identifier: null, password: null };
 });
 
 async function flow() {
@@ -124,5 +143,55 @@ describe("useSignInFlow availability", () => {
     const view = await flow();
     expect(view.ready).toBe(true);
     expect(view.isSignedIn).toBe(true);
+  });
+});
+
+/**
+ * W-AUTH PR-B: the branded screen's port surface — fetchStatus, field-error
+ * flags, the loading gate, and browser SSO. SSO is the ONE flow that still
+ * uses setActive (v4 asymmetry, verified against the installed .d.ts).
+ */
+describe("useSignInFlow branded surface (PR-B)", () => {
+  it("exposes fetchStatus and isLoaded from the SDK", async () => {
+    mockClerkState.fetchStatus = "fetching";
+    mockClerkState.isLoaded = false;
+    const view = await flow();
+    expect(view.fetchStatus).toBe("fetching");
+    expect(view.isLoaded).toBe(false);
+  });
+
+  it("maps errors.fields to framework-free flags — raw messages never cross the port", async () => {
+    mockClerkState.fields = {
+      identifier: { code: "form_identifier_not_found", message: "raw provider text" },
+      password: null,
+    };
+    const view = await flow();
+    expect(view.fieldErrors).toEqual({ identifier: true, password: false });
+  });
+
+  it("startSso: activates the created session via setActive and reports activation", async () => {
+    mockStartSSOFlow.mockResolvedValue({
+      createdSessionId: "sess_sso",
+      setActive: mockSsoSetActive,
+    });
+    const view = await flow();
+
+    await expect(view.startSso("oauth_google")).resolves.toEqual({ kind: "activated" });
+    expect(mockStartSSOFlow).toHaveBeenCalledWith({ strategy: "oauth_google" });
+    expect(mockSsoSetActive).toHaveBeenCalledWith({ session: "sess_sso" });
+  });
+
+  it("startSso: a null createdSessionId (user cancelled) maps to dismissed — no activation", async () => {
+    mockStartSSOFlow.mockResolvedValue({ createdSessionId: null, setActive: mockSsoSetActive });
+    const view = await flow();
+
+    await expect(view.startSso("oauth_apple")).resolves.toEqual({ kind: "dismissed" });
+    expect(mockSsoSetActive).not.toHaveBeenCalled();
+  });
+
+  it("startSso rejections propagate (the screen owns generic-copy mapping)", async () => {
+    mockStartSSOFlow.mockRejectedValue(new Error("browser closed the pipe"));
+    const view = await flow();
+    await expect(view.startSso("oauth_apple")).rejects.toThrow("browser closed the pipe");
   });
 });

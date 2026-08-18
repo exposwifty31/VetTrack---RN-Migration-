@@ -502,7 +502,7 @@
   },
   "signIn": {
     "title": "Sign in",
-    "subtitle": "Clerk-Expo · SecureStore token cache",
+    "subtitle": "Sign in to manage your veterinary equipment",
     "email": "Email",
     "password": "Password",
     "submit": "Sign in",
@@ -510,7 +510,19 @@
     "signedInTitle": "Signed in",
     "goHome": "Go home",
     "incomplete": "Sign-in incomplete: status={{status}}",
-    "error": "Sign-in failed. Check your details and try again."
+    "error": "Sign-in failed. Check your details and try again.",
+    "brand": "VetTrack",
+    "roleCarryFailed": "Couldn't save the selected role. You can continue signing in.",
+    "welcomeBack": "Welcome back",
+    "roleSelectLabel": "Select your role",
+    "roleVetTech": "Vet Tech",
+    "roleVeterinarian": "Veterinarian",
+    "roleSelectHint": "This can be adjusted when your account is reviewed.",
+    "continueWithApple": "Continue with Apple",
+    "continueWithGoogle": "Continue with Google",
+    "phoneHint": "Signing in with an Israeli number (+972)? Enter the number in local format (for example: 0501234567).",
+    "identifierFieldError": "Check your email address.",
+    "passwordFieldError": "Check your password."
   },
   "apiSmoke": {
     "title": "API smoke",

@@ -21,12 +21,34 @@ export class SignInFlowUnavailableError extends Error {
   }
 }
 
+/** Which credential fields the last attempt flagged — display decisions only. */
+export interface SignInFieldErrorFlags {
+  identifier: boolean;
+  password: boolean;
+}
+
+/** Browser-SSO strategies the product offers (Apple mandatory beside Google — App Review). */
+export type SsoStrategy = "oauth_apple" | "oauth_google";
+
+/**
+ * Result of one browser SSO round-trip. `dismissed` covers user cancellation
+ * (the SDK resolves with no created session) — callers MUST stay silent on it;
+ * transport failures reject instead.
+ */
+export type SsoOutcome = { kind: "activated" } | { kind: "dismissed" };
+
 /** What a sign-in surface may do — independent of the auth vendor. */
 export interface SignInFlowPort {
   /** The flow resource exists and can accept a submission. */
   readonly ready: boolean;
   /** An interactive session is already active. */
   readonly isSignedIn: boolean;
+  /** The SDK client finished loading (gates the whole form — ClerkLoading analog). */
+  readonly isLoaded: boolean;
+  /** Whether the underlying flow resource is mid-request (gates submit). */
+  readonly fetchStatus: "idle" | "fetching";
+  /** Field-level flags from the last attempt — localized copy is the caller's. */
+  readonly fieldErrors: SignInFieldErrorFlags;
   /**
    * Submit an email + password. Resolves to a discriminated outcome; rejects
    * only on transport-level failures (and with SignInFlowUnavailableError when
@@ -34,4 +56,10 @@ export interface SignInFlowPort {
    * the caller maps outcomes to its own localized strings.
    */
   submitPassword(emailAddress: string, password: string): Promise<PasswordSignInOutcome>;
+  /**
+   * Run one browser SSO flow. Activates the created session before resolving
+   * (the v4 asymmetry: SSO is the one flow that still uses setActive).
+   * Cancellation resolves `dismissed`; transport failures reject.
+   */
+  startSso(strategy: SsoStrategy): Promise<SsoOutcome>;
 }
