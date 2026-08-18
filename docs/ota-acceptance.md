@@ -91,8 +91,8 @@ Do these in order. Steps 1-5 are not runnable until all of them are done.
 
 ### P0 — Run everything from the repo root
 
-```
-/Users/dan/VetTrack-RN-Migration
+```text
+the RN migration checkout
 ```
 
 **Never publish an update from a git worktree.** With `policy: fingerprint`, the
@@ -145,7 +145,7 @@ going further.
 ### P2 — Install the updates client
 
 ```bash
-cd /Users/dan/VetTrack-RN-Migration
+cd the RN migration checkout
 npx expo install expo-updates
 ```
 
@@ -245,7 +245,7 @@ slip.
 Run once per session, from the repo root:
 
 ```bash
-cd /Users/dan/VetTrack-RN-Migration
+cd the RN migration checkout
 export BRANCH=preview
 export CHANNEL=preview
 eas whoami            # expect: exposwifty31
@@ -360,7 +360,12 @@ On the device:
 **PASS, all four together:**
 
 - Marker reads `ota-marker-B`
-- `Update ID` **differs** from the Step 1 baseline and **matches** the group published in Step 2
+- `Update ID` **differs** from the Step 1 baseline and **matches this platform's
+  update inside the group published in Step 2** — `Updates.updateId` is the
+  platform-specific id and is never the group id, so comparing it against the
+  group value fails on a correct run. Resolve the group first:
+  `eas update:view "$GRP" --json | jq -r '.updates[] | select(.platform=="ios") | .id'`
+  (swap `"android"` on the Pixel).
 - `Embedded launch?` now reads **false**
 - `Runtime version` is **unchanged**
 
@@ -512,7 +517,7 @@ resolve the group to its iOS update first:
 
 ```bash
 GRP=$(eas update:list --branch "$BRANCH" --json --non-interactive \
-        | jq -r '.currentPage[0].group')
+        | jq -r '.currentPage[0].group')   # a GROUP id, shared across platforms
 UPD=$(eas update:view "$GRP" --json \
         | jq -r '.updates[] | select(.platform=="ios") | .id')
 

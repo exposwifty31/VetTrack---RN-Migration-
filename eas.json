@@ -12,6 +12,7 @@
       }
     },
     "preview": {
+      "environment": "production",
       "channel": "preview",
       "distribution": "internal",
       "autoIncrement": false,

@@ -71,7 +71,7 @@ type ResolvedAppConfig = {
 const resolved = (require(path.join(ROOT, "app.config.js")) as () => ResolvedAppConfig)();
 
 const easJson = JSON.parse(fs.readFileSync(path.join(ROOT, "eas.json"), "utf8")) as {
-  build: Record<string, { channel?: string }>;
+  build: Record<string, { channel?: string; environment?: string }>;
 };
 
 describe("runtimeVersion policy", () => {
@@ -135,6 +135,28 @@ describe("build profile channels", () => {
 
   it.each(Object.keys(easJson.build))("eas.json build.%s matches its recorded channel", (profile) => {
     expect(easJson.build[profile]?.channel ?? null).toBe(EXPECTED_CHANNELS[profile] ?? null);
+  });
+});
+
+describe("channel-bound profiles carry the variables their OTA payload needs", () => {
+  // Every OTA publish targets the `production` EAS environment, so a
+  // channel-bound BUILD pinned to a different environment gets a binary without
+  // EXPO_PUBLIC_API_ORIGIN or the Clerk key — the update lands on an app that
+  // cannot reach the API to prove it landed.
+  const channelBound = Object.entries(easJson.build).filter(([, p]) => p.channel);
+
+  it("names at least the two OTA channels", () => {
+    expect(channelBound.map(([n]) => n).sort()).toEqual(["preview", "production"]);
+  });
+
+  // EAS INFERS the environment from the profile NAME when `environment` is
+  // absent — which is exactly what made `preview` wrong: its name resolved to
+  // the empty `preview` environment, while `production`'s name resolves
+  // correctly by accident. Assert the EFFECTIVE value, so a profile is right
+  // for a stated reason rather than by what it happens to be called.
+  it.each(channelBound.map(([n]) => n))("build.%s resolves to the production environment", (name) => {
+    const effective = easJson.build[name]?.environment ?? name;
+    expect(effective).toBe("production");
   });
 });
 

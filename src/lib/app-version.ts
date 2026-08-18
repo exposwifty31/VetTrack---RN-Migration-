@@ -119,6 +119,9 @@ export async function fetchLatestAppVersion(
     const response = await fetchImpl(url, {
       method: "GET",
       headers: { Accept: "application/json" },
+      // The feed is public and versions are not per-user: never let an ambient
+      // cookie or client cert ride along on what must stay an anonymous probe.
+      credentials: "omit",
       signal: controller.signal,
     });
     if (!response.ok) return null;
