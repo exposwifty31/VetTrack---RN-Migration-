@@ -9,8 +9,6 @@ import { Rubik_600SemiBold } from "@expo-google-fonts/rubik/600SemiBold";
 import { Rubik_700Bold } from "@expo-google-fonts/rubik/700Bold";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
-import { ClerkProvider } from "@clerk/expo";
-import { tokenCache } from "@clerk/expo/token-cache";
 import { NavigationContainer } from "@react-navigation/native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
@@ -19,6 +17,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Uniwind, useUniwind } from "uniwind";
 
+import { AuthRoot, resolveClerkPublishableKey } from "./src/infrastructure/auth/AuthRoot";
 import { ClerkTokenBridge } from "./src/infrastructure/auth/ClerkTokenBridge";
 import { PushBridge } from "./src/infrastructure/push/PushBridge";
 import { RealtimeBridge } from "./src/infrastructure/realtime/RealtimeBridge";
@@ -47,7 +46,7 @@ installDevAuthSeam();
 // worst case the OS hides the splash on its own schedule.
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+const publishableKey = resolveClerkPublishableKey();
 
 /**
  * Status-bar icons derived from the EFFECTIVE Uniwind theme — dark icons on the
@@ -119,13 +118,8 @@ export default function App() {
     return null;
   }
 
-  if (!publishableKey) {
-    return withRoot(tree);
-  }
-
-  return withRoot(
-    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      {tree}
-    </ClerkProvider>,
-  );
+  // AuthRoot mounts ClerkProvider (with the SecureStore token cache) when a
+  // key is configured, and passes children through untouched otherwise — the
+  // wiring is behaviorally pinned by AuthRoot.test.tsx.
+  return withRoot(<AuthRoot>{tree}</AuthRoot>);
 }

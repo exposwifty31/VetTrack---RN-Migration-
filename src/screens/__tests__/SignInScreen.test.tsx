@@ -2,33 +2,28 @@
  * W3a / SignInScreen: a failed sign-in must surface GENERIC, translated copy —
  * never the raw provider error message (which can carry authorization internals).
  *
- * W-AUTH (PR-A): mocks follow the @clerk/expo v4 method-based custom-flow API —
- * `useSignIn()` returns `{ signIn, errors, fetchStatus }`; the flow is
- * `signIn.password()` -> check `{ error }` -> `signIn.status === "complete"` ->
- * `signIn.finalize()`. The behavioral invariants pinned here predate the swap.
+ * W-AUTH (PR #75): the screen consumes the SignInFlowPort ADAPTER
+ * (@/infrastructure/auth/useSignInFlow) — so these tests mock the adapter, not
+ * Clerk. The v4 mechanism (password/finalize/returned-error shapes) is pinned
+ * in the adapter's own suite; here we pin the screen's outcome->copy mapping.
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 
 import i18next from "@/i18n/config";
+import type { SignInFlowPort } from "@/core/ports/sign-in-flow.port";
 
 import type { RootStackScreenProps } from "../../navigation/types";
 import { ClerkSignInForm } from "../SignInScreen";
 
-const mockPassword = jest.fn();
-const mockFinalize = jest.fn();
-const mockSignIn: { status: string; password: jest.Mock; finalize: jest.Mock } = {
-  status: "needs_first_factor",
-  password: mockPassword,
-  finalize: mockFinalize,
+const mockSubmitPassword = jest.fn();
+const mockFlow: { ready: boolean; isSignedIn: boolean; submitPassword: jest.Mock } = {
+  ready: true,
+  isSignedIn: false,
+  submitPassword: mockSubmitPassword,
 };
 
-jest.mock("@clerk/expo", () => ({
-  useSignIn: () => ({
-    signIn: mockSignIn,
-    errors: { fields: { identifier: null, password: null }, raw: null, global: null },
-    fetchStatus: "idle",
-  }),
-  useAuth: () => ({ isSignedIn: false }),
+jest.mock("@/infrastructure/auth/useSignInFlow", () => ({
+  useSignInFlow: (): SignInFlowPort => mockFlow,
 }));
 
 jest.mock("@/lib/auth-fetch", () => ({
@@ -39,14 +34,6 @@ jest.mock("@/lib/auth-fetch", () => ({
 
 const SENSITIVE = "azp mismatch: internal_secret_party";
 
-/** password() succeeds and (like the real SignInFuture) mutates status in place. */
-function passwordSucceeds() {
-  mockPassword.mockImplementation(async () => {
-    mockSignIn.status = "complete";
-    return { error: null };
-  });
-}
-
 async function renderForm() {
   // Minimal navigation/route stubs — the form only calls navigation.navigate.
   const navigation = { navigate: jest.fn() } as unknown as RootStackScreenProps<"SignIn">["navigation"];
@@ -55,28 +42,14 @@ async function renderForm() {
 }
 
 beforeEach(() => {
-  mockPassword.mockReset();
-  mockFinalize.mockReset();
-  mockSignIn.status = "needs_first_factor";
+  mockSubmitPassword.mockReset();
+  mockFlow.ready = true;
+  mockFlow.isSignedIn = false;
 });
 
 describe("SignInScreen error handling", () => {
-  it("shows generic translated copy when password() returns an error object", async () => {
-    // v4 reports flow failures as a RETURNED error, not a rejection.
-    mockPassword.mockResolvedValue({ error: new Error(SENSITIVE) });
-    await renderForm();
-
-    await fireEvent.press(screen.getByTestId("signin-submit"));
-
-    await waitFor(() => {
-      expect(screen.getByText(i18next.t("signIn.error"))).toBeTruthy();
-    });
-    expect(screen.queryByText(SENSITIVE)).toBeNull();
-    expect(mockFinalize).not.toHaveBeenCalled();
-  });
-
-  it("shows generic translated copy when password() rejects, never the raw message", async () => {
-    mockPassword.mockRejectedValue(new Error(SENSITIVE));
+  it("maps a failed outcome to generic translated copy — the raw cause is never rendered", async () => {
+    mockSubmitPassword.mockResolvedValue({ kind: "failed", cause: new Error(SENSITIVE) });
     await renderForm();
 
     await fireEvent.press(screen.getByTestId("signin-submit"));
@@ -87,9 +60,8 @@ describe("SignInScreen error handling", () => {
     expect(screen.queryByText(SENSITIVE)).toBeNull();
   });
 
-  it("shows generic translated copy when finalize() returns an error object", async () => {
-    passwordSucceeds();
-    mockFinalize.mockResolvedValue({ error: new Error(SENSITIVE) });
+  it("maps a rejection to the same generic translated copy", async () => {
+    mockSubmitPassword.mockRejectedValue(new Error(SENSITIVE));
     await renderForm();
 
     await fireEvent.press(screen.getByTestId("signin-submit"));
@@ -98,32 +70,45 @@ describe("SignInScreen error handling", () => {
       expect(screen.getByText(i18next.t("signIn.error"))).toBeTruthy();
     });
     expect(screen.queryByText(SENSITIVE)).toBeNull();
+  });
+
+  it("surfaces the incomplete-status copy for an incomplete outcome", async () => {
+    mockSubmitPassword.mockResolvedValue({ kind: "incomplete", status: "needs_second_factor" });
+    await renderForm();
+
+    await fireEvent.press(screen.getByTestId("signin-submit"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(i18next.t("signIn.incomplete", { status: "needs_second_factor" })),
+      ).toBeTruthy();
+    });
   });
 });
 
 describe("SignInScreen diagnostics", () => {
   it("does not report a failure when only the DEV azp diagnostic throws", async () => {
-    // The diagnostic runs AFTER finalize() — the session is already live. A
-    // rejecting resolveToken() reaching the outer catch would paint "sign-in
-    // failed" over a sign-in that worked, and the user would retry a session
-    // they already have.
-    passwordSucceeds();
-    mockFinalize.mockResolvedValue({ error: null });
+    // The diagnostic runs AFTER the flow completes — the session is already
+    // live. A rejecting resolveToken() reaching the outer catch would paint
+    // "sign-in failed" over a sign-in that worked, and the user would retry a
+    // session they already have.
+    mockSubmitPassword.mockResolvedValue({ kind: "complete" });
     const { resolveToken } = jest.requireMock("@/lib/auth-fetch") as {
       resolveToken: jest.Mock;
     };
     resolveToken.mockRejectedValueOnce(new Error("keychain unavailable"));
 
-    // Waiting on finalize() alone is not enough: the diagnostic starts AFTER a
-    // zero-delay timer, so the assertion could run before a leaked rejection had
-    // a chance to call setError() — passing for the wrong reason. Wait for the
-    // diagnostic's own log, which only the isolated path emits.
+    // Waiting on submitPassword alone is not enough: the diagnostic starts
+    // AFTER a zero-delay timer, so the assertion could run before a leaked
+    // rejection had a chance to call setError() — passing for the wrong
+    // reason. Wait for the diagnostic's own log, which only the isolated path
+    // emits.
     const debugSpy = jest.spyOn(console, "debug").mockImplementation(() => {});
     try {
       await renderForm();
       await fireEvent.press(screen.getByTestId("signin-submit"));
 
-      await waitFor(() => expect(mockFinalize).toHaveBeenCalled());
+      await waitFor(() => expect(mockSubmitPassword).toHaveBeenCalled());
       await waitFor(() =>
         expect(debugSpy).toHaveBeenCalledWith("[SignIn] azp diagnostic failed", expect.any(Error)),
       );
@@ -136,8 +121,7 @@ describe("SignInScreen diagnostics", () => {
 
 describe("SignInScreen submit contract (W-AUTH pin)", () => {
   it("renders the credential form and a successful submit shows no error", async () => {
-    passwordSucceeds();
-    mockFinalize.mockResolvedValue({ error: null });
+    mockSubmitPassword.mockResolvedValue({ kind: "complete" });
     await renderForm();
 
     // The minimal form surface: email + password fields and the submit control.
@@ -151,29 +135,19 @@ describe("SignInScreen submit contract (W-AUTH pin)", () => {
     );
     await fireEvent.press(screen.getByTestId("signin-submit"));
 
-    await waitFor(() => expect(mockFinalize).toHaveBeenCalled());
     // Identifier is trimmed before dispatch; the password is passed verbatim.
-    expect(mockPassword).toHaveBeenCalledWith({
-      emailAddress: "vet@example.com",
-      password: "hunter2!",
-    });
+    await waitFor(() =>
+      expect(mockSubmitPassword).toHaveBeenCalledWith("vet@example.com", "hunter2!"),
+    );
     expect(screen.queryByText(i18next.t("signIn.error"))).toBeNull();
   });
 
-  it("surfaces the incomplete status copy when the flow needs another factor", async () => {
-    mockPassword.mockImplementation(async () => {
-      mockSignIn.status = "needs_second_factor";
-      return { error: null };
-    });
+  it("does not dispatch while the flow port is not ready", async () => {
+    mockFlow.ready = false;
     await renderForm();
 
     await fireEvent.press(screen.getByTestId("signin-submit"));
 
-    await waitFor(() => {
-      expect(
-        screen.getByText(i18next.t("signIn.incomplete", { status: "needs_second_factor" })),
-      ).toBeTruthy();
-    });
-    expect(mockFinalize).not.toHaveBeenCalled();
+    expect(mockSubmitPassword).not.toHaveBeenCalled();
   });
 });
