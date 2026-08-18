@@ -21,6 +21,20 @@
         "resourceClass": "m-medium"
       }
     },
+    "measure": {
+      "environment": "production",
+      "distribution": "internal",
+      "autoIncrement": false,
+      "env": {
+        "EXPO_PUBLIC_ENABLE_MEASURE": "true"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "env": {
         "EXPO_PUBLIC_ENABLE_MEASURE": "false"

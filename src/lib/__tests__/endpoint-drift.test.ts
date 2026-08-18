@@ -14,7 +14,12 @@
  *     `server/` is NOT vendored; `.vendor/vettrack/` has no server directory.
  *   - `.gitignore:55` → `.vendor/` is gitignored (`git ls-files .vendor` = 0 files),
  *     so the snapshot is regenerated from the network at preinstall.
- *   - The pin (`VETTRACK_SHA = dc10c799…`) is 112 commits behind vettrack `main`.
+ *   - The pin (`VETTRACK_SHA = 8d379fac…`) was bumped 2026-08-18 from dc10c799 (131
+ *     commits behind) to vettrack `main` @ that date. Note what that bump did NOT
+ *     change: `packages/contracts/src/emergency.ts` is byte-identical at both shas
+ *     (`git diff dc10c799..8d379fac -- packages/contracts/src/emergency.ts` is empty),
+ *     so TIER 1's allowlist — and this suite's result — was the same before and after.
+ *     A stale pin is only visible here when `emergency.ts` itself moves.
  *
  * So the FULL route table is not reachable — but a real, server-owned SUBSET is:
  * `EMERGENCY_SERVER_ROUTE_ALLOWLIST` from `@vettrack/contracts` (vendored, and it
@@ -55,7 +60,9 @@ const VENDOR_SCRIPT_PATH = path.join(REPO_ROOT, "scripts", "vendor-vettrack.mjs"
  *         Lower-friction alternative: emit it into `packages/contracts/src/`
  *         (already inside SPARSE_PATHS) and export it, so a `VETTRACK_SHA` bump
  *         in `scripts/vendor-vettrack.mjs` delivers it with no new RN file.
- *   ALSO: bump VETTRACK_SHA — the current pin predates 112 commits of route changes.
+ *   ALSO: the pin must equal the revision the manifest was generated from. As of the
+ *         2026-08-18 bump the pin IS vettrack `main`, so a manifest generated now
+ *         matches without a further bump — that window closes as `main` moves on.
  */
 const SERVER_ROUTE_MANIFEST_PATH = path.join(LIB_DIR, "__generated__", "server-routes.manifest.json");
 
@@ -66,11 +73,13 @@ type ServerRouteManifest = { vettrackSha: string; routes: string[] };
  * declaration of it: `VETTRACK_SHA` in `scripts/vendor-vettrack.mjs`.
  *
  * Deliberately NOT read from `.vendor/vettrack/.vettrack-pin`: `.vendor/` is
- * gitignored and, verified on disk, `node_modules/@vettrack/contracts` is a
- * COPY rather than a symlink into it — so the pin file describes the vendor
- * tree, not necessarily the installed package. The script constant is the
+ * gitignored, so it does not exist in a clean checkout and cannot be read before
+ * `preinstall` has run — whereas this suite must be able to name the pin from
+ * source alone. (Under npm 11 the installed package is in fact a symlink into
+ * `.vendor/`; verified on disk 2026-08-18. Under pnpm it is a copy. Neither is
+ * load-bearing here — the point is that the script constant is the
  * declaration a manifest generator would be pointed at, and it is always
- * readable from a clean checkout.
+ * readable from a clean checkout.)
  *
  * Throws rather than returning a placeholder: a sentinel like `""`/`"unknown"`
  * would compare equal to a matching sentinel in a manifest and wave it through.
@@ -387,8 +396,8 @@ describe("endpoint-drift: emergency surface (real server truth via @vettrack/con
  * itself the moment SERVER_ROUTE_MANIFEST_PATH lands (see the constant above for
  * exactly what must be generated, by whom, and where).
  *
- * Presence is NOT sufficient to arm it honestly. A manifest checked in today would
- * describe vettrack @ its own revision while this repo is pinned ~112 commits back,
+ * Presence is NOT sufficient to arm it honestly. A manifest describes vettrack @ the
+ * revision it was generated from, which drifts from this repo's pin as `main` moves,
  * so `readServerRouteManifest()` refuses any manifest whose `vettrackSha` does not
  * match the pin — a green assertion over routes from the wrong server revision would
  * claim coverage this suite does not have.
