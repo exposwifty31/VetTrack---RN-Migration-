@@ -89,6 +89,19 @@ describe("eas.json measurement-build contract", () => {
     expect(nonStore.map(([name]) => name)).not.toEqual([]);
   });
 
+  it("pins the `measure` profile itself, not merely 'some non-store profile'", () => {
+    // The assertions above are satisfied by ANY non-store profile with an
+    // environment, so a later change could rename, gut or delete `measure`
+    // while they all stay green. The artifact this workstream exists to make
+    // producible is this profile, so this names it and its required values.
+    expect(easJson.build.measure).toMatchObject({
+      environment: "production",
+      distribution: "internal",
+      env: { EXPO_PUBLIC_ENABLE_MEASURE: "true" },
+      android: { buildType: "apk" },
+    });
+  });
+
   it("every measurement profile names its EAS environment explicitly", () => {
     // Without this the profile's shape infers `preview`, which holds zero
     // variables — no Clerk key, so the binary throws in ClerkProvider on mount.

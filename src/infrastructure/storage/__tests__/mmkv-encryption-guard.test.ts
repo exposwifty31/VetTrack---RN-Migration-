@@ -206,13 +206,37 @@ function resolveBindings(sourceFile: ts.SourceFile): {
   return { direct, namespaces };
 }
 
-/** True when the object literal assigns `encryptionKey`, written in any syntactic form. */
+/**
+ * True when the object literal assigns `encryptionKey` — or when the literal is
+ * not statically readable at all.
+ *
+ * The second half is the load-bearing one. A property this walk cannot read is
+ * not evidence of absence: `createMMKV({ id: "vt.local", ...{ encryptionKey } })`
+ * carries the key in a spread, `{ [k]: v }` hides it behind a computed
+ * expression, and a getter hides it behind a call. Returning `false` for those
+ * would let the guard clear a configuration it never actually inspected —
+ * exactly the in-place keying it exists to block.
+ *
+ * So: unreadable is treated as ASSIGNED. The error direction is a false
+ * positive, which is a loud failure someone resolves by writing the property
+ * plainly; the other direction ships an unreadable store on device.
+ */
 function assignsEncryptionKey(config: ts.ObjectLiteralExpression): boolean {
   return config.properties.some((property) => {
+    // Opaque forms — a spread, a getter/setter, or a method — could carry the
+    // key and cannot be read from here.
+    if (
+      ts.isSpreadAssignment(property) ||
+      ts.isGetAccessorDeclaration(property) ||
+      ts.isSetAccessorDeclaration(property) ||
+      ts.isMethodDeclaration(property)
+    ) {
+      return true;
+    }
     if (ts.isShorthandPropertyAssignment(property)) {
       return property.name.text === "encryptionKey";
     }
-    if (!ts.isPropertyAssignment(property)) return false;
+    if (!ts.isPropertyAssignment(property)) return true;
     const name = property.name;
     if (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) {
       return name.text === "encryptionKey";
@@ -221,7 +245,8 @@ function assignsEncryptionKey(config: ts.ObjectLiteralExpression): boolean {
     if (ts.isComputedPropertyName(name) && ts.isStringLiteralLike(name.expression)) {
       return name.expression.text === "encryptionKey";
     }
-    return false;
+    // A computed name that is not a literal is unreadable, not absent.
+    return true;
   });
 }
 
