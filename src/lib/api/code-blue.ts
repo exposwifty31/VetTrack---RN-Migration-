@@ -113,6 +113,17 @@ export const codeBlueApi = {
    * it is the only path that accepts an `equipmentId` to link at start, which
    * one-tap has no field for (one-tap links its own reserved cart instead).
    * NOT used by the start button — see `useCodeBlueMutations`. Online-only.
+   *
+   * IT THEREFORE HAS ZERO PRODUCTION CALLERS TODAY, and that is the exact
+   * shape this migration keeps tripping over: a capability built, then left
+   * unplugged (A3, B2, B4, C1, F1 in the remediation plan all turned out to be
+   * this). Retaining it is a judgement call, not an oversight — but a retained
+   * function with no named destination is how the pile grows.
+   *
+   * DESTINATION: the equipment-initiated start (scan a crash cart -> start a
+   * Code Blue already linked to it), which the Capacitor app has at
+   * `equipment-detail` and RN does not. If that slice is dropped or absorbed
+   * into one-tap, DELETE this — git remembers it.
    */
   start: (payload: StartCodeBlueRequest): Promise<StartCodeBlueResponse> =>
     requestJson<StartCodeBlueResponse>("/api/code-blue/sessions", {
