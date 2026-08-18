@@ -580,3 +580,64 @@ describe("CodeBlueActions — the picker states the end-of-session consequence",
     expect(screen.getByText("codeBlue.errors.managerNoLongerEligible")).toBeTruthy();
   });
 });
+
+/**
+ * Requirement 5, proven at the surface it is about: the mapped key has to
+ * reach a rendered banner, not just be returned by the mapper.
+ *
+ * `notClinical` is reachable from TWO mutations, not one:
+ * `requireClinicalAuthority` guards both POST /sessions and
+ * POST /sessions/:id/logs (server/routes/code-blue.ts:288, 797), while end and
+ * presence are `requireAuth`-only (:897, :966) and cannot emit it. That is why
+ * its copy names the actor's missing authority rather than "starting" — on the
+ * log path a start-specific message would be the wrong action.
+ */
+describe("CodeBlueActions — start-path coded errors reach the banner", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockMutations({});
+  });
+
+  it("renders the retry-specific copy for CODE_BLUE_START_CONFLICT, not the 'one already exists' copy", async () => {
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: NO_ACTIVE });
+    mockMutations({
+      start: {
+        isError: true,
+        error: new ApiCodedError(409, "CODE_BLUE_START_CONFLICT", "OWNER_IN_FLIGHT"),
+      },
+    });
+
+    await render(<CodeBlueActions />);
+    expect(screen.getByText("codeBlue.errors.startConflict")).toBeTruthy();
+    expect(screen.queryByText("codeBlue.errors.conflict")).toBeNull();
+  });
+
+  it("renders the clinical-authority copy when gate 1 denies with code INSUFFICIENT_ROLE + reason INSUFFICIENT_CLINICAL_AUTHORITY", async () => {
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: NO_ACTIVE });
+    mockMutations({
+      start: {
+        isError: true,
+        error: new ApiCodedError(403, "INSUFFICIENT_ROLE", "INSUFFICIENT_CLINICAL_AUTHORITY"),
+      },
+    });
+
+    await render(<CodeBlueActions />);
+    expect(screen.getByText("codeBlue.errors.notClinical")).toBeTruthy();
+  });
+
+  it("surfaces the SAME clinical-authority key from the log-entry path, which is gated by the same middleware", async () => {
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: ACTIVE });
+    mockMutations({
+      addLogEntry: {
+        isError: true,
+        error: new ApiCodedError(403, "INSUFFICIENT_ROLE", "INSUFFICIENT_CLINICAL_AUTHORITY"),
+      },
+    });
+
+    await render(<CodeBlueActions />);
+    expect(screen.getByText("codeBlue.errors.notClinical")).toBeTruthy();
+  });
+});

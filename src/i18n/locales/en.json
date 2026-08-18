@@ -230,7 +230,7 @@
       "offline": "No connection — this action needs the internet and was not saved. Try again once you're back online.",
       "conflict": "An active Code Blue already exists.",
       "startConflict": "Another Code Blue start is already in progress. Wait a moment and try again.",
-      "notClinical": "Your current shift role can't start a Code Blue. Ask a vet, senior technician or technician on shift to start it.",
+      "notClinical": "Your current shift role doesn't carry clinical authority for Code Blue. A vet, senior technician or technician on shift has to do this.",
       "managerOnly": "Only the manager named when this Code Blue started can end it. Hand the device to them.",
       "managerNoLongerEligible": "The manager named at the start can no longer end this session. An admin has to close it.",
       "notFound": "This session could not be found.",
