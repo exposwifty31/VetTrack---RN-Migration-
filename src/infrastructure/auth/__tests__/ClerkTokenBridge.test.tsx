@@ -18,7 +18,7 @@ const mockAuth = {
   signOut: jest.fn(async () => {}),
 };
 
-jest.mock("@clerk/clerk-expo", () => ({
+jest.mock("@clerk/expo", () => ({
   useAuth: () => mockAuth,
 }));
 

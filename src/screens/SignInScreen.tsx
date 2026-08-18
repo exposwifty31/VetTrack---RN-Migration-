@@ -1,4 +1,4 @@
-import { useAuth, useSignIn } from "@clerk/clerk-expo";
+import { useAuth, useSignIn } from "@clerk/expo";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
@@ -40,7 +40,7 @@ export function SignInScreen(props: RootStackScreenProps<"SignIn">) {
  * server-authorization internals stay in the developer console.
  *
  * Extracted from `onSubmit`, and it swallows its own errors on purpose: this
- * runs AFTER setActive() has established the session, so a rejecting
+ * runs AFTER signIn.finalize() has established the session, so a rejecting
  * resolveToken() propagating out would paint "sign-in failed" over a sign-in
  * that worked. A diagnostic must never change the verdict on the thing it is
  * diagnosing.
@@ -60,7 +60,10 @@ async function logAzpDiagnostic(): Promise<void> {
 
 export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
   const { t } = useTranslation();
-  const { isLoaded, signIn, setActive } = useSignIn();
+  // @clerk/expo v4 method-based custom flow: `signIn` is the mutable
+  // SignInFuture resource (null until the SDK client loads) — the legacy
+  // `isLoaded`/`setActive` destructure no longer exists on this hook.
+  const { signIn } = useSignIn();
   const { isSignedIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -83,16 +86,33 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
   }
 
   const onSubmit = async () => {
-    if (!isLoaded || !signIn) return;
+    if (!signIn) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await signIn.create({ identifier: email.trim(), password });
-      if (result.status === "complete" && result.createdSessionId) {
-        await setActive({ session: result.createdSessionId });
+      // v4 flows report failures as a returned `{ error }`, not a rejection —
+      // both paths surface the same generic localized copy (never raw provider
+      // messages, which can carry authorization internals).
+      const { error: passwordError } = await signIn.password({
+        emailAddress: email.trim(),
+        password,
+      });
+      if (passwordError) {
+        if (__DEV__) console.debug("[SignIn] sign-in failed", passwordError);
+        setError(t("signIn.error"));
+        return;
+      }
+      if (signIn.status === "complete") {
+        // finalize() activates the created session (replaces legacy setActive).
+        const { error: finalizeError } = await signIn.finalize();
+        if (finalizeError) {
+          if (__DEV__) console.debug("[SignIn] sign-in failed", finalizeError);
+          setError(t("signIn.error"));
+          return;
+        }
         if (__DEV__) await logAzpDiagnostic();
       } else {
-        setError(t("signIn.incomplete", { status: result.status }));
+        setError(t("signIn.incomplete", { status: signIn.status }));
       }
     } catch (err) {
       if (__DEV__) console.debug("[SignIn] sign-in failed", err);
@@ -130,7 +150,7 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
         testID="signin-submit"
         className="items-center rounded-xl bg-primary py-3.5 active:opacity-80"
         accessibilityRole="button"
-        disabled={busy || !isLoaded}
+        disabled={busy || !signIn}
         onPress={() => {
           void onSubmit();
         }}

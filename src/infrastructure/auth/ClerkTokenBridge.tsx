@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth } from "@clerk/expo";
 import { useEffect } from "react";
 
 import { setClerkTokenGetter } from "@/lib/auth-fetch";
