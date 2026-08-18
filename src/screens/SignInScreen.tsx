@@ -58,6 +58,35 @@ async function logAzpDiagnostic(): Promise<void> {
   }
 }
 
+/** The non-null SignInFuture resource from the v4 hook. */
+type SignInResource = NonNullable<ReturnType<typeof useSignIn>["signIn"]>;
+
+type PasswordFlowOutcome =
+  | { kind: "complete" }
+  | { kind: "incomplete"; status: string }
+  | { kind: "failed"; cause: unknown };
+
+/**
+ * The v4 method-based password flow as one pure sequence (extracted for S3776
+ * cognitive-complexity — the component maps outcomes to state/copy). v4 flows
+ * report failures as a returned `{ error }`, not a rejection — both paths end
+ * in the same generic localized copy (never raw provider messages, which can
+ * carry authorization internals). finalize() activates the created session
+ * (replaces legacy setActive).
+ */
+async function runPasswordFlow(
+  signIn: SignInResource,
+  emailAddress: string,
+  password: string,
+): Promise<PasswordFlowOutcome> {
+  const { error: passwordError } = await signIn.password({ emailAddress, password });
+  if (passwordError) return { kind: "failed", cause: passwordError };
+  if (signIn.status !== "complete") return { kind: "incomplete", status: signIn.status };
+  const { error: finalizeError } = await signIn.finalize();
+  if (finalizeError) return { kind: "failed", cause: finalizeError };
+  return { kind: "complete" };
+}
+
 export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) {
   const { t } = useTranslation();
   // @clerk/expo v4 method-based custom flow: `signIn` is the mutable
@@ -90,29 +119,14 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
     setBusy(true);
     setError(null);
     try {
-      // v4 flows report failures as a returned `{ error }`, not a rejection —
-      // both paths surface the same generic localized copy (never raw provider
-      // messages, which can carry authorization internals).
-      const { error: passwordError } = await signIn.password({
-        emailAddress: email.trim(),
-        password,
-      });
-      if (passwordError) {
-        if (__DEV__) console.debug("[SignIn] sign-in failed", passwordError);
-        setError(t("signIn.error"));
-        return;
-      }
-      if (signIn.status === "complete") {
-        // finalize() activates the created session (replaces legacy setActive).
-        const { error: finalizeError } = await signIn.finalize();
-        if (finalizeError) {
-          if (__DEV__) console.debug("[SignIn] sign-in failed", finalizeError);
-          setError(t("signIn.error"));
-          return;
-        }
+      const outcome = await runPasswordFlow(signIn, email.trim(), password);
+      if (outcome.kind === "complete") {
         if (__DEV__) await logAzpDiagnostic();
+      } else if (outcome.kind === "incomplete") {
+        setError(t("signIn.incomplete", { status: outcome.status }));
       } else {
-        setError(t("signIn.incomplete", { status: signIn.status }));
+        if (__DEV__) console.debug("[SignIn] sign-in failed", outcome.cause);
+        setError(t("signIn.error"));
       }
     } catch (err) {
       if (__DEV__) console.debug("[SignIn] sign-in failed", err);
