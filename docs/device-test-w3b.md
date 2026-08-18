@@ -504,7 +504,8 @@ Result: ☐ pass ☐ fail — tag programmed and set aside: ☐
 > "safe" tag to practise on.
 >
 > **Use only the tags you labelled `SACRIFICIAL` in step 0.2. Never a tag
-> destined for real equipment. Never the tags from Stage 2.**
+> destined for real equipment. Never the `S2-iOS` / `S2-AND` tags used in steps
+> 2.1–2.6 — only the `SACRIFICIAL` tag you programmed in 2.7.**
 >
 > If you are interrupted mid-stage, treat every tag on the bench as suspect.
 
