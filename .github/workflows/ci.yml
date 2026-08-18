@@ -62,6 +62,16 @@ jobs:
       - name: Test
         run: npm test
 
+      # Release-config gate, OFFLINE half: every build-time env name the source
+      # reads (including the non-EXPO_PUBLIC_ ones app.config.js reads) must have
+      # a declared disposition, and the version fields must be well-formed.
+      # Needs no credentials and no network, so it runs on fork PRs too.
+      # The EAS-backed half asserts against live remote state a PR cannot change
+      # and needs a secret fork PRs never receive — it lives in
+      # .github/workflows/release-preflight.yml (workflow_dispatch).
+      - name: Release config (offline half)
+        run: npm run release:preflight:offline
+
       # Bundle gate: proves the production Metro bundle resolves end-to-end
       # (regression guard for the clerk-expo -> clerk-react -> react-dom peer).
       # Call the local binary directly, never `npx` (githubactions:S6505/S8543).
