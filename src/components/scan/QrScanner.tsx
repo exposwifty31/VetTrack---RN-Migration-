@@ -41,27 +41,33 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
   const appActive = useAppActive();
   // Focus AND foreground — see the `active` prop doc above.
   const cameraActive = active && appActive;
+  // Camera preview failed to start (onMountError) — fail LOUD with a localized
+  // state instead of a silent black frame, same doctrine as permission-denied.
+  const [mountFailed, setMountFailed] = useState(false);
+  // The SESSION gate, not just the activity gate: `mountFailed` must be part of
+  // the derived value, or the layout effect re-running on a background→
+  // foreground transition sets the ref back to true for a camera that never
+  // worked. (The imperative clear in onMountError still exists — it closes the
+  // synchronous window between the native callback and this re-render.)
+  const cameraSessionActive = cameraActive && !mountFailed;
   // The native module holds the closure from the render it was mounted in, so
-  // a queued barcode event can fire with a STALE `cameraActive` captured as
-  // true after the gate has flipped. The ref always carries the latest value;
-  // the handler reads it instead of the captured one.
-  const cameraActiveRef = useRef(cameraActive);
+  // a queued barcode event can fire with a STALE gate captured as true after
+  // the flip. The ref always carries the latest value; the handler reads it
+  // instead of the captured one.
+  const cameraActiveRef = useRef(cameraSessionActive);
   // Layout effect, not passive: a queued native event can run after the
   // inactive commit but BEFORE a passive effect flushes, and would read the
   // ref's previous `true` in exactly the window the ref exists to close.
   useLayoutEffect(() => {
-    cameraActiveRef.current = cameraActive;
+    cameraActiveRef.current = cameraSessionActive;
     return () => {
       // On unmount nothing should fire regardless of what the gate last said.
       cameraActiveRef.current = false;
     };
-  }, [cameraActive]);
+  }, [cameraSessionActive]);
   // onBarcodeScanned fires continuously; debounce to one hand-off per ~2s so a
   // single code can't push ScanConfirm repeatedly (re-arms after returning).
   const lastFireRef = useRef(0);
-  // Camera preview failed to start (onMountError) — fail LOUD with a localized
-  // state instead of a silent black frame, same doctrine as permission-denied.
-  const [mountFailed, setMountFailed] = useState(false);
   // Torch is a declarative expo-camera prop (Camera.types.d.ts:392, no @platform
   // tag — iOS CameraSessionManager.swift:180, Android ExpoCameraView.kt:351).
   // The choice is deliberately KEPT across the background→foreground remount:
@@ -113,7 +119,7 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
 
   return (
     <View className="flex-1">
-      {cameraActive ? (
+      {cameraSessionActive ? (
         <CameraView
           style={{ flex: 1 }}
           facing="back"
@@ -153,7 +159,7 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
           session is actually held; expo-camera 57 exposes no torch-capability
           query, so a torchless device silently no-ops in native (guarded by
           `device.hasTorch`, CameraSessionManager.swift:181). */}
-      {cameraActive ? (
+      {cameraSessionActive ? (
         <View className="absolute bottom-8 self-center">
           <Pressable
             testID="torch-toggle"

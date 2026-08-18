@@ -227,4 +227,25 @@ describe("stale-closure gate (review: a queued event fired after the flip)", () 
     staleHandler({ data: "vt-equipment:123" });
     expect(onScanned).not.toHaveBeenCalled();
   });
+
+  it("stays closed after mount failure even across a background→foreground cycle", async () => {
+    // The imperative clear in onMountError is not enough on its own: the layout
+    // effect re-runs on any `cameraActive` change and, if `mountFailed` is not
+    // part of the derived gate, sets the ref back to true — reopening the door
+    // for a retained callback on a camera that never worked.
+    const onScanned = jest.fn();
+    await render(<QrScanner active onScanned={onScanned} hint="hint" />);
+
+    const staleHandler = cameraProps?.onBarcodeScanned as (r: { data: string }) => void;
+    const mountError = cameraProps?.onMountError as () => void;
+    await act(async () => {
+      mountError();
+    });
+
+    await emitAppState("background");
+    await emitAppState("active"); // the effect re-runs here
+
+    staleHandler({ data: "vt-equipment:123" });
+    expect(onScanned).not.toHaveBeenCalled();
+  });
 });
