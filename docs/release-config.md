@@ -66,6 +66,12 @@ The preflight prints it on every run. To fix, upload the same file to the
 `preview` and `development` environments and move those two names out of
 `knownGapEnvironments` into `environments`.
 
+Do both halves in the same change. `unregisteredInStore` counts names the store
+holds that are not *required* for that environment, and a gap entry is not
+required — so uploading the file without moving the registry entry makes
+`preview` report `unregisteredInStore=1` while still printing the gap. That is
+remediation working, not drift, but it reads like noise.
+
 ---
 
 ## (B) Build-number collision

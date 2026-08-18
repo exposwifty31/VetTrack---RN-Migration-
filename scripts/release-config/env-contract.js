@@ -157,7 +157,17 @@ function requiredNamesFor(environment) {
     .sort();
 }
 
-/** Known, understood absences for `environment` — reported, never fatal. */
+/**
+ * Known, understood absences for `environment` — reported, never fatal.
+ *
+ * NOTE ON THE COUNT THE PREFLIGHT PRINTS. `unregisteredInStore` counts names the
+ * live store holds that are not REQUIRED for that environment, and a gap entry is
+ * by definition not required. So the moment someone actually fixes a gap — uploads
+ * GOOGLE_SERVICES_JSON to `preview`, say — that environment starts reporting
+ * `unregisteredInStore=1` while still listing the gap. That is remediation working,
+ * not drift. Move the name out of `knownGapEnvironments` into `environments` in the
+ * same change and both readings settle.
+ */
 function knownGapsFor(environment) {
   return Object.entries(EXPECTED_IN_EAS_ENVIRONMENT)
     .filter(([, entry]) => (entry.knownGapEnvironments ?? []).includes(environment))
