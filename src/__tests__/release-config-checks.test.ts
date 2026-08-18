@@ -464,18 +464,43 @@ describe("the preflight pins its eas-cli", () => {
  */
 describe("env-contract.d.ts declares the whole module", () => {
   it("declares every runtime export", () => {
+    // Parsed, not grepped. The first version of this guard built a RegExp from
+    // each export name and scanned the raw .d.ts, which meant three things:
+    // a comment or string saying "export const ROOT" satisfied it, an
+    // `export type X` satisfied a check about a RUNTIME export, and the name
+    // went into `new RegExp` unescaped. Written, ironically, in the same commit
+    // whose message complains about guards that confuse mentioning with doing.
+    //
+    // TypeScript is already a dependency of this package (env-contract.js parses
+    // source with it), so the declaration is read the same way the module reads
+    // everything else: as a syntax tree.
     const { readFileSync } = require("node:fs") as typeof import("node:fs");
     const { join } = require("node:path") as typeof import("node:path");
-    const runtimeExports = Object.keys(
-      contract as unknown as Record<string, unknown>,
-    ).sort((a, b) => a.localeCompare(b));
-    const declared = readFileSync(
-      join(__dirname, "..", "..", "scripts", "release-config", "env-contract.d.ts"),
-      "utf8",
+    const ts = require("typescript") as typeof import("typescript");
+
+    const dtsPath = join(__dirname, "..", "..", "scripts", "release-config", "env-contract.d.ts");
+    const sourceFile = ts.createSourceFile(
+      dtsPath,
+      readFileSync(dtsPath, "utf8"),
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS,
     );
-    const undeclared = runtimeExports.filter(
-      (name) => !new RegExp(`export (?:const|function|type) ${name}\\b`).test(declared),
-    );
-    expect(undeclared).toEqual([]);
+
+    /** Exported VALUE declarations only — `export type` is not a runtime export. */
+    const declaredValues = new Set<string>();
+    sourceFile.forEachChild((node) => {
+      const modifiers = ts.canHaveModifiers(node) ? (ts.getModifiers(node) ?? []) : [];
+      if (!modifiers.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) return;
+      if (ts.isFunctionDeclaration(node) && node.name) declaredValues.add(node.name.text);
+      if (ts.isVariableStatement(node)) {
+        for (const decl of node.declarationList.declarations) {
+          if (ts.isIdentifier(decl.name)) declaredValues.add(decl.name.text);
+        }
+      }
+    });
+
+    const runtimeExports = Object.keys(contract as unknown as Record<string, unknown>);
+    expect(runtimeExports.filter((name) => !declaredValues.has(name))).toEqual([]);
   });
 });
