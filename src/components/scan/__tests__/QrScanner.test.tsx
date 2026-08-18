@@ -142,13 +142,13 @@ describe("QrScanner torch", () => {
     await pressTorch();
     expect(cameraProps?.enableTorch).toBe(true);
     expect(screen.getByTestId("torch-toggle").props.accessibilityState).toMatchObject({
-      selected: true,
+      checked: true,
     });
 
     await pressTorch();
     expect(cameraProps?.enableTorch).toBe(false);
     expect(screen.getByTestId("torch-toggle").props.accessibilityState).toMatchObject({
-      selected: false,
+      checked: false,
     });
   });
 
@@ -207,6 +207,24 @@ describe("stale-closure gate (review: a queued event fired after the flip)", () 
     await emitAppState("background"); // the gate flips; the camera unmounts
 
     staleHandler({ data: "vt-equipment:123" }); // the queued event lands late
+    expect(onScanned).not.toHaveBeenCalled();
+  });
+
+  it("drops a queued barcode event after the camera fails to mount", async () => {
+    // `mountFailed` swaps the view but is NOT part of the activity gate —
+    // `active && appActive` are both still true, so without an explicit clear
+    // the ref stays `true` and a queued event fires for a camera that never
+    // actually worked.
+    const onScanned = jest.fn();
+    await render(<QrScanner active onScanned={onScanned} hint="hint" />);
+
+    const staleHandler = cameraProps?.onBarcodeScanned as (r: { data: string }) => void;
+    const mountError = cameraProps?.onMountError as () => void;
+    await act(async () => {
+      mountError();
+    });
+
+    staleHandler({ data: "vt-equipment:123" });
     expect(onScanned).not.toHaveBeenCalled();
   });
 });

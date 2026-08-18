@@ -51,6 +51,10 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
   // ref's previous `true` in exactly the window the ref exists to close.
   useLayoutEffect(() => {
     cameraActiveRef.current = cameraActive;
+    return () => {
+      // On unmount nothing should fire regardless of what the gate last said.
+      cameraActiveRef.current = false;
+    };
   }, [cameraActive]);
   // onBarcodeScanned fires continuously; debounce to one hand-off per ~2s so a
   // single code can't push ScanConfirm repeatedly (re-arms after returning).
@@ -114,7 +118,13 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
           style={{ flex: 1 }}
           facing="back"
           enableTorch={torchOn}
-          onMountError={() => setMountFailed(true)}
+          onMountError={() => {
+            // `mountFailed` swaps the view but is not part of the activity
+            // gate — clear the ref too, or a queued event fires for a camera
+            // that never worked.
+            cameraActiveRef.current = false;
+            setMountFailed(true);
+          }}
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
           onBarcodeScanned={(result) => {
             // Read through the ref, not the captured value: the closure the
@@ -147,9 +157,9 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
         <View className="absolute bottom-8 self-center">
           <Pressable
             testID="torch-toggle"
-            accessibilityRole="button"
+            accessibilityRole="togglebutton"
             accessibilityLabel={t("scan.torch")}
-            accessibilityState={{ selected: torchOn }}
+            accessibilityState={{ checked: torchOn }}
             className={`min-h-[44px] min-w-[44px] items-center justify-center rounded-full px-5 py-3 active:opacity-80 ${
               torchOn ? "bg-white" : "bg-black/50"
             }`}
