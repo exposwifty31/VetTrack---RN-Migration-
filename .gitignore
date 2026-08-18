@@ -2,6 +2,9 @@
 
 # dependencies
 node_modules/
+# the slash-less form too: a SYMLINKED node_modules is a file to git, and
+# `node_modules/` (directory pattern) does not match it — git add -A takes it
+node_modules
 
 # Expo
 .expo/
