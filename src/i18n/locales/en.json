@@ -207,6 +207,7 @@
       "startNotEligible": "Only clinical staff can start a Code Blue.",
       "pickManager": "Choose the resuscitation manager",
       "pickManagerHint": "You can start a Code Blue, but a vet or admin must run it.",
+      "pickManagerConsequence": "Whoever you choose is the only person who can end this Code Blue.",
       "managersLoading": "Loading eligible managers…",
       "managersEmpty": "No vet or admin is available to manage right now.",
       "managersLoadError": "Couldn't load the list of eligible managers.",
@@ -228,8 +229,11 @@
     "errors": {
       "offline": "No connection — this action needs the internet and was not saved. Try again once you're back online.",
       "conflict": "An active Code Blue already exists.",
+      "startConflict": "Another Code Blue start is already in progress. Wait a moment and try again.",
+      "notClinical": "Your current shift role can't start a Code Blue. Ask a vet, senior technician or technician on shift to start it.",
+      "managerOnly": "Only the manager named when this Code Blue started can end it. Hand the device to them.",
+      "managerNoLongerEligible": "The manager named at the start can no longer end this session. An admin has to close it.",
       "notFound": "This session could not be found.",
-      "forbidden": "You're not allowed to do that for this session.",
       "generic": "That didn't go through. Please try again.",
       "managerNotEligible": "That manager isn't currently eligible to run a Code Blue. Pick someone else.",
       "invalidManager": "That manager is no longer available. Pick someone else."

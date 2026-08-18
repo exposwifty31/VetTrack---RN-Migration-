@@ -33,11 +33,14 @@
  * extraction itself.
  *
  * Scope decisions for this slice (documented for the Lead — see PR body):
- *   - Start is gated on the TWO unconditional server gates separately (see the
- *     block comment in `code-blue-actions-derive.ts`): a vet self-designates as
- *     manager in one tap; a senior_technician/technician may initiate but must
- *     NOMINATE a vet/admin from GET /api/users/managers. Anyone outside the
- *     server's initiator allow-list sees the explanation and no affordance.
+ *   - Start is gated on the TWO unconditional server gates SEPARATELY, because
+ *     they read different fields (see the block comment in
+ *     `code-blue-actions-derive.ts`): gate 1 on the shift-derived role, gate 2
+ *     on the permanent one. Clearing both — a vet, or an admin holding a
+ *     clinical shift — is a one-tap self-designation. Clearing only gate 1
+ *     (a senior_technician/technician) means NOMINATING a vet/admin from
+ *     GET /api/users/managers. Clearing neither shows the explanation and no
+ *     affordance.
  *   - The candidate list is ADVISORY, not authoritative — it filters on
  *     permanent role only, so a clinic running the manager evaluator in
  *     `enforce` mode can still 403. The picker therefore stays mounted under
@@ -206,6 +209,17 @@ function ManagerPicker({ start }: Readonly<{ start: Mutations["start"] }>) {
       <Text className="font-rubik text-[13px] text-text-tertiary">
         {t("codeBlue.actions.pickManagerHint")}
       </Text>
+      {/* Nomination is SILENT by owner decision — the person picked is never
+          told. They are also the ONLY identity the server will accept to end
+          the session (403 MANAGER_ONLY). With no notify step to carry that
+          later, the consequence has to be legible here, at the moment of
+          choosing. */}
+      <Text
+        testID="code-blue-manager-consequence"
+        className="font-rubik-semibold text-[13px] text-danger"
+      >
+        {t("codeBlue.actions.pickManagerConsequence")}
+      </Text>
       {managers.map((manager) => (
         <ActionButton
           key={manager.id}
@@ -239,7 +253,11 @@ function StartAffordance({
   start: Mutations["start"];
 }>) {
   const { t } = useTranslation();
-  if (canSelfManage) {
+  // BOTH gates, not gate 2 alone: `canSelfManage` is the permanent role
+  // (gate 2's `users.role`) and `canInitiate` is the shift-derived one
+  // (gate 1). A vet rostered onto an admin shift satisfies gate 2 and fails
+  // gate 1 — offering them the one-tap Start would be a guaranteed 403.
+  if (canInitiate && canSelfManage) {
     return (
       <ActionButton
         label={start.isPending ? t("codeBlue.actions.starting") : t("codeBlue.actions.start")}
@@ -450,12 +468,15 @@ export function CodeBlueActions() {
   const response: ActiveCodeBlueResponse | undefined = sessionQuery.data;
   const session = response?.session ?? null;
   const currentUserId = identity.data?.id ?? null;
-  // PERMANENT role, deliberately NOT `effectiveRole` (which most other surfaces
-  // in this app read): server gate 2 is `inArray(users.role, …)`, and gate 1's
-  // break-glass (`allowPermanentClinicalRoleForEmergency`) admits a clinical
-  // identity with no active shift. Reading `effectiveRole` here would
-  // under-offer Start to exactly the off-shift responder break-glass exists for.
-  const currentRole = identity.data?.role ?? null;
+  // The two gates read DIFFERENT fields, so both are threaded (see the block
+  // comment in `code-blue-actions-derive.ts`):
+  //   gate 1 (initiate) — the SHIFT-derived role, falling back to permanent
+  //     when no shift resolved. `vt_shift_role` has no "vet" member, so an
+  //     on-shift vet's effective role is a technician grade; and an admin on a
+  //     clinical shift genuinely gains clinical authority server-side.
+  //   gate 2 (self-manage) — `users.role`, the permanent one, unconditionally.
+  const permanentRole = identity.data?.role ?? null;
+  const effectiveRole = identity.data?.effectiveRole ?? null;
 
   if (!session) {
     // The server's startSessionSchema requires managerUserName.min(1) — never
@@ -464,8 +485,8 @@ export function CodeBlueActions() {
     const managerUserName = (identity.data?.displayName ?? identity.data?.name ?? "").trim();
     return (
       <NoSessionActions
-        canSelfManage={canSelfManageCodeBlue(currentRole)}
-        canInitiate={canInitiateCodeBlue(currentRole)}
+        canSelfManage={canSelfManageCodeBlue(permanentRole)}
+        canInitiate={canInitiateCodeBlue(effectiveRole, permanentRole)}
         managerUserName={managerUserName}
         currentUserId={currentUserId}
         start={mutations.start}

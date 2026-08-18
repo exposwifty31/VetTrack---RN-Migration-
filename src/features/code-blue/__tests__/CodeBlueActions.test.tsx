@@ -482,3 +482,101 @@ describe("CodeBlueActions", () => {
     });
   });
 });
+
+/**
+ * Requirement 3 + 4 — the action bar must gate on the SHIFT-derived role
+ * (`effectiveRole`, falling back to `role`) for gate 1, while gate 2 stays on
+ * the PERMANENT role, because the server checks `inArray(users.role, …)` there.
+ * Reading one field for both is wrong in both directions, and each direction
+ * has a bedside cost.
+ */
+describe("CodeBlueActions — effectiveRole vs permanent role (the two gates read different fields)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockMutations({});
+  });
+
+  it("an ADMIN rostered onto a technician shift can start — gate 1 passes on the shift role, gate 2 on permanent admin, so it is a one-tap self-designation", async () => {
+    mockIdentity({
+      id: "user-9",
+      role: "admin",
+      effectiveRole: "technician",
+      name: "Ops Admin",
+      displayName: null,
+    });
+    mockSessionQuery({ data: NO_ACTIVE });
+    const startMutate = jest.fn();
+    mockMutations({ start: { mutate: startMutate } });
+
+    await render(<CodeBlueActions />);
+    expect(screen.queryByText("codeBlue.actions.startNotEligible")).toBeNull();
+
+    fireEvent.press(screen.getByText("codeBlue.actions.start"));
+    expect(startMutate).toHaveBeenCalledWith({
+      managerUserId: "user-9",
+      managerUserName: "Ops Admin",
+    });
+  });
+
+  it("a VET rostered onto an ADMIN shift gets NO start affordance — the server denies gate 1, so the one-tap must be gated on BOTH gates, not on gate 2 alone", async () => {
+    mockIdentity({
+      id: "user-8",
+      role: "vet",
+      effectiveRole: "admin",
+      name: "Dr. Cohen",
+      displayName: null,
+    });
+    mockSessionQuery({ data: NO_ACTIVE });
+
+    await render(<CodeBlueActions />);
+    expect(screen.queryByText("codeBlue.actions.start")).toBeNull();
+    expect(screen.queryByText("codeBlue.actions.pickManager")).toBeNull();
+    expect(screen.getByText("codeBlue.actions.startNotEligible")).toBeTruthy();
+  });
+});
+
+/**
+ * Requirement 4 — nomination is SILENT by owner decision, and the nominated
+ * manager is the ONLY identity the server will let end the session
+ * (server/routes/code-blue.ts:993 `MANAGER_ONLY`). The person choosing is
+ * usually NOT that identity, so the consequence has to be on screen at the
+ * moment of choosing; there is no notify step that would carry it later.
+ */
+describe("CodeBlueActions — the picker states the end-of-session consequence", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockMutations({});
+  });
+
+  it("tells the initiator that whoever they pick is the only person who can end the session", async () => {
+    mockIdentity({ id: "user-2", role: "technician", name: "Tech Levi" });
+    mockManagersQuery({ data: [{ id: "u-vet", name: "Dr. Cohen", role: "vet" }] });
+    mockSessionQuery({ data: NO_ACTIVE });
+
+    await render(<CodeBlueActions />);
+    expect(screen.getByText("codeBlue.actions.pickManagerConsequence")).toBeTruthy();
+  });
+
+  /**
+   * `ACTIVE.managerUserId` is "user-1", so identity MUST be user-1 for the End
+   * controls to mount at all — a non-manager never renders them, which would
+   * make this assertion pass vacuously.
+   */
+  it("names WHO must close the session on a 403 MANAGER_ONLY, rather than a generic refusal", async () => {
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: ACTIVE });
+    mockMutations({ end: { isError: true, error: new ApiCodedError(403, "MANAGER_ONLY") } });
+
+    await render(<CodeBlueActions />);
+    expect(screen.getByText("codeBlue.errors.managerOnly")).toBeTruthy();
+  });
+
+  it("routes NO_VET_MANAGER to the escalation copy — 'retry' would loop the user mid-arrest", async () => {
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: ACTIVE });
+    mockMutations({ end: { isError: true, error: new ApiCodedError(422, "NO_VET_MANAGER") } });
+
+    await render(<CodeBlueActions />);
+    expect(screen.getByText("codeBlue.errors.managerNoLongerEligible")).toBeTruthy();
+  });
+});
