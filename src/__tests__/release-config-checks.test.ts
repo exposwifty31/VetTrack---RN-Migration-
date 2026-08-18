@@ -448,6 +448,34 @@ describe("the preflight pins its eas-cli", () => {
     const pkg = JSON.parse(
       readFileSync(join(__dirname, "..", "..", "package.json"), "utf8"),
     ) as { devDependencies: Record<string, string> };
-    expect(pkg.devDependencies["eas-cli"]).toMatch(/^\d+\.\d+\.\d+$/); // exact, no ^ or ~
+    // The EXACT version, not any exact version. "23.0.0" is still a pin, and it
+    // would still pass a /^\d+\.\d+\.\d+$/ check — while silently breaking the
+    // contract with the verification stamp recorded in env-contract.js.
+    expect(pkg.devDependencies["eas-cli"]).toBe("22.0.0");
+  });
+});
+
+/**
+ * The shared declaration only earns its keep if it is COMPLETE. A member the
+ * module exports but the .d.ts omits is invisible to `typeof EnvContract`, so a
+ * consumer either cannot see it or reaches for a second hand-written cast — the
+ * exact duplication the file was created to remove. Two were missing on the
+ * first pass (ROOT, declaredInEasJson).
+ */
+describe("env-contract.d.ts declares the whole module", () => {
+  it("declares every runtime export", () => {
+    const { readFileSync } = require("node:fs") as typeof import("node:fs");
+    const { join } = require("node:path") as typeof import("node:path");
+    const runtimeExports = Object.keys(
+      contract as unknown as Record<string, unknown>,
+    ).sort((a, b) => a.localeCompare(b));
+    const declared = readFileSync(
+      join(__dirname, "..", "..", "scripts", "release-config", "env-contract.d.ts"),
+      "utf8",
+    );
+    const undeclared = runtimeExports.filter(
+      (name) => !new RegExp(`export (?:const|function|type) ${name}\\b`).test(declared),
+    );
+    expect(undeclared).toEqual([]);
   });
 });

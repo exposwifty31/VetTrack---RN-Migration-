@@ -23,6 +23,8 @@ export type ExpectedEnvEntry = {
   gap?: string;
 };
 
+/** Repo root, resolved from this module's own location. */
+export const ROOT: string;
 export const EAS_ENVIRONMENTS: string[];
 export const EXPECTED_IN_EAS_ENVIRONMENT: Record<string, ExpectedEnvEntry>;
 export const INTENTIONALLY_UNSET: Record<string, string>;
@@ -36,3 +38,6 @@ export function expoPublicIntentionallyUnset(): Record<string, string>;
 
 export function deriveShippedPublicEnvReads(): EnvReads;
 export function deriveConfigEnvReads(): EnvReads;
+
+/** name -> the eas.json build profiles that declare it. */
+export function declaredInEasJson(): Map<string, string[]>;
