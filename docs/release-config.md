@@ -190,3 +190,32 @@ gh secret set EXPO_TOKEN --repo exposwifty31/VetTrack---RN-Migration-
 Without `EXPO_TOKEN` the job **fails** with that command in its output. A "skip
 when unauthenticated" branch would skip on every run and report green while
 checking nothing.
+
+---
+
+## Verification record
+
+Measured on `feat/w7-config`, 2026-08-18. Both numbers are from real runs, not
+arithmetic.
+
+| | Test Suites | Tests |
+|---|---|---|
+| Before (`154380c^`) | 116 passed | 1137 passed, 2 skipped (1139) |
+| After (`154380c`) | 117 passed | 1161 passed, 2 skipped (1163) |
+
+Delta: +1 suite (`src/__tests__/release-config-checks.test.ts`, 23 tests) and +1
+test in `manifest-vs-code.test.ts` (`(a-shared-scan)`). `tsc --noEmit` exits 0
+and `eslint . --max-warnings=0` exits 0 in both states.
+
+`npm run release:preflight:offline` exits 0. `npm run release:preflight` exits 1
+on the real `ios.buildNumber "28"` collision described above — that is the gate
+working, not a broken gate.
+
+**Correction.** The commit message on `154380c` states the before-count as
+"116 suites / 1146". That number is wrong; the measured figure is 1137 passed /
+1139 total, as shown above and as the immediately preceding commit
+(`fdfdd605a`-lineage, "116 suites / 1137 tests") independently records. It is
+corrected here rather than by amending the commit, because the commit message is
+an immutable record and a stale number in one is indistinguishable from a
+current one — the same reason `manifest-vs-code.test.ts` carries its CORRECTION
+block instead of a quiet deletion.
