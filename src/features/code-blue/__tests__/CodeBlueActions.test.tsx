@@ -437,9 +437,12 @@ describe("CodeBlueActions — one-tap idempotency fence", () => {
   }
 
   /**
-   * Presses Start inside `act`, matching the existing retry test above. A bare
-   * `fireEvent.press` leaves Pressable's own state work unflushed, which breaks
-   * the NEXT test's render (symptom: a null tree despite correct mocks).
+   * Presses Start inside `act`, matching the double-press retry test above.
+   * Verified empirically: with a BARE `fireEvent.press` here, this test still
+   * passed but the NEXT test's `render` produced a null tree despite correct
+   * mocks, and every test after it failed. Wrapping in `act` fixes it. The
+   * precise unflushed work was not identified — only that `act` is required,
+   * which is why the existing suite already uses this idiom.
    */
   const pressStart = async () => {
     await act(async () => {
