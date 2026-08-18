@@ -45,6 +45,15 @@ jest.mock("@/lib/auth-fetch", () => ({
   decodeJwtPayload: () => null,
 }));
 
+const mockWriteCarriedRole = jest.fn();
+jest.mock("@/features/auth/requested-role-store", () => {
+  const actual = jest.requireActual("@/features/auth/requested-role-store");
+  return {
+    ...actual,
+    writeCarriedRole: (...args: unknown[]) => mockWriteCarriedRole(...args),
+  };
+});
+
 const SENSITIVE = "azp mismatch: internal_secret_party";
 
 async function renderForm() {
@@ -57,6 +66,7 @@ async function renderForm() {
 beforeEach(() => {
   mockSubmitPassword.mockReset();
   mockStartSso.mockReset();
+  mockWriteCarriedRole.mockReset();
   mockFlow.ready = true;
   mockFlow.isSignedIn = false;
   mockFlow.isLoaded = true;
@@ -166,5 +176,42 @@ describe("SignInScreen submit contract (W-AUTH pin)", () => {
     await fireEvent.press(screen.getByTestId("signin-submit"));
 
     expect(mockSubmitPassword).not.toHaveBeenCalled();
+  });
+});
+
+describe("role carry + SSO concurrency (CodeRabbit #76 r1)", () => {
+  it("surfaces localized feedback when carrying the role fails loudly, keeping the visual selection", async () => {
+    const { StorageUnavailableError } = jest.requireActual(
+      "@/infrastructure/storage/MmkvStorageAdapter",
+    );
+    mockWriteCarriedRole.mockImplementationOnce(() => {
+      throw new StorageUnavailableError("setItem", "vt_signup_requested_role", "session", "gone");
+    });
+    await renderForm();
+    fireEvent.press(screen.getByTestId("role-chip-technician"));
+    expect(mockWriteCarriedRole).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(screen.getByText(i18next.t("signIn.roleCarryFailed"))).toBeTruthy();
+    });
+    // The visual selection survives the persistence failure.
+    expect(screen.getByTestId("role-chip-technician").props.accessibilityState.checked).toBe(true);
+  });
+
+  it("blocks a second SSO tap while the first browser flow is still pending", async () => {
+    let resolveSso!: (v: { kind: "dismissed" }) => void;
+    mockStartSso.mockImplementation(
+      () => new Promise<{ kind: "dismissed" }>((r) => { resolveSso = r; }),
+    );
+    await renderForm();
+    fireEvent.press(screen.getByTestId("sso-apple"));
+    fireEvent.press(screen.getByTestId("sso-apple"));
+    fireEvent.press(screen.getByTestId("sso-google"));
+    expect(mockStartSso).toHaveBeenCalledTimes(1);
+
+    resolveSso({ kind: "dismissed" });
+    await waitFor(() => {
+      fireEvent.press(screen.getByTestId("sso-google"));
+      expect(mockStartSso).toHaveBeenCalledTimes(2);
+    });
   });
 });

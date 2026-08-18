@@ -7,9 +7,12 @@
  * Roles are literal `vt_users.role` values (web RoleChips contract) so a
  * downstream consumer of the requested-role tag never needs to remap them.
  *
- * Storage failures degrade silently (read -> null, write -> no-op): the carried
- * role is a nicety and must never crash or block sign-in itself.
+ * A missing storage ADAPTER fails loud (StorageUnavailableError rethrown —
+ * repo guideline: a missing adapter must never silently no-op); any other,
+ * nonessential storage failure degrades silently (read -> null, write ->
+ * no-op) because the carried role is a nicety that must never block sign-in.
  */
+import { StorageUnavailableError } from "@/infrastructure/storage/MmkvStorageAdapter";
 import { safeStorageGetItem, safeStorageRemoveItem, safeStorageSetItem } from "@/lib/safe-storage";
 
 export type SignupRequestedRole = "technician" | "vet";
@@ -20,7 +23,8 @@ export function readCarriedRole(): SignupRequestedRole | null {
   try {
     const value = safeStorageGetItem(REQUESTED_ROLE_STORAGE_KEY, "session");
     return value === "vet" || value === "technician" ? value : null;
-  } catch {
+  } catch (error) {
+    if (error instanceof StorageUnavailableError) throw error;
     return null;
   }
 }
@@ -29,7 +33,8 @@ export function writeCarriedRole(role: SignupRequestedRole | null): void {
   try {
     if (role) safeStorageSetItem(REQUESTED_ROLE_STORAGE_KEY, role, "session");
     else safeStorageRemoveItem(REQUESTED_ROLE_STORAGE_KEY, "session");
-  } catch {
-    // Deliberate no-op — see module doc.
+  } catch (error) {
+    if (error instanceof StorageUnavailableError) throw error;
+    // Nonessential failure — deliberate no-op, see module doc.
   }
 }

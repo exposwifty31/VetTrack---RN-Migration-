@@ -10,21 +10,30 @@ import {
   writeCarriedRole,
 } from "../requested-role-store";
 
+import { StorageUnavailableError } from "@/infrastructure/storage/MmkvStorageAdapter";
+
 const mockStore = new Map<string, string>();
-const mockStorageState = { throws: false };
+const mockStorageState = { throws: false as false | "unavailable" | "other" };
+
+function mockMaybeThrow(operation: "getItem" | "setItem" | "removeItem", key: string): void {
+  if (mockStorageState.throws === "unavailable") {
+    throw new StorageUnavailableError(operation, key, "session", "adapter missing");
+  }
+  if (mockStorageState.throws === "other") throw new Error("flaky storage backend");
+}
 
 jest.mock("@/lib/safe-storage", () => ({
   safeStorageGetItem: (key: string, _kind?: string) => {
-    if (mockStorageState.throws) throw new Error("storage unavailable");
+    mockMaybeThrow("getItem", key);
     return mockStore.has(key) ? mockStore.get(key)! : null;
   },
   safeStorageSetItem: (key: string, value: string, _kind?: string) => {
-    if (mockStorageState.throws) throw new Error("storage unavailable");
+    mockMaybeThrow("setItem", key);
     mockStore.set(key, value);
     return true;
   },
   safeStorageRemoveItem: (key: string, _kind?: string) => {
-    if (mockStorageState.throws) throw new Error("storage unavailable");
+    mockMaybeThrow("removeItem", key);
     mockStore.delete(key);
     return true;
   },
@@ -59,8 +68,15 @@ describe("requested-role-store", () => {
     expect(mockStore.has(REQUESTED_ROLE_STORAGE_KEY)).toBe(false);
   });
 
-  it("degrades to null / no-op when storage throws (a nicety must never crash sign-in)", () => {
-    mockStorageState.throws = true;
+  it("rethrows StorageUnavailableError — a missing adapter must fail loud, never no-op", () => {
+    mockStorageState.throws = "unavailable";
+    expect(() => readCarriedRole()).toThrow(StorageUnavailableError);
+    expect(() => writeCarriedRole("vet")).toThrow(StorageUnavailableError);
+    expect(() => writeCarriedRole(null)).toThrow(StorageUnavailableError);
+  });
+
+  it("degrades to null / no-op on nonessential storage errors (a nicety must never crash sign-in)", () => {
+    mockStorageState.throws = "other";
     expect(readCarriedRole()).toBeNull();
     expect(() => writeCarriedRole("vet")).not.toThrow();
   });

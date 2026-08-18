@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
@@ -83,6 +83,7 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const ssoInFlightRef = useRef(false);
 
   if (flow.isSignedIn) {
     return (
@@ -133,7 +134,13 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
   };
 
   const onSso = async (strategy: SsoStrategy) => {
-    if (submitting) return;
+    // Same-tick double-tap window: two taps can land before React re-renders,
+    // so the render-scope `submitting` and the `disabled` prop alone cannot
+    // stop the second one — the ref is the event-time truth (QrScanner
+    // precedent), `busy` still drives the visual disabled state.
+    if (ssoInFlightRef.current || submitting) return;
+    ssoInFlightRef.current = true;
+    setBusy(true);
     setError(null);
     try {
       const outcome = await flow.startSso(strategy);
@@ -143,12 +150,23 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
     } catch (err) {
       if (__DEV__) console.debug("[SignIn] SSO failed", err);
       setError(t("signIn.error"));
+    } finally {
+      ssoInFlightRef.current = false;
+      setBusy(false);
     }
   };
 
   const onSelectRole = (nextRole: SignupRequestedRole) => {
+    // Visual selection first — it must survive a persistence failure.
     setRole(nextRole);
-    writeCarriedRole(nextRole);
+    try {
+      writeCarriedRole(nextRole);
+    } catch (err) {
+      // Adapter-unavailable propagates loud from the store (repo guideline);
+      // the screen surfaces localized feedback and sign-in stays usable.
+      if (__DEV__) console.debug("[SignIn] role carry failed", err);
+      setError(t("signIn.roleCarryFailed"));
+    }
   };
 
   return (
@@ -170,7 +188,7 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
             accessibilityIgnoresInvertColors
             style={{ width: 56, height: 56, borderRadius: 12 }}
           />
-          <Text className="font-rubik-bold text-[20px] text-foreground">VetTrack</Text>
+          <Text className="font-rubik-bold text-[20px] text-foreground">{t("signIn.brand")}</Text>
           <Text className="text-center font-rubik-bold text-2xl text-foreground">
             {t("signIn.welcomeBack")}
           </Text>
@@ -232,6 +250,8 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
           testID="sso-apple"
           className="items-center rounded-xl border border-border bg-surface py-3.5"
           accessibilityRole="button"
+          accessibilityState={{ disabled: submitting || !flow.ready }}
+          disabled={submitting || !flow.ready}
           onPress={() => {
             void onSso("oauth_apple");
           }}
@@ -244,6 +264,8 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
           testID="sso-google"
           className="items-center rounded-xl border border-border bg-surface py-3.5"
           accessibilityRole="button"
+          accessibilityState={{ disabled: submitting || !flow.ready }}
+          disabled={submitting || !flow.ready}
           onPress={() => {
             void onSso("oauth_google");
           }}
