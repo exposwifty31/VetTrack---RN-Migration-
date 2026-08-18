@@ -7,6 +7,14 @@
     "icon": "./assets/icon.png",
     "scheme": "vettrack",
     "userInterfaceStyle": "automatic",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/c45b4abf-8c8e-4bb6-b977-b258d632436e",
+      "checkAutomatically": "NEVER",
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "uk.vettrack.app",
