@@ -8,7 +8,7 @@
  * Permission-denied fails LOUD — an explicit message + action (request, or open
  * Settings once the OS won't re-prompt), never a silent black frame.
  */
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Linking, Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -46,7 +46,10 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
   // true after the gate has flipped. The ref always carries the latest value;
   // the handler reads it instead of the captured one.
   const cameraActiveRef = useRef(cameraActive);
-  useEffect(() => {
+  // Layout effect, not passive: a queued native event can run after the
+  // inactive commit but BEFORE a passive effect flushes, and would read the
+  // ref's previous `true` in exactly the window the ref exists to close.
+  useLayoutEffect(() => {
     cameraActiveRef.current = cameraActive;
   }, [cameraActive]);
   // onBarcodeScanned fires continuously; debounce to one hand-off per ~2s so a

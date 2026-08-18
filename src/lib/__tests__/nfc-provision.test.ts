@@ -326,18 +326,67 @@ describe("cancellation during a pending native call (review: the lock could fire
     // the flow reaches makeReadOnly AFTER the operator cancelled. On an NTAG215
     // that is an irreversible lock of whatever tag is on the phone now.
     let releaseStatus!: () => void;
+    let statusStarted!: () => void;
+    const started = new Promise<void>((r) => { statusStarted = r; });
     const statusPending = new Promise<{ status: number; capacity: number }>((resolve) => {
       releaseStatus = () => resolve({ status: NdefStatus.ReadWrite, capacity: 504 });
     });
-    native.ndefHandler.getNdefStatus.mockReset().mockReturnValueOnce(statusPending);
+    // The mock SIGNALS when the native call actually begins — `await
+    // Promise.resolve()` proves nothing about where the flow is.
+    native.ndefHandler.getNdefStatus.mockReset().mockImplementationOnce(() => {
+      statusStarted();
+      return statusPending;
+    });
 
     const lock = lockEquipmentStickerTag();
-    await Promise.resolve(); // session opens; the status call is now pending
+    await started; // the native status read is now genuinely pending
 
     await cancelNfcProvisioning(); // the operator cancels mid-read
     releaseStatus(); // the pending status resolves afterwards
 
     await expect(lock).rejects.toBeInstanceOf(NfcProvisionError);
     expect(native.ndefHandler.makeReadOnly).not.toHaveBeenCalled();
+  });
+
+  it("never returns a tagId when cancel lands while getTag is pending", async () => {
+    // A UID returned past a cancel flows into `bindNfcTag`, binding equipment
+    // to a tag the operator abandoned.
+    let releaseTag!: () => void;
+    let tagStarted!: () => void;
+    const started = new Promise<void>((r) => { tagStarted = r; });
+    native.getTag.mockReset().mockImplementationOnce(() => {
+      tagStarted();
+      return new Promise((resolve) => { releaseTag = () => resolve({ id: "04A2B3C4D5E680" }); });
+    });
+
+    const write = writeEquipmentStickerTag(EQUIPMENT_ID);
+    await started;
+
+    await cancelNfcProvisioning();
+    releaseTag();
+
+    await expect(write).rejects.toBeInstanceOf(NfcProvisionError);
+  });
+
+  it("does not report a completed lock when cancel lands while makeReadOnly is pending", async () => {
+    // The physical lock may have taken — that cannot be undone — but the call
+    // must not RESOLVE as a completed operation the operator cancelled. A
+    // re-tap reads ReadOnly and resolves `alreadyLocked`, so failing is safe.
+    stageStatuses(NdefStatus.ReadWrite, NdefStatus.ReadOnly);
+    let releaseLock!: () => void;
+    let lockStarted!: () => void;
+    const started = new Promise<void>((r) => { lockStarted = r; });
+    native.ndefHandler.makeReadOnly.mockReset().mockImplementationOnce(() => {
+      lockStarted();
+      return new Promise<void>((resolve) => { releaseLock = () => resolve(); });
+    });
+
+    const lock = lockEquipmentStickerTag();
+    await started;
+
+    await cancelNfcProvisioning();
+    releaseLock();
+
+    await expect(lock).rejects.toBeInstanceOf(NfcProvisionError);
   });
 });

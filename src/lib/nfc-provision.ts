@@ -230,6 +230,9 @@ export async function writeEquipmentStickerTag(
     // Read the UID only after the write succeeded, so a returned UID is always
     // the UID of a tag this call actually programmed.
     const tag = await NfcManager.getTag().catch(() => null);
+    // Checked AFTER getTag too: a UID returned past a cancel would flow into
+    // `bindNfcTag`, binding equipment to a tag the operator abandoned.
+    assertNotCancelled();
     return { tagId: normalizeTagUid(tag?.id) };
   });
 }
@@ -269,6 +272,10 @@ export async function lockEquipmentStickerTag(alertMessage?: string): Promise<Nf
     }
     // Android's honest `false`. iOS resolves `undefined`, which passes.
     if (result === false) throw new NfcProvisionError("lock_failed");
+    // A cancel that landed WHILE makeReadOnly was pending cannot undo the lock
+    // — but it must not be reported as a completed operation either. Failing
+    // here is safe: a re-tap reads ReadOnly and resolves `alreadyLocked`.
+    assertNotCancelled();
 
     // Same session, so this is free — and it is the only direct evidence that
     // the lock took rather than the call merely returning.
@@ -276,6 +283,7 @@ export async function lockEquipmentStickerTag(alertMessage?: string): Promise<Nf
       throw new NfcProvisionError("lock_failed", { cause });
     });
     if (after.status !== NdefStatus.ReadOnly) throw new NfcProvisionError("lock_failed");
+    assertNotCancelled();
 
     return { alreadyLocked: false };
   });
