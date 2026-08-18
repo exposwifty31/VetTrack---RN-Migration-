@@ -13,12 +13,12 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 
-import { CodeBlueActions } from "../CodeBlueActions";
+import { CodeBlueActions, codeBlueManagerKeys } from "../CodeBlueActions";
 import { useCodeBlueMutations } from "../useCodeBlueMutations";
 import { useIdentity } from "@/app/useIdentity";
 import { ApiCodedError } from "@/lib/api/coded-error";
 import { EmergencyOfflineError } from "@/lib/emergency-block";
-import type { ActiveCodeBlueResponse } from "@/types/code-blue";
+import type { ActiveCodeBlueResponse, CodeBlueManager } from "@/types/code-blue";
 import type { MeUser } from "@/types/api";
 
 jest.mock("react-i18next", () => ({
@@ -39,15 +39,46 @@ jest.mock("@/app/useIdentity", () => ({ useIdentity: jest.fn() }));
 
 jest.mock("../useCodeBlueMutations", () => ({ useCodeBlueMutations: jest.fn() }));
 
+/**
+ * The action bar now issues TWO queries: the shared active-session read and
+ * (initiator-but-not-self-manager only) the manager-candidate list. A single
+ * `mockReturnValue` would hand the session result to both, so the mock
+ * dispatches on the queryKey root instead.
+ */
+type ManagersQueryStub = {
+  data?: readonly CodeBlueManager[];
+  isPending?: boolean;
+  isError?: boolean;
+};
+
+let managersResult: ManagersQueryStub = { data: [], isPending: false, isError: false };
+
+function installQueryMock(session: Partial<UseQueryResult<ActiveCodeBlueResponse, Error>>) {
+  jest.mocked(useQuery).mockImplementation((options: unknown) => {
+    const key = (options as { queryKey?: readonly unknown[] }).queryKey ?? [];
+    const base = { data: undefined, isPending: false, isError: false, refetch: jest.fn() };
+    // Compare against the REAL key, not a "users" literal. The drift this
+    // avoids fails SILENTLY: if the key root changed, the manager query would
+    // fall through to the session branch and return `data: undefined`, which
+    // ManagerPicker turns into `?? []` — so the empty-roster test would still
+    // pass, for the wrong reason.
+    if (key[0] === codeBlueManagerKeys.all[0] && key[1] === codeBlueManagerKeys.all[1]) {
+      return { ...base, ...managersResult } as never;
+    }
+    return {
+      ...base,
+      dataUpdatedAt: Date.parse("2026-08-10T12:00:00.000Z"),
+      ...session,
+    } as never;
+  });
+}
+
 function mockSessionQuery(overrides: Partial<UseQueryResult<ActiveCodeBlueResponse, Error>>) {
-  jest.mocked(useQuery).mockReturnValue({
-    data: undefined,
-    isPending: false,
-    isError: false,
-    dataUpdatedAt: Date.parse("2026-08-10T12:00:00.000Z"),
-    refetch: jest.fn(),
-    ...overrides,
-  } as unknown as UseQueryResult<ActiveCodeBlueResponse, Error>);
+  installQueryMock(overrides);
+}
+
+function mockManagersQuery(overrides: ManagersQueryStub) {
+  managersResult = { data: [], isPending: false, isError: false, ...overrides };
 }
 
 function mockIdentity(overrides: Partial<MeUser> | null, pending = false) {
@@ -59,6 +90,7 @@ function mockIdentity(overrides: Partial<MeUser> | null, pending = false) {
 
 type FakeMutation = {
   mutate: jest.Mock;
+  reset: jest.Mock;
   isPending: boolean;
   isError: boolean;
   isSuccess: boolean;
@@ -68,6 +100,7 @@ type FakeMutation = {
 function fakeMutation(overrides: Partial<FakeMutation> = {}): FakeMutation {
   return {
     mutate: jest.fn(),
+    reset: jest.fn(),
     isPending: false,
     isError: false,
     isSuccess: false,
@@ -89,6 +122,10 @@ function mockMutations(overrides: {
     presence: fakeMutation(overrides.presence),
   } as unknown as ReturnType<typeof useCodeBlueMutations>);
 }
+
+beforeEach(() => {
+  managersResult = { data: [], isPending: false, isError: false };
+});
 
 const NO_ACTIVE: ActiveCodeBlueResponse = {
   session: null,
@@ -144,7 +181,7 @@ describe("CodeBlueActions", () => {
     mockSessionQuery({ data: { session: null } as unknown as ActiveCodeBlueResponse });
     await render(<CodeBlueActions />);
     expect(screen.queryByTestId("code-blue-actions")).toBeNull();
-    expect(screen.queryByText("codeBlue.actions.startRequiresVet")).toBeNull();
+    expect(screen.queryByText("codeBlue.actions.startNotEligible")).toBeNull();
   });
 
   it("CodeRabbit PR #49 (Minor): renders nothing when identity SETTLED without data (no error) — the other half of the guard", async () => {
@@ -156,7 +193,7 @@ describe("CodeBlueActions", () => {
     mockSessionQuery({ data: { session: null } as unknown as ActiveCodeBlueResponse });
     await render(<CodeBlueActions />);
     expect(screen.queryByTestId("code-blue-actions")).toBeNull();
-    expect(screen.queryByText("codeBlue.actions.startRequiresVet")).toBeNull();
+    expect(screen.queryByText("codeBlue.actions.startNotEligible")).toBeNull();
   });
 
   it("CodeRabbit PR #49 (Major): never offers Start when the active-session query itself FAILED — a failed read is 'unknown', not 'no session', and must not risk a double-start", async () => {
@@ -166,7 +203,7 @@ describe("CodeBlueActions", () => {
 
     await render(<CodeBlueActions />);
     expect(screen.queryByText("codeBlue.actions.start")).toBeNull();
-    expect(screen.queryByText("codeBlue.actions.startRequiresVet")).toBeNull();
+    expect(screen.queryByText("codeBlue.actions.startNotEligible")).toBeNull();
     expect(screen.getByText("codeBlue.loadError")).toBeTruthy();
 
     fireEvent.press(screen.getByText("common.retry"));
@@ -183,10 +220,14 @@ describe("CodeBlueActions", () => {
       await render(<CodeBlueActions />);
       fireEvent.press(screen.getByText("codeBlue.actions.start"));
 
-      expect(startMutate).toHaveBeenCalledWith({
-        managerUserId: "user-1",
-        managerUserName: "Dr. Cohen",
-      });
+      expect(startMutate).toHaveBeenCalledWith(
+        {
+          idempotencyToken: "idem-key-1",
+          managerUserId: "user-1",
+          managerUserName: "Dr. Cohen",
+        },
+        expect.anything(),
+      );
     });
 
     it("a vet with no resolvable name never fires Start with an empty managerUserName (server rejects it)", async () => {
@@ -201,13 +242,75 @@ describe("CodeBlueActions", () => {
       expect(startMutate).not.toHaveBeenCalled();
     });
 
-    it("a non-vet clinical role sees an explanation instead of a Start button", async () => {
+    it("a senior_technician — a valid INITIATOR but not a valid MANAGER — gets the picker, and starts by nominating", async () => {
       mockIdentity({ id: "user-2", role: "senior_technician", name: "Tech Levi" });
+      mockManagersQuery({
+        data: [
+          { id: "u-vet", name: "Dr. Cohen", role: "vet" },
+          { id: "u-admin", name: "Ops Admin", role: "admin" },
+        ],
+      });
+      mockSessionQuery({ data: NO_ACTIVE });
+      const startMutate = jest.fn();
+      mockMutations({ start: { mutate: startMutate } });
+
+      await render(<CodeBlueActions />);
+      expect(screen.queryByText("codeBlue.actions.startNotEligible")).toBeNull();
+      expect(screen.getByText("codeBlue.actions.pickManager")).toBeTruthy();
+
+      fireEvent.press(screen.getByText("Dr. Cohen"));
+
+      // NEVER self-designates — that is a guaranteed 400 INVALID_MANAGER.
+      expect(startMutate).toHaveBeenCalledWith(
+        {
+          idempotencyToken: "idem-key-1",
+          managerUserId: "u-vet",
+          managerUserName: "Dr. Cohen",
+        },
+        expect.anything(),
+      );
+    });
+
+    it("keeps the picker on screen after a 403 MANAGER_NOT_CODE_BLUE_ELIGIBLE so a different manager can be nominated", async () => {
+      mockIdentity({ id: "user-2", role: "technician", name: "Tech Levi" });
+      mockManagersQuery({
+        data: [
+          { id: "u-vet", name: "Dr. Cohen", role: "vet" },
+          { id: "u-admin", name: "Ops Admin", role: "admin" },
+        ],
+      });
+      mockSessionQuery({ data: NO_ACTIVE });
+      mockMutations({
+        start: {
+          isError: true,
+          error: new ApiCodedError(403, "MANAGER_NOT_CODE_BLUE_ELIGIBLE"),
+        },
+      });
+
+      await render(<CodeBlueActions />);
+      expect(screen.getByText("codeBlue.errors.managerNotEligible")).toBeTruthy();
+      expect(screen.getByText("Dr. Cohen")).toBeTruthy();
+      expect(screen.getByText("Ops Admin")).toBeTruthy();
+    });
+
+    it("tells an initiator when NO eligible manager exists rather than offering an unusable Start", async () => {
+      mockIdentity({ id: "user-2", role: "technician", name: "Tech Levi" });
+      mockManagersQuery({ data: [] });
+      mockSessionQuery({ data: NO_ACTIVE });
+
+      await render(<CodeBlueActions />);
+      expect(screen.getByText("codeBlue.actions.managersEmpty")).toBeTruthy();
+      expect(screen.queryByText("codeBlue.actions.start")).toBeNull();
+    });
+
+    it("a role outside the server's initiator allow-list (student) sees the explanation, never a picker", async () => {
+      mockIdentity({ id: "user-3", role: "student", name: "Student Bar" });
       mockSessionQuery({ data: NO_ACTIVE });
 
       await render(<CodeBlueActions />);
       expect(screen.queryByText("codeBlue.actions.start")).toBeNull();
-      expect(screen.getByText("codeBlue.actions.startRequiresVet")).toBeTruthy();
+      expect(screen.queryByText("codeBlue.actions.pickManager")).toBeNull();
+      expect(screen.getByText("codeBlue.actions.startNotEligible")).toBeTruthy();
     });
 
     it("shows the LOUD offline banner (not the generic one) when start fails offline", async () => {
@@ -392,5 +495,449 @@ describe("CodeBlueActions", () => {
       expect(screen.getByTestId("code-blue-log-input")).toBeTruthy();
       expect(screen.getByText("codeBlue.actions.join")).toBeTruthy();
     });
+  });
+});
+
+/**
+ * Requirement 3 + 4 — the action bar must gate on the SHIFT-derived role
+ * (`effectiveRole`, falling back to `role`) for gate 1, while gate 2 stays on
+ * the PERMANENT role, because the server checks `inArray(users.role, …)` there.
+ * Reading one field for both is wrong in both directions, and each direction
+ * has a bedside cost.
+ */
+describe("CodeBlueActions — effectiveRole vs permanent role (the two gates read different fields)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockMutations({});
+  });
+
+  it("an ADMIN rostered onto a technician shift can start — gate 1 passes on the shift role, gate 2 on permanent admin, so it is a one-tap self-designation", async () => {
+    mockIdentity({
+      id: "user-9",
+      role: "admin",
+      effectiveRole: "technician",
+      name: "Ops Admin",
+      displayName: null,
+    });
+    mockSessionQuery({ data: NO_ACTIVE });
+    const startMutate = jest.fn();
+    mockMutations({ start: { mutate: startMutate } });
+
+    await render(<CodeBlueActions />);
+    expect(screen.queryByText("codeBlue.actions.startNotEligible")).toBeNull();
+
+    fireEvent.press(screen.getByText("codeBlue.actions.start"));
+    expect(startMutate).toHaveBeenCalledWith(
+      {
+        idempotencyToken: "idem-key-1",
+        managerUserId: "user-9",
+        managerUserName: "Ops Admin",
+      },
+      expect.anything(),
+    );
+  });
+
+  it("a VET rostered onto an ADMIN shift gets NO start affordance — the server denies gate 1, so the one-tap must be gated on BOTH gates, not on gate 2 alone", async () => {
+    mockIdentity({
+      id: "user-8",
+      role: "vet",
+      effectiveRole: "admin",
+      name: "Dr. Cohen",
+      displayName: null,
+    });
+    mockSessionQuery({ data: NO_ACTIVE });
+
+    await render(<CodeBlueActions />);
+    expect(screen.queryByText("codeBlue.actions.start")).toBeNull();
+    expect(screen.queryByText("codeBlue.actions.pickManager")).toBeNull();
+    expect(screen.getByText("codeBlue.actions.startNotEligible")).toBeTruthy();
+  });
+});
+
+/**
+ * Requirement 4 — nomination is SILENT by owner decision, and the nominated
+ * manager is the ONLY identity the server will let end the session
+ * (server/routes/code-blue.ts:993 `MANAGER_ONLY`). The person choosing is
+ * usually NOT that identity, so the consequence has to be on screen at the
+ * moment of choosing; there is no notify step that would carry it later.
+ */
+describe("CodeBlueActions — the picker states the end-of-session consequence", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockMutations({});
+  });
+
+  it("tells the initiator that whoever they pick is the only person who can end the session", async () => {
+    mockIdentity({ id: "user-2", role: "technician", name: "Tech Levi" });
+    mockManagersQuery({ data: [{ id: "u-vet", name: "Dr. Cohen", role: "vet" }] });
+    mockSessionQuery({ data: NO_ACTIVE });
+
+    await render(<CodeBlueActions />);
+    expect(screen.getByText("codeBlue.actions.pickManagerConsequence")).toBeTruthy();
+  });
+
+  /**
+   * `ACTIVE.managerUserId` is "user-1", so identity MUST be user-1 for the End
+   * controls to mount at all — a non-manager never renders them, which would
+   * make this assertion pass vacuously.
+   */
+  it("names WHO must close the session on a 403 MANAGER_ONLY, rather than a generic refusal", async () => {
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: ACTIVE });
+    mockMutations({ end: { isError: true, error: new ApiCodedError(403, "MANAGER_ONLY") } });
+
+    await render(<CodeBlueActions />);
+    expect(screen.getByText("codeBlue.errors.managerOnly")).toBeTruthy();
+  });
+
+  it("routes NO_VET_MANAGER to the escalation copy — 'retry' would loop the user mid-arrest", async () => {
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: ACTIVE });
+    mockMutations({ end: { isError: true, error: new ApiCodedError(422, "NO_VET_MANAGER") } });
+
+    await render(<CodeBlueActions />);
+    expect(screen.getByText("codeBlue.errors.managerNoLongerEligible")).toBeTruthy();
+  });
+});
+
+/**
+ * Requirement 5, proven at the surface it is about: the mapped key has to
+ * reach a rendered banner, not just be returned by the mapper.
+ *
+ * `notClinical` is reachable from TWO mutations, not one:
+ * `requireClinicalAuthority` guards both POST /sessions and
+ * POST /sessions/:id/logs (server/routes/code-blue.ts:288, 797), while end and
+ * presence are `requireAuth`-only (:897, :966) and cannot emit it. That is why
+ * its copy names the actor's missing authority rather than "starting" — on the
+ * log path a start-specific message would be the wrong action.
+ */
+describe("CodeBlueActions — start-path coded errors reach the banner", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockMutations({});
+  });
+
+  // REMOVED IN RECONCILE: a test asserting CODE_BLUE_START_CONFLICT with reason
+  // "OWNER_IN_FLIGHT" -> a dedicated `startConflict` key. The server emits
+  // exactly three reasons for that code (server/lib/code-blue-one-tap.ts:247,
+  // 275, 295 -> uppercased at routes/code-blue.ts:643): ACTIVE_LEASE,
+  // FENCE_SUPERSEDED, ACTIVE_SESSION_EXISTS. "OWNER_IN_FLIGHT" exists nowhere
+  // in the server — it was an invented example, so the test pinned copy for a
+  // response that cannot arrive. The one-tap mapper now splits the three real
+  // reasons, each covered above/below.
+
+  it("renders the clinical-authority copy when gate 1 denies with code INSUFFICIENT_ROLE + reason INSUFFICIENT_CLINICAL_AUTHORITY", async () => {
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: NO_ACTIVE });
+    mockMutations({
+      start: {
+        isError: true,
+        error: new ApiCodedError(403, "INSUFFICIENT_ROLE", "INSUFFICIENT_CLINICAL_AUTHORITY"),
+      },
+    });
+
+    await render(<CodeBlueActions />);
+    expect(screen.getByText("codeBlue.errors.notClinical")).toBeTruthy();
+  });
+
+  it("surfaces the SAME clinical-authority key from the log-entry path, which is gated by the same middleware", async () => {
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: ACTIVE });
+    mockMutations({
+      addLogEntry: {
+        isError: true,
+        error: new ApiCodedError(403, "INSUFFICIENT_ROLE", "INSUFFICIENT_CLINICAL_AUTHORITY"),
+      },
+    });
+
+    await render(<CodeBlueActions />);
+    expect(screen.getByText("codeBlue.errors.notClinical")).toBeTruthy();
+  });
+});
+
+/**
+ * J1 — the one-tap idempotency fence, at the only layer that can actually
+ * prove it: the press gesture.
+ *
+ * The server keys `vt_code_blue_start_claims` on `idempotencyToken`. If the UI
+ * minted a fresh token per PRESS, a double-press (or a retry after a lost
+ * response) would open two independent claims and race two starts — exactly
+ * the defect one-tap exists to remove. So "the second press re-sends the FIRST
+ * token" is the guarantee, and it is a property of this component's ref, not
+ * of the api module.
+ *
+ * TEST HYGIENE: tokens come from a sequenced `mockImplementation`, never
+ * `mockReturnValueOnce`. A once-queue that a test does not fully drain leaks
+ * into the next test (`jest.clearAllMocks()` does not empty it), which made an
+ * earlier draft of this suite fail in file order while passing in isolation.
+ */
+describe("CodeBlueActions — one-tap idempotency fence", () => {
+  /** Hands out tok-1, tok-2, … per call. Order-independent, nothing to leak. */
+  function sequenceTokens() {
+    let n = 0;
+    jest.mocked(Crypto.randomUUID).mockImplementation(() => `tok-${++n}` as `${string}-${string}`);
+  }
+
+  function renderStartable(startOverrides: Partial<FakeMutation>) {
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen", displayName: null });
+    mockSessionQuery({ data: NO_ACTIVE });
+    mockMutations({ start: startOverrides });
+  }
+
+  /** A mutate mock that honours the per-call `onSuccess`, like react-query does. */
+  function mutateResolving(succeed: boolean) {
+    return jest.fn((_vars: unknown, opts?: { onSuccess?: () => void }) => {
+      if (succeed) opts?.onSuccess?.();
+    });
+  }
+
+  /**
+   * Presses Start inside `act`, matching the double-press retry test above.
+   * Verified empirically: with a BARE `fireEvent.press` here, this test still
+   * passed but the NEXT test's `render` produced a null tree despite correct
+   * mocks, and every test after it failed. Wrapping in `act` fixes it. The
+   * precise unflushed work was not identified — only that `act` is required,
+   * which is why the existing suite already uses this idiom.
+   */
+  const pressStart = async () => {
+    await act(async () => {
+      fireEvent.press(screen.getByText("codeBlue.actions.start"));
+    });
+  };
+
+  const tokenOf = (mock: jest.Mock, call: number) =>
+    (mock.mock.calls[call][0] as { idempotencyToken: string }).idempotencyToken;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    sequenceTokens();
+    mockMutations({});
+  });
+
+  it("a second press RE-SENDS the same idempotencyToken — one token per gesture, not per press", async () => {
+    const startMutate = mutateResolving(false);
+    renderStartable({ mutate: startMutate });
+
+    await render(<CodeBlueActions />);
+    await pressStart();
+    await pressStart();
+
+    expect(startMutate).toHaveBeenCalledTimes(2);
+    expect(tokenOf(startMutate, 0)).toBe("tok-1");
+    expect(tokenOf(startMutate, 1)).toBe("tok-1"); // THE FENCE
+    expect(Crypto.randomUUID).toHaveBeenCalledTimes(1); // minted once, not per press
+  });
+
+  it("sends the one-tap payload shape (token + self-designated manager)", async () => {
+    const startMutate = mutateResolving(false);
+    renderStartable({ mutate: startMutate });
+
+    await render(<CodeBlueActions />);
+    await pressStart();
+
+    expect(startMutate.mock.calls[0][0]).toEqual({
+      idempotencyToken: "tok-1",
+      managerUserId: "user-1",
+      managerUserName: "Dr. Cohen",
+    });
+  });
+
+  it("after a SUCCESSFUL start the token resets — a later start must not replay the committed claim", async () => {
+    const startMutate = mutateResolving(true);
+    renderStartable({ mutate: startMutate });
+
+    await render(<CodeBlueActions />);
+    await pressStart(); // succeeds -> claim committed
+    await pressStart(); // a genuinely NEW start
+
+    expect(tokenOf(startMutate, 0)).toBe("tok-1");
+    // Reusing tok-1 here would replay the committed claim and hand back the OLD
+    // sessionId under outcome:"replay" instead of starting a new session.
+    expect(tokenOf(startMutate, 1)).toBe("tok-2");
+  });
+});
+
+/**
+ * J1 — the three 409 `CODE_BLUE_START_CONFLICT` reasons must reach the operator
+ * as three DIFFERENT instructions. This is the user-visible half of the
+ * upgrade: the legacy route could only ever say "an active Code Blue exists",
+ * whether your own start had in fact committed or someone else had won.
+ */
+describe("CodeBlueActions — one-tap conflict reasons render distinctly", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockMutations({});
+  });
+
+  function renderWithStartError(error: unknown) {
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: NO_ACTIVE });
+    mockMutations({ start: { isError: true, error } });
+  }
+
+  // One shape, three server reasons. Parameterised rather than copied: the
+  // point of this block is that the SAME 409 code splits by `reason`, and three
+  // near-identical bodies hide that the reason is the only variable.
+  it.each([
+    ["ACTIVE_LEASE", "codeBlue.errors.startPending", "your own attempt is still landing — press again"],
+    ["FENCE_SUPERSEDED", "codeBlue.errors.startSuperseded", "a newer attempt took the fence"],
+    ["ACTIVE_SESSION_EXISTS", "codeBlue.errors.conflict", "someone else won — join theirs"],
+  ])("409 %s -> %s (%s)", async (reason, expectedKey) => {
+    renderWithStartError(new ApiCodedError(409, "CODE_BLUE_START_CONFLICT", reason));
+    await render(<CodeBlueActions />);
+    expect(screen.getByText(expectedKey)).toBeTruthy();
+  });
+
+  it("400 INVALID_MANAGER -> its own copy, not the generic banner", async () => {
+    renderWithStartError(new ApiCodedError(400, "INVALID_MANAGER", "INVALID_MANAGER"));
+    await render(<CodeBlueActions />);
+    expect(screen.getByText("codeBlue.errors.invalidManager")).toBeTruthy();
+  });
+
+  it("offline STILL wins outright — the loud offline banner, never a conflict banner", async () => {
+    renderWithStartError(new EmergencyOfflineError("start", "/api/code-blue/one-tap", "POST"));
+    await render(<CodeBlueActions />);
+    expect(screen.getByTestId("code-blue-offline-banner")).toBeTruthy();
+    expect(screen.queryByTestId("code-blue-error-banner")).toBeNull();
+  });
+});
+
+/**
+ * ULTRAREVIEW finding 2 — a failed start must not haunt the NEXT arrest.
+ *
+ * `useCodeBlueMutations()` lives in `CodeBlueActions`, which stays mounted
+ * across session transitions; the start banner lives in `NoSessionActions`,
+ * which mounts only while there is NO active session. react-query keeps
+ * `isError` until the mutation is reset or re-fired, so:
+ *
+ *   press Start -> 409 (someone else won the race) -> banner, correctly
+ *   -> their session opens, NoSessionActions unmounts
+ *   -> 20 minutes later that session ends, NoSessionActions REMOUNTS
+ *   -> the banner returns, telling the next responder "a Code Blue already
+ *      exists" while none does.
+ *
+ * Wrong information at the one moment it costs the most. The reset is keyed on
+ * the session identity, NOT on mount, so a fresh error raised while the screen
+ * is still session-less survives long enough to be read.
+ */
+describe("CodeBlueActions — a stale start error does not cross sessions", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("resets the start mutation when a session appears", async () => {
+    const reset = jest.fn();
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: NO_ACTIVE });
+    mockMutations({
+      start: { isError: true, error: new ApiCodedError(409, "ACTIVE_SESSION_EXISTS"), reset },
+    });
+    const view = await render(<CodeBlueActions />);
+
+    expect(screen.getByText("codeBlue.errors.conflict")).toBeTruthy();
+    reset.mockClear(); // the mount-time reset must not satisfy this assertion
+
+    mockSessionQuery({ data: ACTIVE });
+    await act(async () => {
+      view.rerender(<CodeBlueActions />);
+    });
+
+    expect(reset).toHaveBeenCalled();
+  });
+
+  it("resets again when that session ends, so the next arrest starts clean", async () => {
+    const reset = jest.fn();
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: ACTIVE });
+    mockMutations({ start: { reset } });
+    const view = await render(<CodeBlueActions />);
+    reset.mockClear();
+
+    mockSessionQuery({ data: NO_ACTIVE });
+    await act(async () => {
+      view.rerender(<CodeBlueActions />);
+    });
+
+    expect(reset).toHaveBeenCalled();
+  });
+
+  it("does NOT reset a fresh error while the screen is still session-less", async () => {
+    // The failure mode of an over-eager fix: clearing on every render would
+    // erase the banner before anyone read it.
+    const reset = jest.fn();
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: NO_ACTIVE });
+    mockMutations({
+      start: { isError: true, error: new ApiCodedError(409, "ACTIVE_SESSION_EXISTS"), reset },
+    });
+    const view = await render(<CodeBlueActions />);
+    reset.mockClear();
+
+    await act(async () => {
+      view.rerender(<CodeBlueActions />);
+    });
+
+    expect(reset).not.toHaveBeenCalled();
+    expect(screen.getByText("codeBlue.errors.conflict")).toBeTruthy();
+  });
+});
+
+/**
+ * CodeRabbit kept this one open, and was right to: one-tap's whole promise is
+ * "everything ready", and the two fields that say whether it actually WAS were
+ * being discarded.
+ *
+ *   reservedCartId: null  — no ready crash cart could be reserved. The session
+ *     still starts (soft-reserve is advisory), so without a notice the team
+ *     believes a cart is waiting and finds out at the patient.
+ *   pagingState: "failed" — the team page did not go out. Nobody is coming.
+ *
+ * Both are silent degradations of an orchestration the responder is trusting.
+ */
+describe("CodeBlueActions — the start outcome is reported, not swallowed", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  async function startThenSession(data: Record<string, unknown>) {
+    const startMutate = jest.fn((_payload: unknown, opts?: { onSuccess?: (d: unknown) => void }) =>
+      opts?.onSuccess?.(data),
+    );
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: NO_ACTIVE });
+    mockMutations({ start: { mutate: startMutate } });
+    const view = await render(<CodeBlueActions />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByText("codeBlue.actions.start"));
+    });
+
+    mockSessionQuery({ data: ACTIVE });
+    await act(async () => {
+      view.rerender(<CodeBlueActions />);
+    });
+  }
+
+  it("warns when NO crash cart was reserved", async () => {
+    await startThenSession({ outcome: "created", sessionId: "cb-1", reservedCartId: null, pagingState: "sent" });
+    expect(screen.getByText("codeBlue.notice.noCartReserved")).toBeTruthy();
+  });
+
+  it("warns when the team page FAILED", async () => {
+    await startThenSession({ outcome: "created", sessionId: "cb-1", reservedCartId: "cart-3", pagingState: "failed" });
+    expect(screen.getByText("codeBlue.notice.pagingFailed")).toBeTruthy();
+  });
+
+  it("says nothing when the orchestration did what it promised", async () => {
+    await startThenSession({ outcome: "created", sessionId: "cb-1", reservedCartId: "cart-3", pagingState: "sent" });
+    expect(screen.queryByText("codeBlue.notice.noCartReserved")).toBeNull();
+    expect(screen.queryByText("codeBlue.notice.pagingFailed")).toBeNull();
+  });
+
+  it("does not carry a notice into a DIFFERENT session", async () => {
+    // The notice belongs to the arrest it describes. A stale warning on the
+    // next Code Blue is the same defect as the stale error banner.
+    await startThenSession({ outcome: "created", sessionId: "cb-OLD", reservedCartId: null, pagingState: "sent" });
+    expect(screen.queryByText("codeBlue.notice.noCartReserved")).toBeNull();
   });
 });

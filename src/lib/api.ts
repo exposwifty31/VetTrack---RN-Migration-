@@ -23,6 +23,7 @@ import type {
   QuickScanToggleResult,
   ScanResult,
 } from "@/types/api";
+import type { CodeBlueManager } from "@/types/code-blue";
 
 /**
  * W2b (H6): the throwing JSON normalizer is now the SINGLE shared `requestJson`
@@ -103,6 +104,45 @@ export const api = {
       const me = await requestJson<MeUser>("/api/users/me");
       if (me.id) setCurrentUserId(me.id);
       return me;
+    },
+    /**
+     * Code Blue manager candidates (GET /api/users/managers,
+     * server/routes/users.ts:1186). `requireAuth` only — deliberately no role
+     * floor, since any clinical initiator may need to nominate. The server
+     * filters to `role IN ('vet','admin')` + active + not-deleted, scoped to
+     * the caller's clinic, ordered by name.
+     *
+     * ADVISORY, NOT AUTHORITATIVE: the filter is on PERMANENT role only. A
+     * clinic running the Code Blue manager evaluator in `enforce` mode can
+     * still reject a listed candidate with 403
+     * MANAGER_NOT_CODE_BLUE_ELIGIBLE on their check-in-derived OPERATIONAL
+     * role, which this endpoint does not see. Callers must keep the picker
+     * usable after that error rather than dead-ending.
+     */
+    managers: async (): Promise<CodeBlueManager[]> => {
+      // Row-level, not container-level. `Array.isArray` proves only that
+      // `managers` is an array; ManagerPicker then calls `manager.name.trim()`
+      // and uses `manager.id` as a React key, so ONE malformed row throws a
+      // TypeError during render and takes the picker down — on the arrest path,
+      // where the picker is the only way a technician can start. Unusable rows
+      // are dropped rather than rendered, the same doctrine `api.equipment.scan`
+      // applies below for the same reason.
+      const body = await requestJson<{ managers?: unknown }>("/api/users/managers");
+      if (!Array.isArray(body?.managers)) return [];
+      return body.managers.filter(
+        (row): row is CodeBlueManager =>
+          typeof row === "object" &&
+          row !== null &&
+          typeof (row as CodeBlueManager).id === "string" &&
+          (row as CodeBlueManager).id.length > 0 &&
+          typeof (row as CodeBlueManager).name === "string" &&
+          // NON-BLANK. A whitespace-only name passes a typeof check, and
+          // ManagerPicker renders it as a blank DISABLED row — while
+          // `managers.length !== 0` keeps the "no eligible managers" state from
+          // rendering. All-blank rows would therefore show a technician a list
+          // of unclickable blanks with no explanation, mid-arrest.
+          (row as CodeBlueManager).name.trim().length > 0,
+      );
     },
   },
   /*

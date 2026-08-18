@@ -33,36 +33,52 @@
  * extraction itself.
  *
  * Scope decisions for this slice (documented for the Lead — see PR body):
- *   - Start self-designates the current user as manager and is gated to the
- *     "vet" role client-side (the only role that is both a valid initiator
- *     AND a valid manager per server/routes/code-blue.ts). Nominating a
- *     DIFFERENT manager needs a user-picker; out of scope here.
+ *   - Start is gated on the TWO unconditional server gates SEPARATELY, because
+ *     they read different fields (see the block comment in
+ *     `code-blue-actions-derive.ts`): gate 1 on the shift-derived role, gate 2
+ *     on the permanent one. Clearing both — a vet, or an admin holding a
+ *     clinical shift — is a one-tap self-designation. Clearing only gate 1
+ *     (a senior_technician/technician) means NOMINATING a vet/admin from
+ *     GET /api/users/managers. Clearing neither shows the explanation and no
+ *     affordance.
+ *   - The candidate list is ADVISORY, not authoritative — it filters on
+ *     permanent role only, so a clinic running the manager evaluator in
+ *     `enforce` mode can still 403. The picker therefore stays mounted under
+ *     the error banner so a different manager can be nominated immediately.
  *   - Log entries are freeform "note" category only; an equipment picker for
  *     "equipment" category entries is a future slice.
  */
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import * as Crypto from "expo-crypto";
 
 import { useIdentity } from "@/app/useIdentity";
+import { api } from "@/lib/api";
 import { codeBlueApi, codeBlueKeys } from "@/lib/api/code-blue";
 import type {
+  OneTapStartResponse,
   ActiveCodeBlueResponse,
+  CodeBlueManager,
   CodeBlueSession,
   CodeBlueSessionOutcome,
 } from "@/types/code-blue";
 
 import {
   canEndCodeBlue,
-  canStartCodeBlue,
+  canInitiateCodeBlue,
+  canSelfManageCodeBlue,
   codeBlueMutationErrorKey,
   computeElapsedMsForLog,
   resolveLogDraftIdempotencyKey,
-  type CodeBlueMutationErrorKey,
   type LogDraftIdempotencyEntry,
 } from "./code-blue-actions-derive";
+import {
+  oneTapStartErrorKey,
+  resolveOneTapStartToken,
+  type OneTapStartErrorKey,
+} from "./one-tap-derive";
 import { useCodeBlueMutations } from "./useCodeBlueMutations";
 
 const OUTCOMES: readonly CodeBlueSessionOutcome[] = ["rosc", "died", "transferred", "ongoing"];
@@ -92,7 +108,7 @@ function ActionButton({
   );
 }
 
-function ErrorBanner({ errorKey }: Readonly<{ errorKey: CodeBlueMutationErrorKey }>) {
+function ErrorBanner({ errorKey }: Readonly<{ errorKey: OneTapStartErrorKey }>) {
   const { t } = useTranslation();
   const isOffline = errorKey === "codeBlue.errors.offline";
   return (
@@ -105,12 +121,22 @@ function ErrorBanner({ errorKey }: Readonly<{ errorKey: CodeBlueMutationErrorKey
   );
 }
 
-/** Renders a mutation's error as an `ErrorBanner`, or nothing when it isn't errored. */
+/**
+ * Renders a mutation's error as an `ErrorBanner`, or nothing when it isn't
+ * errored. `mapError` defaults to the shared mapper; the START action passes
+ * `oneTapStartErrorKey` so the one-tap-only codes (the three distinct 409
+ * `CODE_BLUE_START_CONFLICT` reasons, `INVALID_MANAGER`) get their own copy
+ * instead of collapsing into the generic banner.
+ */
 function MutationErrorBanner({
   mutation,
-}: Readonly<{ mutation: Readonly<{ isError: boolean; error: unknown }> }>) {
+  mapError = codeBlueMutationErrorKey,
+}: Readonly<{
+  mutation: Readonly<{ isError: boolean; error: unknown }>;
+  mapError?: (error: unknown) => OneTapStartErrorKey;
+}>) {
   if (!mutation.isError) return null;
-  return <ErrorBanner errorKey={codeBlueMutationErrorKey(mutation.error)} />;
+  return <ErrorBanner errorKey={mapError(mutation.error)} />;
 }
 
 /**
@@ -128,35 +154,247 @@ function QueryErrorState({ onRetry }: Readonly<{ onRetry: () => void }>) {
   );
 }
 
-function NoSessionActions({
-  eligible,
+/**
+ * Manager-candidate list key — see `api.users.managers` for the advisory caveat.
+ *
+ * Shares the `"users"` root with `IDENTITY_QUERY_KEY` (`["users","me"]`). Benign
+ * today, but a future root-prefixed `invalidateQueries(["users"])` — or a
+ * persister, of which this app has NONE (verified in `lib/api/code-blue.ts`'s
+ * header) — would sweep both. If persistence ever lands, this key stays OUT of
+ * the include-list for the same reason `codeBlueKeys.active()` does.
+ */
+export const codeBlueManagerKeys = {
+  all: ["users", "code-blue-managers"] as const,
+};
+
+/**
+ * Nomination path for an initiator who cannot be their own manager
+ * (senior_technician / technician). One tap per candidate: the row IS the
+ * commit, so an arrest never costs a select-then-confirm round trip.
+ *
+ * The list stays mounted through a failed start — a 403
+ * MANAGER_NOT_CODE_BLUE_ELIGIBLE (gate 3, per-clinic `enforce`) or a 400
+ * INVALID_MANAGER (gate 2, candidate deactivated since the fetch) is a
+ * "pick someone else" signal, not a dead end.
+ */
+/** Dispatch a Code Blue start. Supplied by {@link NoSessionActions}, which owns
+ *  the idempotency token — no call site mints or forwards one itself. */
+type StartCodeBlue = (managerUserId: string, managerUserName: string) => void;
+
+function ManagerPicker({
+  start,
+  onStart,
+}: Readonly<{ start: Mutations["start"]; onStart: StartCodeBlue }>) {
+  const { t } = useTranslation();
+  // Deliberately inherits `createAppQueryClient` defaults (`retry: 1`,
+  // `staleTime: 5_000` — src/lib/query-client.ts), NOT react-query's own
+  // `retry: 3` + backoff: on an arrest path a failed fetch must reach the
+  // error state fast, and a 5s staleTime keeps the roster fresh per arrest.
+  // Do not raise either here.
+  const managersQuery = useQuery({
+    queryKey: codeBlueManagerKeys.all,
+    queryFn: () => api.users.managers(),
+  });
+
+  if (managersQuery.isPending) {
+    return (
+      <Text className="text-center font-rubik text-[13px] text-text-tertiary">
+        {t("codeBlue.actions.managersLoading")}
+      </Text>
+    );
+  }
+  if (managersQuery.isError) {
+    return (
+      <>
+        <Text className="text-center font-rubik text-[13px] text-danger">
+          {t("codeBlue.actions.managersLoadError")}
+        </Text>
+        <ActionButton label={t("common.retry")} onPress={() => void managersQuery.refetch()} />
+      </>
+    );
+  }
+
+  const managers: readonly CodeBlueManager[] = managersQuery.data ?? [];
+  if (managers.length === 0) {
+    return (
+      <Text className="text-center font-rubik text-[13px] text-text-tertiary">
+        {t("codeBlue.actions.managersEmpty")}
+      </Text>
+    );
+  }
+
+  return (
+    <>
+      <Text className="font-rubik-semibold text-[15px] text-text-primary">
+        {t("codeBlue.actions.pickManager")}
+      </Text>
+      <Text className="font-rubik text-[13px] text-text-tertiary">
+        {t("codeBlue.actions.pickManagerHint")}
+      </Text>
+      {/* Nomination is SILENT by owner decision — the person picked is never
+          told. They are also the ONLY identity the server will accept to end
+          the session (403 MANAGER_ONLY). With no notify step to carry that
+          later, the consequence has to be legible here, at the moment of
+          choosing. */}
+      <Text
+        testID="code-blue-manager-consequence"
+        className="font-rubik-semibold text-[13px] text-danger"
+      >
+        {t("codeBlue.actions.pickManagerConsequence")}
+      </Text>
+      {managers.map((manager) => (
+        <ActionButton
+          key={manager.id}
+          label={manager.name}
+          testID={`code-blue-manager-${manager.id}`}
+          disabled={start.isPending || !manager.name.trim()}
+          onPress={() => {
+            // Server `startSessionSchema` requires managerUserName.min(1) — a
+            // nameless row would 400 on shape before reaching either gate.
+            const managerUserName = manager.name.trim();
+            if (!managerUserName) return;
+            onStart(manager.id, managerUserName);
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
+function StartAffordance({
+  canSelfManage,
+  canInitiate,
   managerUserName,
   currentUserId,
   start,
+  onStart,
 }: Readonly<{
-  eligible: boolean;
+  canSelfManage: boolean;
+  canInitiate: boolean;
   managerUserName: string;
   currentUserId: string | null;
   start: Mutations["start"];
+  onStart: StartCodeBlue;
 }>) {
   const { t } = useTranslation();
+  // BOTH gates, not gate 2 alone: `canSelfManage` is the permanent role
+  // (gate 2's `users.role`) and `canInitiate` is the shift-derived one
+  // (gate 1). A vet rostered onto an admin shift satisfies gate 2 and fails
+  // gate 1 — offering them the one-tap Start would be a guaranteed 403.
+  if (canInitiate && canSelfManage) {
+    return (
+      <ActionButton
+        label={start.isPending ? t("codeBlue.actions.starting") : t("codeBlue.actions.start")}
+        disabled={start.isPending || !managerUserName}
+        onPress={() => {
+          if (!currentUserId || !managerUserName) return;
+          onStart(currentUserId, managerUserName);
+        }}
+      />
+    );
+  }
+  if (canInitiate) return <ManagerPicker start={start} onStart={onStart} />;
+  return (
+    <Text className="text-center font-rubik text-[13px] text-text-tertiary">
+      {t("codeBlue.actions.startNotEligible")}
+    </Text>
+  );
+}
+
+/**
+ * What one-tap actually managed, when it did not manage all of it.
+ *
+ * `POST /api/code-blue/one-tap` promises "everything ready": a claim, the
+ * nearest READY crash cart soft-reserved, and the team paged. Two of those can
+ * fail without failing the start —
+ *
+ *   reservedCartId: null   no ready cart could be reserved. Soft-reserve is
+ *                          advisory, so the session opens anyway; silence here
+ *                          means the team believes a cart is waiting for them.
+ *   pagingState: "failed"  the page did not go out. Nobody is coming.
+ *
+ * Neither is an error, which is exactly why both need saying out loud. The
+ * response carried both fields and nothing read them until CodeRabbit declined
+ * to close the finding on that.
+ */
+function StartOutcomeNotice({ outcome }: Readonly<{ outcome: OneTapStartResponse | null }>) {
+  const { t } = useTranslation();
+  if (!outcome) return null;
+  const lines: string[] = [];
+  if (outcome.reservedCartId === null) lines.push(t("codeBlue.notice.noCartReserved"));
+  if (outcome.pagingState === "failed") lines.push(t("codeBlue.notice.pagingFailed"));
+  if (lines.length === 0) return null;
+  return (
+    <View className="gap-1 px-5 pb-2" testID="code-blue-start-notice">
+      {lines.map((line) => (
+        <Text key={line} className="font-rubik-semibold text-[13px] text-warning">
+          {line}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+function NoSessionActions(
+  props: Readonly<{
+    canSelfManage: boolean;
+    canInitiate: boolean;
+    managerUserName: string;
+    currentUserId: string | null;
+    start: Mutations["start"];
+    onStarted: (outcome: OneTapStartResponse) => void;
+  }>,
+) {
+  const { start, onStarted } = props;
+
+  /**
+   * J1 — the idempotency fence. ONE token per start GESTURE, minted on the
+   * first press and re-sent verbatim on every retry of that gesture: the
+   * server keys its durable `vt_code_blue_start_claims` row on it, so a
+   * double-press or a retry after a lost response REPLAYS the original session
+   * instead of racing a second start.
+   */
+  const tokenRef = useRef<string | null>(null);
+
+  /**
+   * RECONCILE (J1 x manager-picker): the ONLY place a start is dispatched.
+   *
+   * The two slices landed in parallel. J1 moved `start` onto
+   * POST /api/code-blue/one-tap, where `idempotencyToken` is REQUIRED
+   * (`oneTapStartSchema`, `.strict()`), and minted the token at its single
+   * call site. The picker slice meanwhile split that site in two — self-manage
+   * and nominate-a-manager. Each branch was green alone; together, both picker
+   * call sites would have posted without a token and 400'd, including the
+   * nominate path that is the whole point of the picker.
+   *
+   * Passing one callback down rather than patching two `start.mutate` calls is
+   * deliberate: a call site that cannot see `start` cannot forget the token.
+   * Same shape as the emergency-push fix — remove the branch, don't remember it.
+   */
+  const startCodeBlue = useCallback(
+    (managerUserId: string, managerUserName: string) => {
+      if (!managerUserId || !managerUserName) return;
+      const idempotencyToken = resolveOneTapStartToken(tokenRef.current, Crypto.randomUUID);
+      tokenRef.current = idempotencyToken;
+      start.mutate(
+        { idempotencyToken, managerUserId, managerUserName },
+        {
+          onSuccess: (outcome) => {
+            tokenRef.current = null;
+            // Reported UPWARD because this component unmounts the moment the
+            // session becomes active — the outcome has to outlive it.
+            onStarted(outcome);
+          },
+        },
+      );
+    },
+    [start, onStarted],
+  );
+
   return (
     <View className="gap-2 px-5 pb-3" testID="code-blue-actions">
-      {eligible ? (
-        <ActionButton
-          label={start.isPending ? t("codeBlue.actions.starting") : t("codeBlue.actions.start")}
-          disabled={start.isPending || !managerUserName}
-          onPress={() => {
-            if (!currentUserId || !managerUserName) return;
-            start.mutate({ managerUserId: currentUserId, managerUserName });
-          }}
-        />
-      ) : (
-        <Text className="text-center font-rubik text-[13px] text-text-tertiary">
-          {t("codeBlue.actions.startRequiresVet")}
-        </Text>
-      )}
-      <MutationErrorBanner mutation={start} />
+      <StartAffordance {...props} onStart={startCodeBlue} />
+      <MutationErrorBanner mutation={props.start} mapError={oneTapStartErrorKey} />
     </View>
   );
 }
@@ -313,6 +551,28 @@ export function CodeBlueActions() {
   });
   const mutations = useCodeBlueMutations();
 
+  /**
+   * A failed start must not haunt the NEXT arrest.
+   *
+   * `useCodeBlueMutations` lives here, in a component that stays mounted across
+   * session transitions, while the start banner lives in `NoSessionActions`,
+   * which mounts only while there is no active session. react-query holds
+   * `isError` until the mutation is reset or re-fired, so a 409 raised during
+   * one arrest is still set when `NoSessionActions` remounts after that session
+   * ends — telling the next responder "a Code Blue already exists" when none
+   * does, at the moment that costs most.
+   *
+   * Keyed on the session IDENTITY, deliberately not on every render: an error
+   * raised while the screen is still session-less has to survive long enough to
+   * be read. Only a session appearing or ending clears it.
+   */
+  const activeSessionId = sessionQuery.data?.session?.id ?? null;
+  const [startOutcome, setStartOutcome] = useState<OneTapStartResponse | null>(null);
+  const resetStart = mutations.start.reset;
+  useEffect(() => {
+    resetStart();
+  }, [activeSessionId, resetStart]);
+
   // Identity + the (shared) session query must resolve before any action can
   // be gated correctly — CodeBlueViewer already renders its own loading state
   // for the latter, so this bar simply stays absent until both are ready.
@@ -335,7 +595,15 @@ export function CodeBlueActions() {
   const response: ActiveCodeBlueResponse | undefined = sessionQuery.data;
   const session = response?.session ?? null;
   const currentUserId = identity.data?.id ?? null;
-  const currentRole = identity.data?.role ?? null;
+  // The two gates read DIFFERENT fields, so both are threaded (see the block
+  // comment in `code-blue-actions-derive.ts`):
+  //   gate 1 (initiate) — the SHIFT-derived role, falling back to permanent
+  //     when no shift resolved. `vt_shift_role` has no "vet" member, so an
+  //     on-shift vet's effective role is a technician grade; and an admin on a
+  //     clinical shift genuinely gains clinical authority server-side.
+  //   gate 2 (self-manage) — `users.role`, the permanent one, unconditionally.
+  const permanentRole = identity.data?.role ?? null;
+  const effectiveRole = identity.data?.effectiveRole ?? null;
 
   if (!session) {
     // The server's startSessionSchema requires managerUserName.min(1) — never
@@ -344,19 +612,28 @@ export function CodeBlueActions() {
     const managerUserName = (identity.data?.displayName ?? identity.data?.name ?? "").trim();
     return (
       <NoSessionActions
-        eligible={canStartCodeBlue(currentRole)}
+        canSelfManage={canSelfManageCodeBlue(permanentRole)}
+        canInitiate={canInitiateCodeBlue(effectiveRole, permanentRole)}
         managerUserName={managerUserName}
         currentUserId={currentUserId}
         start={mutations.start}
+        onStarted={setStartOutcome}
       />
     );
   }
 
   return (
-    <ActiveSessionActions
-      session={session}
-      isManager={canEndCodeBlue(currentUserId, session.managerUserId)}
-      mutations={mutations}
-    />
+    <>
+      {/* Scoped to the arrest it describes — a warning carried into the NEXT
+          Code Blue is the same defect as the stale error banner above. */}
+      <StartOutcomeNotice
+        outcome={startOutcome?.sessionId === session.id ? startOutcome : null}
+      />
+      <ActiveSessionActions
+        session={session}
+        isManager={canEndCodeBlue(currentUserId, session.managerUserId)}
+        mutations={mutations}
+      />
+    </>
   );
 }

@@ -7,27 +7,58 @@ import { EmergencyOfflineError } from "@/lib/emergency-block";
 
 import {
   canEndCodeBlue,
-  canStartCodeBlue,
+  canInitiateCodeBlue,
+  canSelfManageCodeBlue,
   codeBlueMutationErrorKey,
   computeElapsedMsForLog,
   resolveLogDraftIdempotencyKey,
 } from "../code-blue-actions-derive";
 
-describe("canStartCodeBlue", () => {
-  it("allows a vet to self-designate as manager and start", () => {
-    expect(canStartCodeBlue("vet")).toBe(true);
+describe("canSelfManageCodeBlue — server gate 2 alone (the vet/admin allow-list on users.role)", () => {
+  it("allows a vet", () => {
+    expect(canSelfManageCodeBlue("vet")).toBe(true);
   });
 
-  it("denies non-vet clinical roles (no self-manager eligibility)", () => {
-    expect(canStartCodeBlue("senior_technician")).toBe(false);
-    expect(canStartCodeBlue("technician")).toBe(false);
-    expect(canStartCodeBlue("student")).toBe(false);
-    expect(canStartCodeBlue("admin")).toBe(false);
+  /**
+   * Gate 2's allow-list literally contains "admin". This predicate is no
+   * longer the conflated "may start AND manage" intersection — callers compose
+   * that as `canInitiate && canSelfManage` — because `allowSystemAdmin: false`
+   * never denied admins at gate 1, it only declined to auto-grant them
+   * (server/middleware/authority.ts:229-232). An admin holding a clinical
+   * shift passes gate 1 on that shift's role and may self-designate.
+   */
+  it("allows an admin — gate 2 accepts them, and an admin on a clinical shift clears gate 1 too", () => {
+    expect(canSelfManageCodeBlue("admin")).toBe(true);
   });
 
-  it("denies an unresolved role", () => {
-    expect(canStartCodeBlue(undefined)).toBe(false);
-    expect(canStartCodeBlue(null)).toBe(false);
+  it("denies senior_technician/technician — valid initiators, but NOT valid managers", () => {
+    expect(canSelfManageCodeBlue("senior_technician")).toBe(false);
+    expect(canSelfManageCodeBlue("technician")).toBe(false);
+  });
+
+
+  it("denies student and an unresolved role", () => {
+    expect(canSelfManageCodeBlue("student")).toBe(false);
+    expect(canSelfManageCodeBlue(undefined)).toBe(false);
+    expect(canSelfManageCodeBlue(null)).toBe(false);
+  });
+});
+
+describe("canInitiateCodeBlue — server gate 1 (requireClinicalAuthority allow-list)", () => {
+  it("allows every clinical role the server lets POST /sessions", () => {
+    expect(canInitiateCodeBlue("vet")).toBe(true);
+    expect(canInitiateCodeBlue("senior_technician")).toBe(true);
+    expect(canInitiateCodeBlue("technician")).toBe(true);
+  });
+
+  it("denies admin — allowSystemAdmin:false excludes system-admin identity from the emergency gate", () => {
+    expect(canInitiateCodeBlue("admin")).toBe(false);
+  });
+
+  it("denies student and an unresolved role", () => {
+    expect(canInitiateCodeBlue("student")).toBe(false);
+    expect(canInitiateCodeBlue(undefined)).toBe(false);
+    expect(canInitiateCodeBlue(null)).toBe(false);
   });
 });
 
@@ -102,15 +133,14 @@ describe("codeBlueMutationErrorKey", () => {
     expect(codeBlueMutationErrorKey(new ApiCodedError(404, "SESSION_NOT_FOUND"))).toBe(
       "codeBlue.errors.notFound",
     );
-    expect(codeBlueMutationErrorKey(new ApiCodedError(403, "MANAGER_ONLY"))).toBe(
-      "codeBlue.errors.forbidden",
-    );
     expect(codeBlueMutationErrorKey(new ApiCodedError(403, "MANAGER_NOT_CODE_BLUE_ELIGIBLE"))).toBe(
-      "codeBlue.errors.forbidden",
+      "codeBlue.errors.managerNotEligible",
     );
-    expect(codeBlueMutationErrorKey(new ApiCodedError(403, "MANAGER_INACTIVE"))).toBe(
-      "codeBlue.errors.forbidden",
+    expect(codeBlueMutationErrorKey(new ApiCodedError(400, "INVALID_MANAGER"))).toBe(
+      "codeBlue.errors.invalidManager",
     );
+    // MANAGER_ONLY / MANAGER_INACTIVE / NO_VET_MANAGER assert in the END-path
+    // describe below: they used to share `forbidden`, and no longer do.
   });
 
   it("degrades an unknown coded error and any non-coded error to the generic key", () => {
@@ -119,5 +149,141 @@ describe("codeBlueMutationErrorKey", () => {
     );
     expect(codeBlueMutationErrorKey(new Error("boom"))).toBe("codeBlue.errors.generic");
     expect(codeBlueMutationErrorKey(null)).toBe("codeBlue.errors.generic");
+  });
+});
+
+/**
+ * The END path is a THREE-error ladder server-side, and the three are not
+ * interchangeable (server/routes/code-blue.ts:994/1008/1014). Collapsing them
+ * onto `forbidden` ("You're not allowed to do that") tells a technician
+ * mid-arrest to stop, when two of the three actually mean "nobody can close
+ * this — escalate", and the third means "the person you nominated must".
+ */
+describe("codeBlueMutationErrorKey — the END path is three outcomes, not one 'forbidden'", () => {
+  it("maps MANAGER_ONLY to its own key — the mirror of the promise the picker made", () => {
+    expect(codeBlueMutationErrorKey(new ApiCodedError(403, "MANAGER_ONLY"))).toBe(
+      "codeBlue.errors.managerOnly",
+    );
+  });
+
+  it("maps NO_VET_MANAGER (422) to an ESCALATION — the nominated manager no longer qualifies, so this session cannot be closed by anyone on this path", () => {
+    expect(codeBlueMutationErrorKey(new ApiCodedError(422, "NO_VET_MANAGER"))).toBe(
+      "codeBlue.errors.managerNoLongerEligible",
+    );
+  });
+
+  it("maps MANAGER_INACTIVE to the SAME escalation — deactivated account, same dead end, same remedy", () => {
+    expect(codeBlueMutationErrorKey(new ApiCodedError(403, "MANAGER_INACTIVE"))).toBe(
+      "codeBlue.errors.managerNoLongerEligible",
+    );
+  });
+});
+
+describe("codeBlueMutationErrorKey — START-path codes", () => {
+  /**
+   * The envelope sends `code: "INSUFFICIENT_ROLE"` with
+   * `reason: "INSUFFICIENT_CLINICAL_AUTHORITY"` (server/middleware/authority.ts:302-306).
+   * A mapper that only switches on `code` would never fire on the reason
+   * string — so `reason` must be consulted too.
+   */
+  it("maps INSUFFICIENT_CLINICAL_AUTHORITY, which arrives as the REASON while the code is INSUFFICIENT_ROLE", () => {
+    expect(
+      codeBlueMutationErrorKey(
+        new ApiCodedError(403, "INSUFFICIENT_ROLE", "INSUFFICIENT_CLINICAL_AUTHORITY"),
+      ),
+    ).toBe("codeBlue.errors.notClinical");
+  });
+
+  // REMOVED IN RECONCILE: a test asserting CODE_BLUE_START_CONFLICT with reason
+  // "OWNER_IN_FLIGHT" -> a dedicated `startConflict` key. The server emits
+  // exactly three reasons for that code (server/lib/code-blue-one-tap.ts:247,
+  // 275, 295 -> uppercased at routes/code-blue.ts:643): ACTIVE_LEASE,
+  // FENCE_SUPERSEDED, ACTIVE_SESSION_EXISTS. "OWNER_IN_FLIGHT" exists nowhere
+  // in the server — it was an invented example, so the test pinned copy for a
+  // response that cannot arrive. The one-tap mapper now splits the three real
+  // reasons, each covered above/below.
+  it("maps a bare ACTIVE_SESSION_EXISTS to the join-the-running-one copy", () => {
+    expect(codeBlueMutationErrorKey(new ApiCodedError(409, "ACTIVE_SESSION_EXISTS"))).toBe(
+      "codeBlue.errors.conflict",
+    );
+  });
+});
+
+/**
+ * Requirement 3 — gate 1 is matched on the SHIFT-derived role, not the
+ * permanent one. `vt_shift_role` is an enum of exactly
+ * `technician | senior_technician | admin` (server/schema/ops.ts:18) — "vet"
+ * is NOT a shift role — so the permanent role and the effective role diverge
+ * routinely, and the server resolves each of these cases explicitly:
+ *
+ *   - permanent admin + clinical shift -> GRANTED. server/lib/authority.ts:14-16
+ *     says so in as many words: "A user whose permanent role is 'admin' but
+ *     who picks up a clinical shift row still gains that shift's clinical
+ *     authority for the shift's duration."
+ *   - any permanent role + `admin` shift -> DENIED. `normalizeShiftRoleToClinical`
+ *     returns null, so `effectiveClinicalRole` is null with reason
+ *     SHIFT_ROLE_NOT_CLINICAL — and the emergency break-glass is unreachable
+ *     because `isPermanentRoleFallbackEligible` additionally requires
+ *     `reason === "EZSHIFT_NONE"` (server/middleware/authority.ts:130-141).
+ *   - permanent student -> DENIED unconditionally, checked FIRST, even with an
+ *     active clinical shift row (server/lib/authority.ts:10-13).
+ */
+describe("canInitiateCodeBlue — gate 1 reads the EFFECTIVE (shift) role, falling back to permanent", () => {
+  it("grants a permanent ADMIN who is rostered onto a clinical shift — the server grants exactly this", () => {
+    expect(canInitiateCodeBlue("technician", "admin")).toBe(true);
+  });
+
+  it("denies a permanent VET rostered onto an ADMIN shift — an admin shift is not clinical authority, and break-glass needs EZSHIFT_NONE", () => {
+    expect(canInitiateCodeBlue("admin", "vet")).toBe(false);
+  });
+
+  it("denies a permanent STUDENT even when rostered onto a technician shift — the server's student hard-stop runs first", () => {
+    expect(canInitiateCodeBlue("technician", "student")).toBe(false);
+  });
+
+  it("falls back to the permanent role when no effective role resolved — the off-shift break-glass responder", () => {
+    expect(canInitiateCodeBlue(null, "vet")).toBe(true);
+    expect(canInitiateCodeBlue("", "senior_technician")).toBe(true);
+  });
+});
+
+/**
+ * POST /api/code-blue/sessions runs `requireClinicalUser` BEFORE
+ * `requireClinicalAuthority` (server/routes/code-blue.ts:288-305). It is a
+ * separate gate reading a separate field — `req.authUser.role`, the PERMANENT
+ * identity — against `CLINICAL_ROLES = {admin, vet, senior_technician,
+ * technician}` (server/middleware/auth.ts:962, 974). That set is NOT the
+ * authority allow-list, and crucially it does not carry the legacy aliases
+ * `normalizeShiftRoleToClinical` accepts (`vet_tech -> technician`,
+ * `lead_technician -> senior_technician`, server/lib/authority-roles.ts:40-44).
+ *
+ * So a `vet_tech` rostered onto a technician shift resolves an effective role
+ * the authority gate would accept, and is still hard-denied one middleware
+ * earlier. Both roles are first-class in this client (main-tab-set,
+ * menu-routes, tasks-derive), so the mis-offer is reachable.
+ */
+describe("canInitiateCodeBlue — the identity gate (requireClinicalUser), which runs FIRST", () => {
+  it("denies a permanent VET_TECH on a technician shift — the shift role is fine, the identity role is not in CLINICAL_ROLES", () => {
+    expect(canInitiateCodeBlue("technician", "vet_tech")).toBe(false);
+  });
+
+  it("denies a permanent LEAD_TECHNICIAN on a senior_technician shift — same alias gap, one tier up", () => {
+    expect(canInitiateCodeBlue("senior_technician", "lead_technician")).toBe(false);
+  });
+
+  it("denies an off-shift VET_TECH read through the one-argument contract", () => {
+    expect(canInitiateCodeBlue("vet_tech")).toBe(false);
+  });
+
+  it("still grants the four identity roles the server actually admits", () => {
+    expect(canInitiateCodeBlue("technician", "admin")).toBe(true);
+    expect(canInitiateCodeBlue("technician", "vet")).toBe(true);
+    expect(canInitiateCodeBlue("technician", "senior_technician")).toBe(true);
+    expect(canInitiateCodeBlue("technician", "technician")).toBe(true);
+  });
+
+  it("degrades to the effective role when the identity role is absent — `role` is optional on the /me shape", () => {
+    expect(canInitiateCodeBlue("technician", null)).toBe(true);
+    expect(canInitiateCodeBlue("technician")).toBe(true);
   });
 });
