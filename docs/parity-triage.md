@@ -3,8 +3,8 @@
 **Phase 4 output.** Fifteen parity items from the W4 audit, classified PORT / DEFER, with
 every defer carrying a named gate. Research only; no source changed by this document.
 
-**Repos read:** RN at `/Users/dan/wt-audit/w4` (branch `chore/w4-parity-triage`, HEAD `cfbed40`) ·
-Capacitor at `/Users/dan/vettrack` (`main`, HEAD `8d379facc`). Every line/file citation below was
+**Repos read:** RN at this repo (branch `chore/w4-parity-triage`, HEAD `cfbed40`) ·
+Capacitor at the vettrack repo (`main`, HEAD `8d379facc`). Every line/file citation below was
 re-checked against those trees on 2026-08-18; where a citation is from a prior audit and could not
 be re-verified here, it is marked as such in §4.
 
@@ -27,11 +27,11 @@ none is a top-level parity item).
 | 8 | **inventory-items** — `src/pages/inventory-items.tsx` (420 ln), `native-nav-model.ts:68`, management section, `adminOnly:true` | **PORT** | An RN-only clinic cannot set a reorder point, which silently disables a feature **RN already shipped**. `autopilotRestockBurnWorker` (registered unconditionally, `start-schedulers.ts:32,104`, daily 07:00) selects clinics having an active item with a non-null `reorderPoint`; the sole writer of that column product-wide is this page; neither the restock blueprint seed nor PMS sync sets it. So `AutopilotQueueScreen` renders `autopilot.empty` forever with no in-app fix. | — | An admin-gated list + edit sheet writing `parLevel`/`reorderPoint` through the existing `PATCH /api/inventory-items/:id`. **Server complete** — full CRUD already ships, reads are student-floor, only mutations are `requireAdmin`. |
 | 9 | **Tablet master-detail + nav adaptation (iPad)** | **DEFER** | *Stated as inference, not observation — no iPad was run.* No clinical action is blocked: TwoPane already covers Equipment, Rooms and Tasks, which is where side-by-side pays. What degrades is ergonomics on an unshipped form factor — a phone bottom tab bar stretched across 1024pt, and 15 non-list screens at iPad width. The one non-hypothetical cost is that Apple's required 13-inch iPad screenshot would photograph a stretched phone UI. | **The RN app's first iOS App Store submission (G5).** `app.json` sets `ios.supportsTablet: true`, so the build ships iPad-installable by construction and iPad users arrive whether or not anyone plans for them. Apple requires ≥1 13-inch iPad screenshot; VetTrack already paid this toll once on the Capacitor lane (`ipad-01-equipment.png` et al.). Self-enforcing: nobody produces that screenshot without first looking at RN on an iPad. Deliberately **not** gated on "an iPad is added to the exit-verdict device list" — that is circular. | — |
 | 10 | **Equipment CREATE** — `POST /api/equipment` | **DEFER** | A technician or vet finds an untracked device mid-shift — a loaner, a return from service, an untagged pump — and cannot enter it from the phone. RN's scan degrades an unrecognized payload into a list search, which returns nothing for a device that does not exist yet. The desktop console is not a fallback for either role (`ManagementWebGate`'s only affordance is Sign out). The device stays in use, uncustodied and invisible to every sweep surface. | **PRIMARY: the first RN build promoted to a production store track under `uk.vettrack.app`.** Verified basis — RN `app.json` declares that bundle for both platforms, the same as the live Capacitor app, so RN lands as an *update that overwrites it*; at that moment vet/technician/vet_tech have zero create surface anywhere. **EARLIER TRIP-WIRE:** one occurrence in a real shift during the G3/G4 on-device verdict run promotes this to PORT immediately. **NOT a gate:** "when someone asks" — the affected roles cannot see the capability is missing and will route around it via an admin, producing no signal. | — |
-| 11 | **sign-up** — `src/pages/signup.tsx` (167 ln); RN has no `SignUp` route, no `useSignUp` call, no `signUp` namespace | **DEFER** | No technician is blocked during a shift — account creation happens once. The break is at onboarding: a new hire meets a sign-in wall and must be handed credentials or the `vettrack.uk/signup?clinic=CODE` link. Today that handoff is nearly free because the same phone can still carry the live Capacitor app. It becomes structural only when RN replaces it on `uk.vettrack.app`. Apple review is unaffected (pre-provisioned demo account); Play's 12-tester lane costs 12 one-time manual provisions, already the documented plan. | **When the RN build is *scoped* for submission to the `uk.vettrack.app` production App Store listing (the G5 scoping step)** — sign-up, join-clinic and pending-approval re-enter scope as **one unit**, because that update removes in-app account creation from every existing iPhone. Gated at scoping, not at submission, because three surfaces cannot be built at the instant they are needed. **Secondary:** if the Play cohort widens beyond the hand-provisioned roster, per-tester provisioning stops being one-time. |
+| 11 | **sign-up** — `src/pages/signup.tsx` (167 ln); RN has no `SignUp` route, no `useSignUp` call, no `signUp` namespace | **DEFER** | No technician is blocked during a shift — account creation happens once. The break is at onboarding: a new hire meets a sign-in wall and must be handed credentials or the `vettrack.uk/signup?clinic=CODE` link. Today that handoff is nearly free because the same phone can still carry the live Capacitor app. It becomes structural only when RN replaces it on `uk.vettrack.app`. Apple review is unaffected (pre-provisioned demo account); Play's 12-tester lane costs 12 one-time manual provisions, already the documented plan. | **When the RN build is *scoped* for submission to the `uk.vettrack.app` production App Store listing (the G5 scoping step)** — sign-up and pending-approval re-enter scope as **one unit**, because that update removes in-app account creation from every existing iPhone. **Join-clinic is NOT part of that unit** — it is PORT (row 4) and lands before this gate, because its failure is a closed lockout loop for an already-signed-in user rather than a one-time onboarding handoff. Gated at scoping, not at submission, because three surfaces cannot be built at the instant they are needed. **Secondary:** if the Play cohort widens beyond the hand-provisioned roster, per-tester provisioning stops being one-time. | — |
 | 12 | **/my-profile** (avatar + shift activity) | **DEFER** | **The nil result is the finding.** I could not construct a task a technician cannot complete because of this, and I looked. Shift activity: zero consequence — `vt_shift_sessions` is called "the legacy clock-in table is orphaned" by its own schema, and three independent searches for a production writer came back empty, so Capacitor users get the empty state today. Avatar: identity is already carried three other ways in RN (name on GreetingHeader, initial in GlassTopBar, display name + edit in Menu), the top bar shows only the signed-in user's *own* initial (self-identification, not peer), and role is server-enforced on every mutation rather than read off a badge. | **A user asks for a profile photo — OR shift-chat / Code-Blue presence rows need face-level disambiguation that name+role text no longer provides.** Both peer-identity surfaces already exist in RN and render identity as *text* today (`MessageBubble.tsx:115,171`; `CodeBlueViewer.tsx:127`); an avatar starts carrying information at the moment that text stops being sufficient. **Gate explicitly REJECTED on review:** "when the Capacitor avatar path is device-verified in production" — nobody schedules cosmetic device-verification on the surface RN is replacing. **Split the item:** shift activity must NEVER be ported as-built; if shift history is ever wanted it must be **rebuilt on the roster-window / `vt_shifts` model**. | — |
 | 13 | **shift-chat archive** — `ShiftChatArchive.tsx` (69 ln), `GET /api/shift-chat/archive/:shiftId` | **DEFER** | A senior technician cannot read the previous shift's raw chat when the generated handover omitted something. **But they cannot on the shipping Capacitor app either** — a whole-tree grep finds no Link and no `setLocation` to `/shift-chat/:shiftId`, it is in no nav model, no deep-link map and no server-generated URL, and the only id a client can obtain (`GET /api/shifts`, requireAdmin) is a roster row the handler rejects. Shipping RN without this regresses no one; it preserves an existing inability. | **Either of two events. DEMAND (primary):** the first time a senior_technician or admin asks to read a previous shift's chat — in practice the first handover dispute where the curated artifact is challenged. **OBJECTIVE (checkable):** any work that adds a past-shift *index* endpoint server-side, since that is the only genuinely missing piece. **Explicitly NOT gated on Capacitor first building an entry point** — that platform is being retired, so waiting on it parks this permanently. | — |
-| 14 | **report-a-bug** — More-sheet row → `ReportIssueDialog` → `POST /api/support` | **DEFER** | RN has **no defect-report channel of any kind** — no submit path, no `support`/`reportBug` namespace, and no Sentry/Bugsnag/crash dependency in `package.json`. A technician reproducing a wrong-custody state mid-shift has no in-app affordance; the build id and device string are never captured. The cost is not a blocked workflow — it is that the migration's bug-discovery loop runs blind on the platform being migrated *to*, going into a device pilot. | **The Capacitor phone app is retired for clinic staff** — the first release in which RN is the phone app of record and the More-sheet fallback is gone. On that day the row disappears from a staff phone with nothing behind it, so this must close **in the same release**, not after it. **Earlier trigger:** a second clinic onboards — that invalidates the "vendor email substitutes for the clinic-internal loop" reasoning outright, since the dialog is a `clinicId`-scoped ticket + push to that clinic's admins. |
-| 15 | **what's-new** — `src/pages/whats-new.tsx` (180 ln), `routes.tsx:281`, AuthGuard only | **DEFER** | Bounded and one-morning: a technician opens RN the day after cutover, finds search and the alert bell moved, and has no in-app explanation. They can still complete every task. Contrast the same repo's damage-recording gap, where an action is impossible outright. **Consequence of deferring past the *second* gate is unbounded** — silent OTA versions with no channel of any kind. **Consequence of building now:** a second bilingual changelog under a CI parity gate, duplicating the store field, staffed by nobody — with the failure already on record (`whats-new.tsx:66-69`: the page read v1.1.0 while 1.1.2 was deployed). | **PRIMARY: the RN cutover release** (first EAS build under the reused bundle id replacing Capacitor in place). Deliverable there is **copy, not code** — a bundle-id-reuse update surfaces the store's own What's New field *before the user opens the app*. Write the notes; do not build the screen. **SECOND, STANDING: when RN adds `expo-updates` / EAS Update.** Today RN has no OTA channel at all, so the store field is the channel; an OTA bypasses it and the app becomes the only place a user can learn what changed. **That gate demands code.** |
+| 14 | **report-a-bug** — More-sheet row → `ReportIssueDialog` → `POST /api/support` | **DEFER** | RN has **no defect-report channel of any kind** — no submit path, no `support`/`reportBug` namespace, and no Sentry/Bugsnag/crash dependency in `package.json`. A technician reproducing a wrong-custody state mid-shift has no in-app affordance; the build id and device string are never captured. The cost is not a blocked workflow — it is that the migration's bug-discovery loop runs blind on the platform being migrated *to*, going into a device pilot. | **The Capacitor phone app is retired for clinic staff** — the first release in which RN is the phone app of record and the More-sheet fallback is gone. On that day the row disappears from a staff phone with nothing behind it, so this must close **in the same release**, not after it. **Earlier trigger:** a second clinic onboards — that invalidates the "vendor email substitutes for the clinic-internal loop" reasoning outright, since the dialog is a `clinicId`-scoped ticket + push to that clinic's admins. | — |
+| 15 | **what's-new** — `src/pages/whats-new.tsx` (180 ln), `routes.tsx:281`, AuthGuard only | **DEFER** | Bounded and one-morning: a technician opens RN the day after cutover, finds search and the alert bell moved, and has no in-app explanation. They can still complete every task. Contrast the same repo's damage-recording gap, where an action is impossible outright. **Consequence of deferring past the *second* gate is unbounded** — silent OTA versions with no channel of any kind. **Consequence of building now:** a second bilingual changelog under a CI parity gate, duplicating the store field, staffed by nobody — with the failure already on record (`whats-new.tsx:66-69`: the page read v1.1.0 while 1.1.2 was deployed). | **PRIMARY: the RN cutover release** (first EAS build under the reused bundle id replacing Capacitor in place). Deliverable there is **copy, not code** — a bundle-id-reuse update surfaces the store's own What's New field *before the user opens the app*. Write the notes; do not build the screen. **SECOND, STANDING: when RN adds `expo-updates` / EAS Update.** Today RN has no OTA channel at all, so the store field is the channel; an OTA bypasses it and the app becomes the only place a user can learn what changed. **That gate demands code.** | — |
 
 ### WON'T-DO carve-outs (sub-items inside row 6, not top-level parity items)
 
@@ -52,6 +52,7 @@ A thing a technician cannot do at the bedside outranks a thing an admin cannot d
 Effort is shown only to make the inversions visible.
 
 ### 1 — Auth strategies *(effort: wiring, not building)*
+
 The broadest bedside failure there is: a user who cannot sign in has **no** Code Blue, **no** custody,
 **no** scan, **no** crash cart. `authFetch` throws `AUTH_INVALID` before dispatch without a JWT.
 Three distinct populations: existing Apple/Google/phone users locked out by the in-place update;
@@ -65,6 +66,7 @@ weights "directly clinical" over "precondition to everything" would swap 1 and 2
 puts both first.
 
 ### 2 — Crash-cart checklist *(effort: one screen, one api module, one namespace; zero server)*
+
 The only port on the emergency path. `StartOfShiftCard.tsx:56` makes the vet's start-of-shift focal
 action literally `href "/crash-cart"` and RN has no such screen; the desktop fallback does not exist
 for that role, because `management.web` is granted only to admin + senior_technician +
@@ -74,6 +76,7 @@ way to clear it, and the daily 06:30 autopilot drift card nags every role with n
 (the `crash_cart_drift` proposal has **no** side effect builder; approving it writes nothing).
 
 ### 3 — Offline READ persister *(effort: (a) ~1 file, (b) L)*
+
 A technician cold-starts in a basement imaging room — the exact condition the offline work exists
 for — and is told *"Session expired. Sign in again to continue."* They can reach no data screen at
 all. Worse, the plausible response to that message is to sign out and back in, which destroys the
@@ -81,11 +84,13 @@ persisted Clerk session and makes the app genuinely unrecoverable until they wal
 Slice (a) alone stops the lie and is roughly one file; do it independently of the read cache.
 
 ### 4 — Clinic join-code onboarding *(effort: one screen + a reason pass-through; zero backend)*
+
 A closed lockout loop with no exit and no explanation, for anyone whose `vt_users` row is missing,
 soft-deleted, or reassigned mid-pilot. Narrower population than #1–#3, but total for whoever it
 catches, and self-recovery is impossible — an admin has to find them in the database.
 
 ### 5 — Equipment EDIT (move-room + floor note) *(effort: one mutation + one sheet)*
+
 Bedside, technician-audience, and it corrupts a **binding** surface: a stale human `roomId` outranks
 RFID under ADR-006's pinned precedence, so the ultrasound reads "Room 3" on detail, radar, locate
 and Asset Copilot while sitting in Prep, and the RFID reads that would correct it are structurally
@@ -94,17 +99,20 @@ items *already* in a room, not-found-here only invalidates a dock anchor, and ch
 tier only *while held*, so the stale value re-surfaces on return.
 
 ### 6 — The 22 real endpoint gaps *(effort: 13 are mutation-only adds on cards that already render)*
+
 Bedside equipment operational cluster: damage, confirm-in-room, condition-states,
 location-inference. Ranked below #5 because #5 is the one that actively *poisons* a precedence
 ladder rather than merely being absent. Note the composition: this is not "35 wiring jobs" — 12 were
 not gaps at all, and 2 of the remainder are rows #2 and #4 above.
 
 ### 7 — Settings depth → the haptics gate *(effort: one line + a toggle)*
+
 Bedside and physical, but recoverable: a technician running a bulk sweep or holding the phone
 through a Code Blue cannot silence VetTrack's haptics without disabling system haptics for every app
 on the device. Ranked here because the remedy exists (a bad one), where #1–#6 have none.
 
 ### 8 — inventory-items *(effort: list + edit sheet; zero server)*
+
 Last by the stated rule: an **admin, at a desk**, cannot set a reorder point. The consequence is
 real but indirect — it makes a *shipped* RN consumer (`AutopilotQueueScreen`, with ProposalCard,
 ReasonSheet, accept/reject/edit) render empty forever. A practice manager cannot make the app tell
@@ -180,7 +188,7 @@ what would settle each, and — where it matters — which way the bucket would 
    iPad-simulator pass via argent, which is available and takes minutes. This is the single cheapest
    uncertainty on the list and it is left open only because it sits behind a gate that forces it.
 
-2. **Production Clerk credential distribution is unread (row 1).** The lockout argument assumes a
+1. **Production Clerk credential distribution is unread (row 1).** The lockout argument assumes a
    non-trivial number of live users authenticate via Apple / Google / phone. That is grounded in
    *code* (all four are wired, and the 1.2.0 review notes list Apple first) and in the IL-market
    phone normalizer — but **not** in a headcount. The Clerk dashboard is the only thing that can
@@ -188,23 +196,23 @@ what would settle each, and — where it matters — which way the bucket would 
    passwords would downgrade the *OAuth half* from core to deferred. It **cannot** downgrade
    sign-up, pending-approval, or join-clinic, which are unconditional.
 
-3. **Production database contents are not visible from here (row 12).** The claim that
+1. **Production database contents are not visible from here (row 12).** The claim that
    `vt_shift_sessions` has no production writer is proven three ways in *code* (`insert(shiftSessions)`
    hits only test fixtures; raw `INSERT INTO vt_shift_sessions` outside `migrations/` is zero; seed
    and scripts are zero — re-verified today). It is **not** proven that the table is empty in
    production. If a clinic has historical rows from the pre-roster clock-in era, `/my-profile` shows
    real content on Capacitor and the "zero consequence" claim weakens to "no *new* data".
 
-4. **One out-of-repo mechanism (row 15).** That an `eas submit` bundle-id-reuse update surfaces the
+1. **One out-of-repo mechanism (row 15).** That an `eas submit` bundle-id-reuse update surfaces the
    store's What's New field to existing users *before they open the app* is verified from how EAS
    publishes listing metadata, **not** from a file in either checkout. If that is wrong, row 15's
    primary gate loses its "copy, not code" deliverable and the item gets larger.
 
-5. **Play closed-track feedback (row 14).** TestFlight's screenshot+crash feedback channel is
+1. **Play closed-track feedback (row 14).** TestFlight's screenshot+crash feedback channel is
    verified; the Play closed-track equivalent is **not**. It is carried as a supporting note only and
    carries no weight in the gate.
 
-6. **The `email_code` fifth Capacitor auth strategy is comment-asserted, not code-verified (row 1).**
+1. **The `email_code` fifth Capacitor auth strategy is comment-asserted, not code-verified (row 1).**
    `clerk-appearance.ts:59` says "keep only the email/password + email-code flows inside the Clerk
    component", but the appearance object only *hides social buttons* — what `<SignIn>` actually
    renders is Clerk dashboard state unreadable from either repo. Counted as 4 code-wired strategies,
@@ -212,12 +220,12 @@ what would settle each, and — where it matters — which way the bucket would 
 
 ### Judgment calls a reader can reverse
 
-7. **Rows 1 and 2 could swap.** Auth is ranked above crash-cart because it denies *all* clinical
+1. **Rows 1 and 2 could swap.** Auth is ranked above crash-cart because it denies *all* clinical
    content rather than one clinical act. A reader weighting "directly on the Code Blue path" over
    "precondition to everything" would put crash-cart first. Nothing downstream changes; both are top
    of the queue either way.
 
-8. **Row 8 (inventory-items) has a live DEFER argument.** It is admin-only, once-per-item
+1. **Row 8 (inventory-items) has a live DEFER argument.** It is admin-only, once-per-item
    configuration, and admins are the least device-constrained users. If you weight that above the
    shipped-but-inert Autopilot consumer, DEFER is arguable — **but** its gate would have to be "when
    restock_burn generation is enabled for any clinic", and the worker is registered unconditionally
@@ -225,28 +233,28 @@ what would settle each, and — where it matters — which way the bucket would 
    today at `start-schedulers.ts:32,104`). There is no future event to wait for. That is precisely
    why DEFER fails.
 
-9. **Row 10 (equipment create) overrides no recorded decision but re-opens one.** `G3-PLAN.md:32`
+1. **Row 10 (equipment create) overrides no recorded decision but re-opens one.** `G3-PLAN.md:32`
    lists "New/edit equipment" by name under "C — explicitly deferred", and the G3 owner verdict was
    taken and passed with it absent. This triage keeps create deferred but **splits the lump**: the
    recorded deferral covers create *and* edit together, and the halves have different audiences —
    create is technician-floor and phone-tab-bar reachable; edit's *admin form* is `isAdmin`-gated but
    two of its four callers are ungated technician writes. Row 5 reopens the edit half only.
 
-10. **Row 3 overrides a standing plan line.** `G3-PLAN.md:296-303` scoped the offline read cache as
+1. **Row 3 overrides a standing plan line.** `G3-PLAN.md:296-303` scoped the offline read cache as
     an optional parallel track, explicitly "not required for the daily-driver verdict if the owner
     accepts online-only reads for G3". A reader could keep it deferred through G4/G5 — store
     submission does not depend on offline reads. The override is narrow: the plan sized and deferred
     a **read cache** without noticing the same gap also produces a false *"session expired"* message,
     which is a correctness bug costing roughly one file. **Only slice (a) is being reclassified.**
 
-11. **Row 3 also corrects a closed decision made on a false premise.** `G3-PLAN.md:299` declares the
+1. **Row 3 also corrects a closed decision made on a false premise.** `G3-PLAN.md:299` declares the
     engine "closed: op-sqlite". `offline-queue-store.ts:1-15` records the later empirical finding
     (2026-08-11) that no op-sqlite/expo-sqlite dependency exists in `package.json` — the reference was
     aspirational web-side contract text — and chose MMKV. **Re-adopting op-sqlite now** would add a
     native dependency, a config plugin and the expo-updates Podfile clash workaround, for a cache the
     same team just demonstrated fits in an MMKV JSON blob.
 
-12. **Row 3's mechanism choice is a constraint, not a preference.** Build it as Capacitor's
+1. **Row 3's mechanism choice is a constraint, not a preference.** Build it as Capacitor's
     mechanism — a try/catch read-through in the API layer — **not** as a
     `PersistQueryClientProvider`. An explicit per-endpoint cache can only ever contain what was
     deliberately written to it; a generic persister dehydrates everything by default and needs a
@@ -254,7 +262,7 @@ what would settle each, and — where it matters — which way the bucket would 
     `src/lib/api/code-blue.ts:22-30` had to pre-write a doctrine forbidding `codeBlueKeys.active()`
     from any future include-list. Satisfy the denylist by construction, not by vigilance.
 
-13. **Row 7 is the one item argued *down*.** The audit framed 105-vs-36 i18n keys as a capability
+1. **Row 7 is the one item argued *down*.** The audit framed 105-vs-36 i18n keys as a capability
     ratio; it is not. Seven of ~27 Capacitor controls already exist in RN, one (`textSize`) is
     delivered free by OS Dynamic Type (RN has **zero** `allowFontScaling`/`maxFontSizeMultiplier`
     overrides — porting it would fight the OS control Capacitor only needs because WKWebView does not
