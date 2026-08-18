@@ -16,10 +16,23 @@ import type { RootStackScreenProps } from "../../navigation/types";
 import { ClerkSignInForm } from "../SignInScreen";
 
 const mockSubmitPassword = jest.fn();
-const mockFlow: { ready: boolean; isSignedIn: boolean; submitPassword: jest.Mock } = {
+const mockStartSso = jest.fn();
+const mockFlow: {
+  ready: boolean;
+  isSignedIn: boolean;
+  isLoaded: boolean;
+  fetchStatus: "idle" | "fetching";
+  fieldErrors: { identifier: boolean; password: boolean };
+  submitPassword: jest.Mock;
+  startSso: jest.Mock;
+} = {
   ready: true,
   isSignedIn: false,
+  isLoaded: true,
+  fetchStatus: "idle",
+  fieldErrors: { identifier: false, password: false },
   submitPassword: mockSubmitPassword,
+  startSso: mockStartSso,
 };
 
 jest.mock("@/infrastructure/auth/useSignInFlow", () => ({
@@ -43,8 +56,12 @@ async function renderForm() {
 
 beforeEach(() => {
   mockSubmitPassword.mockReset();
+  mockStartSso.mockReset();
   mockFlow.ready = true;
   mockFlow.isSignedIn = false;
+  mockFlow.isLoaded = true;
+  mockFlow.fetchStatus = "idle";
+  mockFlow.fieldErrors = { identifier: false, password: false };
 });
 
 describe("SignInScreen error handling", () => {

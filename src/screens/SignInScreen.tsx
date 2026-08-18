@@ -1,18 +1,31 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 
+import { PressableScale } from "@/components/PressableScale";
+import type { SsoStrategy } from "@/core/ports/sign-in-flow.port";
+import { resolveAuthCardLayout } from "@/features/auth/auth-card-layout";
+import { RoleChips } from "@/features/auth/components/RoleChips";
+import {
+  readCarriedRole,
+  writeCarriedRole,
+  type SignupRequestedRole,
+} from "@/features/auth/requested-role-store";
 import { useSignInFlow } from "@/infrastructure/auth/useSignInFlow";
 import { decodeJwtPayload, isValidJwt, resolveToken } from "@/lib/auth-fetch";
+import { useIsTablet } from "@/lib/use-is-tablet";
 import type { RootStackScreenProps } from "../navigation/types";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
 
 /**
- * Minimal Clerk email/password sign-in for G1 Slice 3.
- * Errors surface generic, localized copy — never raw provider messages. A
- * DEV-only console diagnostic records azp presence (G1 gating check); server
- * authorization internals are never rendered to end users.
+ * Branded sign-in (W-AUTH PR-B) — parity with web `signin.tsx`: VetTrack
+ * branding, role pre-selection chips (C5), email/password via the
+ * SignInFlowPort adapter, Apple/Google browser SSO, the Israeli phone-format
+ * hint, and the Slice-13 tablet centered card. Errors surface generic,
+ * localized copy — never raw provider messages. A DEV-only console diagnostic
+ * records azp presence (G1 gating check); server authorization internals are
+ * never rendered to end users.
  */
 export function SignInScreen(props: RootStackScreenProps<"SignIn">) {
   const { t } = useTranslation();
@@ -39,8 +52,8 @@ export function SignInScreen(props: RootStackScreenProps<"SignIn">) {
  * Dev-only azp gating diagnostic (G1). NEVER surfaced to end users — the
  * server-authorization internals stay in the developer console.
  *
- * Extracted from `onSubmit`, and it swallows its own errors on purpose: this
- * runs AFTER signIn.finalize() has established the session, so a rejecting
+ * Extracted from the submit handlers, and it swallows its own errors on
+ * purpose: this runs AFTER the session is established, so a rejecting
  * resolveToken() propagating out would paint "sign-in failed" over a sign-in
  * that worked. A diagnostic must never change the verdict on the thing it is
  * diagnosing.
@@ -64,6 +77,8 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
   // the v4 password->status->finalize mechanism; this screen only maps
   // outcomes to state/copy and never imports Clerk.
   const flow = useSignInFlow();
+  const isTablet = useIsTablet();
+  const [role, setRole] = useState<SignupRequestedRole | null>(() => readCarriedRole());
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -73,19 +88,30 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
     return (
       <View className="flex-1 gap-3 bg-background px-6 pt-6">
         <Text className="text-2xl font-bold text-foreground">{t("signIn.signedInTitle")}</Text>
-        <Pressable
-          className="items-center rounded-xl bg-primary py-3.5 active:opacity-80"
+        <PressableScale
+          className="items-center rounded-xl bg-primary py-3.5"
           accessibilityRole="button"
           onPress={() => navigation.navigate("Main")}
         >
           <Text className="text-[15px] font-semibold text-primary-foreground">{t("signIn.goHome")}</Text>
-        </Pressable>
+        </PressableScale>
       </View>
     );
   }
 
+  // ClerkLoading analog: gate the whole form until the SDK client resolves.
+  if (!flow.isLoaded) {
+    return (
+      <View testID="signin-loading" className="flex-1 items-center justify-center bg-background">
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  const submitting = busy || flow.fetchStatus === "fetching";
+
   const onSubmit = async () => {
-    if (!flow.ready) return;
+    if (!flow.ready || submitting) return;
     setBusy(true);
     setError(null);
     try {
@@ -106,47 +132,136 @@ export function ClerkSignInForm({ navigation }: RootStackScreenProps<"SignIn">) 
     }
   };
 
+  const onSso = async (strategy: SsoStrategy) => {
+    if (submitting) return;
+    setError(null);
+    try {
+      const outcome = await flow.startSso(strategy);
+      // "dismissed" (user closed the browser) is SILENT by port contract —
+      // cancellation is not a failure and must never paint error copy.
+      if (outcome.kind === "activated" && __DEV__) await logAzpDiagnostic();
+    } catch (err) {
+      if (__DEV__) console.debug("[SignIn] SSO failed", err);
+      setError(t("signIn.error"));
+    }
+  };
+
+  const onSelectRole = (nextRole: SignupRequestedRole) => {
+    setRole(nextRole);
+    writeCarriedRole(nextRole);
+  };
+
   return (
-    <View className="flex-1 gap-3 bg-background px-6 pt-6">
-      <Text className="text-2xl font-bold text-foreground">{t("signIn.title")}</Text>
-      <Text className="text-[14px] text-muted">{t("signIn.subtitle")}</Text>
-
-      <TextInput
-        className="rounded-xl border border-border bg-surface px-4 py-3 text-foreground"
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        placeholder={t("signIn.email")}
-        placeholderTextColor="#64748b"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        className="rounded-xl border border-border bg-surface px-4 py-3 text-foreground"
-        secureTextEntry
-        placeholder={t("signIn.password")}
-        placeholderTextColor="#64748b"
-        value={password}
-        onChangeText={setPassword}
-      />
-
-      <Pressable
-        testID="signin-submit"
-        className="items-center rounded-xl bg-primary py-3.5 active:opacity-80"
-        accessibilityRole="button"
-        disabled={busy || !flow.ready}
-        onPress={() => {
-          void onSubmit();
-        }}
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 24 }}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View
+        testID="signin-card"
+        // Slice-13 tablet: centered capped card on an opaque token surface
+        // (never a new blur layer); phones keep the full-bleed column.
+        style={resolveAuthCardLayout(isTablet)}
+        className={isTablet ? "gap-3 rounded-lg border border-border bg-surface p-6" : "gap-3"}
       >
-        {busy ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <Text className="text-[15px] font-semibold text-primary-foreground">{t("signIn.submit")}</Text>
-        )}
-      </Pressable>
+        <View className="mb-2 items-center gap-2">
+          <Image
+            source={require("../../assets/icon.png")}
+            accessibilityIgnoresInvertColors
+            style={{ width: 56, height: 56, borderRadius: 12 }}
+          />
+          <Text className="font-rubik-bold text-[20px] text-foreground">VetTrack</Text>
+          <Text className="text-center font-rubik-bold text-2xl text-foreground">
+            {t("signIn.welcomeBack")}
+          </Text>
+          <Text className="text-center font-rubik text-[14px] text-muted">
+            {t("signIn.subtitle")}
+          </Text>
+        </View>
 
-      {error ? <Text className="text-[14px] text-danger">{error}</Text> : null}
-    </View>
+        <RoleChips selectedRole={role} onSelectRole={onSelectRole} />
+
+        <TextInput
+          className="rounded-xl border border-border bg-surface px-4 py-3 text-foreground"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          placeholder={t("signIn.email")}
+          placeholderTextColor="#64748b"
+          value={email}
+          onChangeText={setEmail}
+        />
+        {flow.fieldErrors.identifier ? (
+          <Text className="font-rubik text-[13px] text-danger">
+            {t("signIn.identifierFieldError")}
+          </Text>
+        ) : null}
+        <TextInput
+          className="rounded-xl border border-border bg-surface px-4 py-3 text-foreground"
+          secureTextEntry
+          placeholder={t("signIn.password")}
+          placeholderTextColor="#64748b"
+          value={password}
+          onChangeText={setPassword}
+        />
+        {flow.fieldErrors.password ? (
+          <Text className="font-rubik text-[13px] text-danger">
+            {t("signIn.passwordFieldError")}
+          </Text>
+        ) : null}
+
+        <PressableScale
+          testID="signin-submit"
+          className="items-center rounded-xl bg-primary py-3.5"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: submitting || !flow.ready }}
+          disabled={submitting || !flow.ready}
+          onPress={() => {
+            void onSubmit();
+          }}
+        >
+          {submitting ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text className="text-[15px] font-semibold text-primary-foreground">{t("signIn.submit")}</Text>
+          )}
+        </PressableScale>
+
+        {/* iOS App Review: offering Google requires offering Apple — both, Apple first. */}
+        <PressableScale
+          testID="sso-apple"
+          className="items-center rounded-xl border border-border bg-surface py-3.5"
+          accessibilityRole="button"
+          onPress={() => {
+            void onSso("oauth_apple");
+          }}
+        >
+          <Text className="font-rubik-semibold text-[15px] text-foreground">
+            {t("signIn.continueWithApple")}
+          </Text>
+        </PressableScale>
+        <PressableScale
+          testID="sso-google"
+          className="items-center rounded-xl border border-border bg-surface py-3.5"
+          accessibilityRole="button"
+          onPress={() => {
+            void onSso("oauth_google");
+          }}
+        >
+          <Text className="font-rubik-semibold text-[15px] text-foreground">
+            {t("signIn.continueWithGoogle")}
+          </Text>
+        </PressableScale>
+
+        {error ? <Text className="text-[14px] text-danger">{error}</Text> : null}
+
+        <Text className="text-center font-rubik text-[12px] text-text-tertiary">
+          {t("signIn.phoneHint")}
+        </Text>
+
+        {/* Clerk bot-protection mount point — SSO can create a sign-up. */}
+        <View nativeID="clerk-captcha" testID="clerk-captcha" />
+      </View>
+    </ScrollView>
   );
 }

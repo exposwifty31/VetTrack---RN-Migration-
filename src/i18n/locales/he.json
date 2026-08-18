@@ -511,7 +511,7 @@
   },
   "signIn": {
     "title": "התחברות",
-    "subtitle": "Clerk-Expo · מטמון אסימונים ב-SecureStore",
+    "subtitle": "התחבר לניהול ציוד הוטרינרי שלך",
     "email": "אימייל",
     "password": "סיסמה",
     "submit": "התחבר",
@@ -519,7 +519,17 @@
     "signedInTitle": "מחובר",
     "goHome": "מעבר לבית",
     "incomplete": "ההתחברות לא הושלמה: סטטוס={{status}}",
-    "error": "ההתחברות נכשלה. בדוק את הפרטים ונסה שוב."
+    "error": "ההתחברות נכשלה. בדוק את הפרטים ונסה שוב.",
+    "welcomeBack": "ברוך שובך",
+    "roleSelectLabel": "בחר/י את התפקיד שלך",
+    "roleVetTech": "טכנאי/ת וטרינרי/ת",
+    "roleVeterinarian": "וטרינר/ית",
+    "roleSelectHint": "מנהל/ת המרפאה יכול/ה לעדכן זאת בעת בדיקת החשבון שלך.",
+    "continueWithApple": "המשך עם Apple",
+    "continueWithGoogle": "המשך עם Google",
+    "phoneHint": "מתחבר עם מספר ישראלי (+972)? ניתן להזין את המספר בפורמט מקומי (לדוגמה: 0501234567).",
+    "identifierFieldError": "בדוק את כתובת האימייל.",
+    "passwordFieldError": "בדוק את הסיסמה."
   },
   "apiSmoke": {
     "title": "בדיקת API",

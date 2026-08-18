@@ -5,14 +5,17 @@
  * signIn.finalize() (replaces legacy setActive). Screens import THIS hook and
  * the port types only; the Clerk import boundary test enforces it tree-wide.
  */
-import { useAuth, useSignIn } from "@clerk/expo";
+import { useAuth, useSignIn, useSSO } from "@clerk/expo";
 import { useMemo } from "react";
 
 import {
   SignInFlowUnavailableError,
   type PasswordSignInOutcome,
   type SignInFlowPort,
+  type SsoOutcome,
+  type SsoStrategy,
 } from "@/core/ports/sign-in-flow.port";
+import { resolveSignInFieldErrors } from "./sign-in-errors";
 
 /** The non-null SignInFuture resource from the v4 hook. */
 type SignInResource = NonNullable<ReturnType<typeof useSignIn>["signIn"]>;
@@ -37,19 +40,32 @@ async function runPasswordFlow(
 
 /** SignInFlowPort over the live Clerk client. Must render under ClerkProvider. */
 export function useSignInFlow(): SignInFlowPort {
-  const { signIn } = useSignIn();
-  const { isSignedIn } = useAuth();
+  const { signIn, errors, fetchStatus } = useSignIn();
+  const { isSignedIn, isLoaded } = useAuth();
+  const { startSSOFlow } = useSSO();
 
   return useMemo<SignInFlowPort>(
     () => ({
       ready: signIn != null,
       isSignedIn: isSignedIn === true,
+      isLoaded: isLoaded === true,
+      fetchStatus: fetchStatus === "fetching" ? "fetching" : "idle",
+      fieldErrors: resolveSignInFieldErrors(errors),
       async submitPassword(emailAddress: string, password: string) {
         // Fail LOUD, never a silent no-op (port contract).
         if (!signIn) throw new SignInFlowUnavailableError();
         return runPasswordFlow(signIn, emailAddress, password);
       },
+      async startSso(strategy: SsoStrategy): Promise<SsoOutcome> {
+        // Browser SSO (v4 asymmetry): the ONE flow that still activates via
+        // setActive. A cancelled browser resolves with createdSessionId: null —
+        // mapped to "dismissed" so callers stay silent on it by contract.
+        const { createdSessionId, setActive } = await startSSOFlow({ strategy });
+        if (!createdSessionId || !setActive) return { kind: "dismissed" };
+        await setActive({ session: createdSessionId });
+        return { kind: "activated" };
+      },
     }),
-    [signIn, isSignedIn],
+    [signIn, isSignedIn, isLoaded, fetchStatus, errors, startSSOFlow],
   );
 }
