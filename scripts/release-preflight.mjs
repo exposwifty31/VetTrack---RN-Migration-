@@ -88,8 +88,18 @@ function redact(text) {
  */
 const EAS_CLI_VERSION = "22.0.0";
 
+/**
+ * Resolved from the RUNNING interpreter, never from PATH (javascript:S4036).
+ * `npx` is installed alongside the `node` binary in every standard
+ * distribution, so `dirname(process.execPath)` is a fixed location the caller
+ * cannot shadow by prepending a writable directory. No plain-"npx" fallback:
+ * falling back would reintroduce exactly the PATH lookup this avoids, so an
+ * unusual layout fails loudly instead of quietly running something else.
+ */
+const NPX_BIN = path.join(path.dirname(process.execPath), "npx");
+
 function eas(args) {
-  const res = spawnSync("npx", [`eas-cli@${EAS_CLI_VERSION}`, ...args], {
+  const res = spawnSync(NPX_BIN, [`eas-cli@${EAS_CLI_VERSION}`, ...args], {
     cwd: ROOT,
     encoding: "utf8",
     maxBuffer: 32 * 1024 * 1024,
@@ -128,6 +138,21 @@ function requireCredentials() {
 // ---------------------------------------------------------------------------
 // Offline: every name the source reads has a disposition somewhere
 // ---------------------------------------------------------------------------
+
+/**
+ * Where a derived env name is accounted for — declared in an eas.json profile,
+ * expected in the EAS server-side store, deliberately unset, or nowhere at all.
+ * Extracted from the reporting loop: as a nested ternary it was both unreadable
+ * and the bulk of that function's cognitive complexity (S3358, S3776).
+ */
+function dispositionOf(name, declared) {
+  if (declared.has(name)) return `eas.json ${declared.get(name).join(", ")}`;
+  if (name in contract.EXPECTED_IN_EAS_ENVIRONMENT) {
+    return `EAS store: ${contract.EXPECTED_IN_EAS_ENVIRONMENT[name].environments.join(", ")}`;
+  }
+  if (name in contract.INTENTIONALLY_UNSET) return "intentionally unset";
+  return "UNACCOUNTED";
+}
 
 function checkEnvAccounting() {
   section("env accounting (offline)");
@@ -177,15 +202,12 @@ function checkEnvAccounting() {
   }
 
   say(`derived ${derived.size} env name(s) from source; all accounted: ${unaccounted.length === 0}`);
-  for (const [name, files] of [...derived].sort()) {
-    const where = declared.has(name)
-      ? `eas.json ${declared.get(name).join(", ")}`
-      : name in contract.EXPECTED_IN_EAS_ENVIRONMENT
-        ? `EAS store: ${contract.EXPECTED_IN_EAS_ENVIRONMENT[name].environments.join(", ")}`
-        : name in contract.INTENTIONALLY_UNSET
-          ? "intentionally unset"
-          : "UNACCOUNTED";
-    say(`  ${name.padEnd(36)} ${where}   [${files.join(", ")}]`);
+  // Sorted by NAME explicitly: `derived` is a Map, so its entries are
+  // [name, files] arrays and a bare .sort() would compare their stringified
+  // form. That happens to order correctly today only because the name comes
+  // first in the pair (javascript:S2871).
+  for (const [name, files] of [...derived].sort(([a], [b]) => a.localeCompare(b))) {
+    say(`  ${name.padEnd(36)} ${dispositionOf(name, declared)}   [${files.join(", ")}]`);
   }
 }
 
@@ -220,7 +242,7 @@ function easEnvironmentNames(environment) {
   }
   const names = new Set();
   for (const line of res.stdout.split("\n")) {
-    const m = /^Name\s+([A-Za-z_][A-Za-z0-9_]*)\s*$/.exec(line);
+    const m = /^Name\s+([A-Za-z_]\w*)\s*$/.exec(line);
     if (m) names.add(m[1]);
   }
   return names;
@@ -389,4 +411,4 @@ async function main() {
   report();
 }
 
-main();
+await main();

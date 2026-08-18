@@ -34,8 +34,9 @@
  */
 function compareEnvPresence({ required, present }) {
   const presentSet = new Set(present);
-  const missing = required.filter((name) => !presentSet.has(name)).sort();
-  const satisfied = required.filter((name) => presentSet.has(name)).sort();
+  const byName = (a, b) => a.localeCompare(b);
+  const missing = required.filter((name) => !presentSet.has(name)).sort(byName);
+  const satisfied = required.filter((name) => presentSet.has(name)).sort(byName);
   return {
     ok: missing.length === 0,
     missing,
@@ -59,10 +60,10 @@ function compareEnvPresence({ required, present }) {
  * @returns {number} -1 | 0 | 1, or NaN when either side is not a version string.
  */
 function compareBuildVersions(a, b) {
-  const parse = (v) => String(v).trim().split(".").map((p) => Number(p));
+  const parse = (v) => String(v).trim().split(".").map(Number);
   const pa = parse(a);
   const pb = parse(b);
-  if ([...pa, ...pb].some((n) => !Number.isFinite(n))) return NaN;
+  if ([...pa, ...pb].some((n) => !Number.isFinite(n))) return Number.NaN;
   for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
     const x = pa[i] ?? 0;
     const y = pb[i] ?? 0;
@@ -111,8 +112,12 @@ function refusesDuplicateBuildNumber({ platform, local, prior }) {
     return { ok: true, reason: null, suggestion: null, highestPrior: null };
   }
 
-  const highestPrior = usable.reduce((hi, p) =>
-    compareBuildVersions(p, hi) > 0 ? p : hi,
+  // Seeded explicitly. The `usable.length === 0` guard above already makes the
+  // unseeded form unreachable — this is legibility for the next reader and for
+  // static analysis, not a live crash being fixed.
+  const highestPrior = usable.reduce(
+    (hi, p) => (compareBuildVersions(p, hi) > 0 ? p : hi),
+    usable[0],
   );
   const cmp = compareBuildVersions(localStr, highestPrior);
 
@@ -200,8 +205,7 @@ function assetlinksCoverage({ servedDoc, packageName, expected }) {
       typeof stmt === "object" &&
       Array.isArray(stmt.relation) &&
       stmt.relation.includes(APP_LINK_RELATION) &&
-      stmt.target &&
-      stmt.target.namespace === "android_app" &&
+      stmt.target?.namespace === "android_app" &&
       stmt.target.package_name === packageName,
   );
 

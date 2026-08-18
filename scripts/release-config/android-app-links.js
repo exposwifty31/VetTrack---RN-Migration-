@@ -99,7 +99,7 @@ function autoVerifiedHosts(appJson) {
       if (datum?.scheme === "https" && datum?.host) hosts.add(datum.host);
     }
   }
-  return [...hosts].sort();
+  return [...hosts].sort((a, b) => a.localeCompare(b));
 }
 
 module.exports = {

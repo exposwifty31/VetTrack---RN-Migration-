@@ -131,6 +131,13 @@ const INTENTIONALLY_UNSET = {
  * GOOGLE_SERVICES_JSON is read by app.config.js, which that suite does not scan.
  * Handing it the unfiltered registry would fail a passing test for a non-defect.
  */
+/** TS parses .tsx, .js and .ts under different grammars; pick by extension. */
+function scriptKindFor(file) {
+  if (file.endsWith(".tsx")) return ts.ScriptKind.TSX;
+  if (file.endsWith(".js")) return ts.ScriptKind.JS;
+  return ts.ScriptKind.TS;
+}
+
 function expoPublicEasEnvironmentRegistry() {
   const out = {};
   for (const [name, entry] of Object.entries(EXPECTED_IN_EAS_ENVIRONMENT)) {
@@ -154,7 +161,7 @@ function requiredNamesFor(environment) {
   return Object.entries(EXPECTED_IN_EAS_ENVIRONMENT)
     .filter(([, entry]) => entry.environments.includes(environment))
     .map(([name]) => name)
-    .sort();
+    .sort((a, b) => a.localeCompare(b));
 }
 
 /**
@@ -230,11 +237,7 @@ function collectEnvReads(files, { filter = () => true } = {}) {
 
   for (const file of files) {
     const rel = path.relative(ROOT, file);
-    const scriptKind = file.endsWith(".tsx")
-      ? ts.ScriptKind.TSX
-      : file.endsWith(".js")
-        ? ts.ScriptKind.JS
-        : ts.ScriptKind.TS;
+    const scriptKind = scriptKindFor(file);
     const sourceFile = ts.createSourceFile(
       file,
       fs.readFileSync(file, "utf8"),

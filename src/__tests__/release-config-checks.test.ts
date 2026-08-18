@@ -201,7 +201,11 @@ describe("(B) build-number collision", () => {
   });
 
   it("compares numerically, not lexicographically (a string compare would pass 9 over 10)", () => {
-    expect("9" > "10").toBe(true); // the bug this avoids, stated in the test
+    // NOT an assertion: `"9" > "10"` is true in JavaScript by definition, so
+    // asserting it can never fail — a passing line that proves nothing, in a
+    // file whose whole premise is proof-by-refusal. It is the hazard being
+    // guarded against, so it belongs in prose. The two assertions below are the
+    // ones that can actually go red.
     expect(checks.compareBuildVersions("9", "10")).toBe(-1);
     expect(
       checks.refusesDuplicateBuildNumber({ platform: "ios", local: "9", prior: ["10"] }).ok,
