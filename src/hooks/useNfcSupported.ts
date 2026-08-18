@@ -23,10 +23,17 @@ export function useNfcSupported(): boolean | null {
       try {
         const ok = await NfcManager.isSupported();
         if (!active) return;
-        setSupported(ok);
-        // Only start the manager when there is hardware to start — `start()` on
-        // a device without NFC throws on Android.
-        if (ok) await NfcManager.start();
+        if (!ok) {
+          setSupported(false);
+          return;
+        }
+        // `start()` BEFORE publishing: an affordance shown while the manager is
+        // still initializing opens sessions that fail — and if start() then
+        // rejects, the user has already seen a capability that does not exist.
+        // (`start()` on a device without NFC throws on Android, which is why it
+        // only runs behind the probe.)
+        await NfcManager.start();
+        if (active) setSupported(true);
       } catch {
         // A probe that throws is not evidence of capability. Fail closed: an
         // affordance that opens a session which can never succeed is worse than

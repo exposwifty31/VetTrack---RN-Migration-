@@ -63,7 +63,7 @@ Note that `docs/g2-ntag-ndef-spec.md:28` still says the RN build is
 `uk.vettrack.rnmigration`. That is **stale** relative to this branch. Confirm
 empirically rather than trusting either document:
 
-```
+```sh
 # Android
 adb shell pm list packages | grep vettrack
 ```
@@ -88,11 +88,11 @@ Result: ☐ pass ☐ fail — ..................................................
 - **Record the UID case in 2.1 — it is a real check, not a formality.** Native
   returns UPPERCASE hex on both platforms (`ios/Util.m:16` `"%02lX"`;
   `android/Util.java:19` `hexArray = "0123456789ABCDEF"`) while the Capacitor
-  app binds lowercase (`/Users/dan/vettrack/src/lib/nfc-capgo-decode.ts:24`,
+  app binds lowercase (`vettrack:src/lib/nfc-capgo-decode.ts:24`,
   `toString(16)`). This build normalizes to lowercase (`normalizeTagUid` in
   `src/lib/nfc-provision.ts`) **specifically so the two agree**.
   `vt_equipment.nfcTagId` is `.unique()` globally
-  (`/Users/dan/vettrack/server/schema/equipment.ts:136`) and matched
+  (`vettrack:server/schema/equipment.ts:136`) and matched
   byte-exactly, so if the bound line ever renders an **uppercase** UID the
   normalization has regressed and one physical sticker can occupy two rows.
   Lowercase is the pass.
@@ -124,7 +124,7 @@ Result: ☐ pass ☐ fail — account used: ....................................
 
 ### 0.4 — Build integrity
 
-```
+```sh
 npm ci          # NOT pnpm — package-lock.json is authoritative
 npx expo run:ios      # and, on the other machine/device
 npx expo run:android
@@ -468,11 +468,14 @@ Result: ☐ pass ☐ fail ☐ skipped — ......................................
 
 ### 2.7 — Program the sacrificial tags (do NOT lock them)
 
-Stage 3 needs an already-programmed tag: the lock refuses an unprogrammed one
-("This sticker cannot be locked. Program it first."). Doing that write **here**,
-while still in the reversible stage, means Stage 3 opens with a known-good tag
-and contains nothing but lock operations. If this write fails you are still in
-reversible territory and have lost nothing.
+Stage 3 needs an already-programmed tag — and NOT because the lock would refuse
+a blank one. **It will not refuse.** The guard checks NDEF status only, and a
+factory NTAG215 frequently ships NDEF-formatted-and-empty, which reads
+`ReadWrite` and locks. No layer shows a "program it first" message; nothing
+stands between a blank tag and a permanent lock except this procedure. Doing the
+write **here**, while still in the reversible stage, is what guarantees Stage 3
+opens with a known-good tag and contains nothing but lock operations. If this
+write fails you are still in reversible territory and have lost nothing.
 
 **Do:** repeat step 2.1 (iPhone) or 2.3 (Pixel) against `SACRIFICIAL-1`, on any
 unit. **Stop there — do not touch "Lock sticker permanently" yet.**

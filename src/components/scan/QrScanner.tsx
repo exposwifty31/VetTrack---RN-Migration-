@@ -8,7 +8,7 @@
  * Permission-denied fails LOUD — an explicit message + action (request, or open
  * Settings once the OS won't re-prompt), never a silent black frame.
  */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Linking, Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -41,6 +41,14 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
   const appActive = useAppActive();
   // Focus AND foreground — see the `active` prop doc above.
   const cameraActive = active && appActive;
+  // The native module holds the closure from the render it was mounted in, so
+  // a queued barcode event can fire with a STALE `cameraActive` captured as
+  // true after the gate has flipped. The ref always carries the latest value;
+  // the handler reads it instead of the captured one.
+  const cameraActiveRef = useRef(cameraActive);
+  useEffect(() => {
+    cameraActiveRef.current = cameraActive;
+  }, [cameraActive]);
   // onBarcodeScanned fires continuously; debounce to one hand-off per ~2s so a
   // single code can't push ScanConfirm repeatedly (re-arms after returning).
   const lastFireRef = useRef(0);
@@ -106,9 +114,10 @@ export default function QrScanner({ onScanned, hint, active }: QrScannerProps) {
           onMountError={() => setMountFailed(true)}
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
           onBarcodeScanned={(result) => {
-            // Defends against an event already in flight while the gate flips
-            // false (the unmount above is the primary gate).
-            if (!cameraActive) return;
+            // Read through the ref, not the captured value: the closure the
+            // native module holds is from an earlier render, so the captured
+            // `cameraActive` can be true after the gate flipped false.
+            if (!cameraActiveRef.current) return;
             const now = Date.now();
             if (now - lastFireRef.current < 2000) return;
             lastFireRef.current = now;

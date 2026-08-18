@@ -85,6 +85,17 @@ export const NFC_SESSION_TIMEOUT_MS = 75_000;
  */
 let provisioningInFlight = false;
 
+/**
+ * Cancellation generation. `cancelTechnologyRequest` only rejects a PENDING
+ * `requestTechnology`; once the session is open and the body is awaiting a
+ * native call (`getNdefStatus`, `writeNdefMessage`), there is nothing left to
+ * reject — the call resolves normally and the flow continues PAST the
+ * operator's cancel. The generation makes that visible: `withSession` records
+ * it at entry, and `assertNotCancelled` is checked after every awaited native
+ * call, before anything irreversible.
+ */
+let cancelGeneration = 0;
+
 /** Native returns UPPERCASE hex on both platforms; the row is keyed on lowercase. */
 function normalizeTagUid(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -128,15 +139,23 @@ async function openSession(alertMessage?: string): Promise<void> {
 }
 
 /** Run `body` inside exactly one Ndef session, single-flight, always closed. */
-async function withSession<T>(alertMessage: string | undefined, body: () => Promise<T>): Promise<T> {
+async function withSession<T>(
+  alertMessage: string | undefined,
+  body: (assertNotCancelled: () => void) => Promise<T>,
+): Promise<T> {
   if (provisioningInFlight) throw new NfcProvisionError("busy");
   provisioningInFlight = true;
+  const generation = cancelGeneration;
+  const assertNotCancelled = () => {
+    if (cancelGeneration !== generation) throw new NfcProvisionError("session_failed");
+  };
   try {
     // A session that never opened has nothing to cancel — and cancelling here
     // would make the `busy` / timeout accounting ambiguous.
     await openSession(alertMessage);
+    assertNotCancelled();
     try {
-      return await body();
+      return await body(assertNotCancelled);
     } finally {
       await NfcManager.cancelTechnologyRequest().catch(() => {});
     }
@@ -165,6 +184,7 @@ async function withSession<T>(alertMessage: string | undefined, body: () => Prom
  * guard. Safe to call when nothing is in flight.
  */
 export async function cancelNfcProvisioning(): Promise<void> {
+  cancelGeneration += 1;
   await NfcManager.cancelTechnologyRequest().catch(() => {});
 }
 
@@ -200,12 +220,13 @@ export async function writeEquipmentStickerTag(
     throw cause;
   }
 
-  return withSession(alertMessage, async () => {
+  return withSession(alertMessage, async (assertNotCancelled) => {
     try {
       await NfcManager.ndefHandler.writeNdefMessage(bytes);
     } catch (cause) {
       throw new NfcProvisionError("write_failed", { cause });
     }
+    assertNotCancelled();
     // Read the UID only after the write succeeded, so a returned UID is always
     // the UID of a tag this call actually programmed.
     const tag = await NfcManager.getTag().catch(() => null);
@@ -224,10 +245,13 @@ export type NfcLockResult = {
  * first (the card gates this behind an explicit two-step arm + confirm).
  */
 export async function lockEquipmentStickerTag(alertMessage?: string): Promise<NfcLockResult> {
-  return withSession(alertMessage, async () => {
+  return withSession(alertMessage, async (assertNotCancelled) => {
     const before = await NfcManager.ndefHandler.getNdefStatus().catch((cause: unknown) => {
       throw new NfcProvisionError("not_lockable", { cause });
     });
+    // The last exit before the irreversible call: a cancel that landed while
+    // the status read was pending must stop the lock, not merely the session.
+    assertNotCancelled();
 
     // Idempotent branch — NfcLockPlugin.swift:117-122.
     if (before.status === NdefStatus.ReadOnly) return { alreadyLocked: true };

@@ -6,7 +6,7 @@
  * equipment-detail screen purely to read `supported` would put a second reader
  * lifecycle next to a write/lock session that must own its own.
  */
-import { renderHook, waitFor } from "@testing-library/react-native";
+import { act, renderHook, waitFor } from "@testing-library/react-native";
 import NfcManager from "react-native-nfc-manager";
 
 import { useNfcSupported } from "../useNfcSupported";
@@ -53,5 +53,33 @@ describe("useNfcSupported", () => {
     const { result } = await renderHook(() => useNfcSupported());
 
     await waitFor(() => expect(result.current).toBe(false));
+  });
+});
+
+describe("supported is published only after start() succeeds (review)", () => {
+  it("stays null while start() is still pending", async () => {
+    native.isSupported.mockResolvedValue(true);
+    let releaseStart!: () => void;
+    native.start.mockReturnValue(new Promise<void>((r) => { releaseStart = () => r(); }));
+
+    const { result } = await renderHook(() => useNfcSupported());
+    await act(async () => {}); // isSupported resolves; start() is still pending
+
+    // Publishing true here would flash an affordance whose manager is not
+    // initialized — a session opened in that window fails.
+    expect(result.current).toBeNull();
+
+    await act(async () => { releaseStart(); });
+    expect(result.current).toBe(true);
+  });
+
+  it("resolves false when start() rejects, without ever having shown true", async () => {
+    native.isSupported.mockResolvedValue(true);
+    native.start.mockRejectedValue(new Error("no NFC service"));
+
+    const { result } = await renderHook(() => useNfcSupported());
+    await act(async () => {});
+
+    expect(result.current).toBe(false);
   });
 });

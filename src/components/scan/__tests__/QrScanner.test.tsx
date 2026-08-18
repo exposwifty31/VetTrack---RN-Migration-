@@ -191,3 +191,22 @@ describe("QrScanner mount failure", () => {
     expect(screen.getByText("scan.cameraUnavailable")).toBeTruthy();
   });
 });
+
+describe("stale-closure gate (review: a queued event fired after the flip)", () => {
+  it("drops a barcode event delivered from a pre-background closure", async () => {
+    // The native module holds the closure from the render it was mounted in.
+    // Before the ref fix the handler read the CAPTURED `cameraActive` — true at
+    // capture time — so an event queued across the flip fired `onScanned` for a
+    // camera the user had already left. The in-flight guard was decorative.
+    const onScanned = jest.fn();
+    await render(<QrScanner active onScanned={onScanned} hint="hint" />);
+
+    const staleHandler = cameraProps?.onBarcodeScanned as (r: { data: string }) => void;
+    expect(staleHandler).toBeInstanceOf(Function);
+
+    await emitAppState("background"); // the gate flips; the camera unmounts
+
+    staleHandler({ data: "vt-equipment:123" }); // the queued event lands late
+    expect(onScanned).not.toHaveBeenCalled();
+  });
+});

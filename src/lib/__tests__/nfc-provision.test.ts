@@ -317,3 +317,27 @@ describe("NfcProvisionError", () => {
     expect(error.code).toBe("lock_failed");
   });
 });
+
+describe("cancellation during a pending native call (review: the lock could fire after cancel)", () => {
+  it("never calls makeReadOnly when cancel lands while getNdefStatus is pending", async () => {
+    // The remount hazard, second half. Cancelling rejects a PENDING
+    // requestTechnology — but once the session is open and the body is awaiting
+    // getNdefStatus, there is nothing left to reject: the status resolves and
+    // the flow reaches makeReadOnly AFTER the operator cancelled. On an NTAG215
+    // that is an irreversible lock of whatever tag is on the phone now.
+    let releaseStatus!: () => void;
+    const statusPending = new Promise<{ status: number; capacity: number }>((resolve) => {
+      releaseStatus = () => resolve({ status: NdefStatus.ReadWrite, capacity: 504 });
+    });
+    native.ndefHandler.getNdefStatus.mockReset().mockReturnValueOnce(statusPending);
+
+    const lock = lockEquipmentStickerTag();
+    await Promise.resolve(); // session opens; the status call is now pending
+
+    await cancelNfcProvisioning(); // the operator cancels mid-read
+    releaseStatus(); // the pending status resolves afterwards
+
+    await expect(lock).rejects.toBeInstanceOf(NfcProvisionError);
+    expect(native.ndefHandler.makeReadOnly).not.toHaveBeenCalled();
+  });
+});
