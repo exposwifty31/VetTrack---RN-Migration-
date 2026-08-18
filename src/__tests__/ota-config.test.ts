@@ -100,12 +100,41 @@ describe("updates block", () => {
   });
 });
 
+/**
+ * EXHAUSTIVE over eas.json, not a two-row allowlist.
+ *
+ * The earlier version asserted only that `preview` and `production` carry their
+ * channels. That says nothing about any OTHER profile — so a new profile could
+ * be added with no channel and this suite would stay green. The very next
+ * branch did exactly that (`measure`), and nothing noticed.
+ *
+ * Channel-less is a legitimate answer, and for two profiles it is the RIGHT
+ * one — but it has to be an answer, recorded here, not an omission. Adding a
+ * profile to eas.json now fails this test until someone states which case it
+ * is, which is the decision the omission was skipping.
+ */
+const EXPECTED_CHANNELS: Record<string, string | null> = {
+  // Dev builds load from the dev server; an update channel is meaningless.
+  development: null,
+  preview: "preview",
+  // A MEASUREMENT artifact must be frozen: an OTA shifting the JS bundle
+  // underneath a perf run would silently invalidate the numbers it produced.
+  measure: null,
+  production: "production",
+};
+
 describe("build profile channels", () => {
-  it.each([
-    ["preview", "preview"],
-    ["production", "production"],
-  ])("eas.json build.%s is subscribed to the %s channel", (profile, channel) => {
-    expect(easJson.build[profile]?.channel).toBe(channel);
+  // The guard runs FROM eas.json, so a profile added there without an entry
+  // above fails here. The map may name a profile eas.json does not have yet —
+  // that is a forward declaration, not a failure, and it keeps this contract
+  // from coupling to the merge order of a sibling branch.
+  it("every profile in eas.json has a recorded channel decision", () => {
+    const undecided = Object.keys(easJson.build).filter((p) => !(p in EXPECTED_CHANNELS));
+    expect(undecided).toEqual([]);
+  });
+
+  it.each(Object.keys(easJson.build))("eas.json build.%s matches its recorded channel", (profile) => {
+    expect(easJson.build[profile]?.channel ?? null).toBe(EXPECTED_CHANNELS[profile] ?? null);
   });
 });
 
