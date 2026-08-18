@@ -75,8 +75,21 @@ function redact(text) {
     .join("\n");
 }
 
+/**
+ * PINNED, not `@latest`. This repo's CI already runs repo-owned binaries
+ * (`./node_modules/.bin/expo`, `./node_modules/.bin/patch-package`) rather than
+ * resolving a version at run time, and this gate has a stronger reason to
+ * follow that rule than they do: `easEnvironmentNames()` parses the CLI's
+ * human-readable output with a fixed regex. An unpinned CLI therefore turns a
+ * cosmetic upstream format change into a red gate on a commit that changed
+ * nothing — the false alarm that teaches people to ignore the gate. 22.0.0 is
+ * the version the env contract was verified against (see env-contract.js).
+ * Raise both together, deliberately, or not at all.
+ */
+const EAS_CLI_VERSION = "22.0.0";
+
 function eas(args) {
-  const res = spawnSync("npx", ["eas-cli@latest", ...args], {
+  const res = spawnSync("npx", [`eas-cli@${EAS_CLI_VERSION}`, ...args], {
     cwd: ROOT,
     encoding: "utf8",
     maxBuffer: 32 * 1024 * 1024,

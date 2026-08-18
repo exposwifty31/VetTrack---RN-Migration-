@@ -215,9 +215,18 @@ function assetlinksCoverage({ servedDoc, packageName, expected }) {
     };
   }
 
+  // Array.isArray, not `?? []`, and for the same reason `relation` is guarded
+  // that way sixteen lines up: a served document is REMOTE input. A field that
+  // arrives as a string or an object is a malformed assetlinks file — a real
+  // failure of the exact thing this gate checks — and `.map` on it threw
+  // TypeError. The preflight's try/catch covers only the fetch and the JSON
+  // parse, so that throw escaped as a stack trace instead of the
+  // "fingerprint not served" line. Treat a non-array as serving nothing.
   const served = new Set(
     ours.flatMap((stmt) =>
-      (stmt.target.sha256_cert_fingerprints ?? []).map(normalizeFingerprint),
+      Array.isArray(stmt.target.sha256_cert_fingerprints)
+        ? stmt.target.sha256_cert_fingerprints.map(normalizeFingerprint)
+        : [],
     ),
   );
   const missingFingerprints = (expected ?? []).filter(

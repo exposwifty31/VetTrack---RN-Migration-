@@ -300,6 +300,33 @@ describe("(C) Android App Links", () => {
     expect(verdict.problems[0]).toContain("hypothetical Play App Signing key");
   });
 
+  it("REFUSES, rather than CRASHES, when the fingerprint list is not a list", () => {
+    // Ultrareview finding 1. `relation` is guarded with Array.isArray sixteen
+    // lines above; `sha256_cert_fingerprints` was guarded only against
+    // null/undefined, so a served document with that field as a string reached
+    // `.map` and threw TypeError. The preflight's try/catch wraps only the
+    // fetch and the JSON parse — this call sits outside it, so the gate would
+    // have died with a stack trace instead of printing the "fingerprint not
+    // served" line it exists to print. A malformed assetlinks document is a
+    // REAL failure of exactly the thing being checked; it has to read as one.
+    const verdict = checks.assetlinksCoverage({
+      servedDoc: [
+        {
+          relation: ["delegate_permission/common.handle_all_urls"],
+          target: {
+            namespace: "android_app",
+            package_name: PACKAGE,
+            sha256_cert_fingerprints: UPLOAD_KEY.sha256, // a bare string, not an array
+          },
+        },
+      ],
+      packageName: PACKAGE,
+      expected: [UPLOAD_KEY],
+    });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.missingFingerprints).toEqual([UPLOAD_KEY]);
+  });
+
   it("REFUSES a document that names a different package", () => {
     const verdict = checks.assetlinksCoverage({
       servedDoc: servedToday,
@@ -389,5 +416,25 @@ describe("(C) Android App Links", () => {
     expect(blocker.ownerActions.join("\n")).toContain("App integrity");
     expect(blocker.ownerActions.join("\n")).toContain("ANDROID_PLAY_SIGNING_SHA256");
     expect(blocker.ownerActions.join("\n")).toContain("digitalassetlinks.googleapis.com");
+  });
+});
+
+/**
+ * The preflight shells out to eas-cli and parses its human-readable output with
+ * a fixed regex. `@latest` would make an upstream formatting change fail the
+ * gate on a commit that changed nothing — and a gate that cries wolf is a gate
+ * people learn to skip. Pinned deliberately; raise it together with the
+ * verification stamp in env-contract.js.
+ */
+describe("the preflight pins its eas-cli", () => {
+  it("never resolves the CLI version at run time", () => {
+    const { readFileSync } = require("node:fs") as typeof import("node:fs");
+    const { join } = require("node:path") as typeof import("node:path");
+    const source = readFileSync(
+      join(__dirname, "..", "..", "scripts", "release-preflight.mjs"),
+      "utf8",
+    );
+    expect(source).not.toContain("eas-cli@latest");
+    expect(source).toMatch(/const EAS_CLI_VERSION = "\d+\.\d+\.\d+";/);
   });
 });
