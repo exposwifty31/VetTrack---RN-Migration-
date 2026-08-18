@@ -10,13 +10,14 @@
  * flag untouched.
  */
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { useTranslation } from "react-i18next";
 
 import { PressableScale } from "@/components/PressableScale";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { applyLocaleChange } from "@/features/account/locale-toggle";
 import { type Locale } from "@/i18n/locale-resolver";
+import { AppText } from "@/theme/ScaledText";
 import { isRtlReloadPending } from "@/i18n/rtl";
 
 export function LanguageCard() {
@@ -43,7 +44,7 @@ export function LanguageCard() {
 
   return (
     <SectionCard>
-      <Text className="font-rubik text-[12.5px] text-text-tertiary">{t("account.language")}</Text>
+      <AppText className="font-rubik text-[12.5px] text-text-tertiary">{t("account.language")}</AppText>
       <View className="mt-2 flex-row gap-2">
         <LocaleOption
           label={t("common.hebrew")}
@@ -57,9 +58,9 @@ export function LanguageCard() {
         />
       </View>
       {persistFailed ? (
-        <Text className="mt-2 font-rubik text-[12.5px] text-danger">{t("account.localeError")}</Text>
+        <AppText className="mt-2 font-rubik text-[12.5px] text-danger">{t("account.localeError")}</AppText>
       ) : reloadPending ? (
-        <Text className="mt-2 font-rubik text-[12.5px] text-warning">{t("account.restartHint")}</Text>
+        <AppText className="mt-2 font-rubik text-[12.5px] text-warning">{t("account.restartHint")}</AppText>
       ) : null}
     </SectionCard>
   );
@@ -81,7 +82,7 @@ function LocaleOption({
       }
       onPress={onPress}
     >
-      <Text
+      <AppText
         className={
           selected
             ? "font-rubik-semibold text-[15px] text-foreground"
@@ -89,7 +90,7 @@ function LocaleOption({
         }
       >
         {label}
-      </Text>
+      </AppText>
     </PressableScale>
   );
 }
