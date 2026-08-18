@@ -881,3 +881,63 @@ describe("CodeBlueActions — a stale start error does not cross sessions", () =
     expect(screen.getByText("codeBlue.errors.conflict")).toBeTruthy();
   });
 });
+
+/**
+ * CodeRabbit kept this one open, and was right to: one-tap's whole promise is
+ * "everything ready", and the two fields that say whether it actually WAS were
+ * being discarded.
+ *
+ *   reservedCartId: null  — no ready crash cart could be reserved. The session
+ *     still starts (soft-reserve is advisory), so without a notice the team
+ *     believes a cart is waiting and finds out at the patient.
+ *   pagingState: "failed" — the team page did not go out. Nobody is coming.
+ *
+ * Both are silent degradations of an orchestration the responder is trusting.
+ */
+describe("CodeBlueActions — the start outcome is reported, not swallowed", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  async function startThenSession(data: Record<string, unknown>) {
+    const startMutate = jest.fn((_payload: unknown, opts?: { onSuccess?: (d: unknown) => void }) =>
+      opts?.onSuccess?.(data),
+    );
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: NO_ACTIVE });
+    mockMutations({ start: { mutate: startMutate } });
+    const view = await render(<CodeBlueActions />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByText("codeBlue.actions.start"));
+    });
+
+    mockSessionQuery({ data: ACTIVE });
+    await act(async () => {
+      view.rerender(<CodeBlueActions />);
+    });
+  }
+
+  it("warns when NO crash cart was reserved", async () => {
+    await startThenSession({ outcome: "created", sessionId: "cb-1", reservedCartId: null, pagingState: "sent" });
+    expect(screen.getByText("codeBlue.notice.noCartReserved")).toBeTruthy();
+  });
+
+  it("warns when the team page FAILED", async () => {
+    await startThenSession({ outcome: "created", sessionId: "cb-1", reservedCartId: "cart-3", pagingState: "failed" });
+    expect(screen.getByText("codeBlue.notice.pagingFailed")).toBeTruthy();
+  });
+
+  it("says nothing when the orchestration did what it promised", async () => {
+    await startThenSession({ outcome: "created", sessionId: "cb-1", reservedCartId: "cart-3", pagingState: "sent" });
+    expect(screen.queryByText("codeBlue.notice.noCartReserved")).toBeNull();
+    expect(screen.queryByText("codeBlue.notice.pagingFailed")).toBeNull();
+  });
+
+  it("does not carry a notice into a DIFFERENT session", async () => {
+    // The notice belongs to the arrest it describes. A stale warning on the
+    // next Code Blue is the same defect as the stale error banner.
+    await startThenSession({ outcome: "created", sessionId: "cb-OLD", reservedCartId: null, pagingState: "sent" });
+    expect(screen.queryByText("codeBlue.notice.noCartReserved")).toBeNull();
+  });
+});

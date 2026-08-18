@@ -58,6 +58,7 @@ import { useIdentity } from "@/app/useIdentity";
 import { api } from "@/lib/api";
 import { codeBlueApi, codeBlueKeys } from "@/lib/api/code-blue";
 import type {
+  OneTapStartResponse,
   ActiveCodeBlueResponse,
   CodeBlueManager,
   CodeBlueSession,
@@ -300,6 +301,40 @@ function StartAffordance({
   );
 }
 
+/**
+ * What one-tap actually managed, when it did not manage all of it.
+ *
+ * `POST /api/code-blue/one-tap` promises "everything ready": a claim, the
+ * nearest READY crash cart soft-reserved, and the team paged. Two of those can
+ * fail without failing the start —
+ *
+ *   reservedCartId: null   no ready cart could be reserved. Soft-reserve is
+ *                          advisory, so the session opens anyway; silence here
+ *                          means the team believes a cart is waiting for them.
+ *   pagingState: "failed"  the page did not go out. Nobody is coming.
+ *
+ * Neither is an error, which is exactly why both need saying out loud. The
+ * response carried both fields and nothing read them until CodeRabbit declined
+ * to close the finding on that.
+ */
+function StartOutcomeNotice({ outcome }: Readonly<{ outcome: OneTapStartResponse | null }>) {
+  const { t } = useTranslation();
+  if (!outcome) return null;
+  const lines: string[] = [];
+  if (outcome.reservedCartId === null) lines.push(t("codeBlue.notice.noCartReserved"));
+  if (outcome.pagingState === "failed") lines.push(t("codeBlue.notice.pagingFailed"));
+  if (lines.length === 0) return null;
+  return (
+    <View className="gap-1 px-5 pb-2" testID="code-blue-start-notice">
+      {lines.map((line) => (
+        <Text key={line} className="font-rubik-semibold text-[13px] text-warning">
+          {line}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 function NoSessionActions(
   props: Readonly<{
     canSelfManage: boolean;
@@ -307,9 +342,10 @@ function NoSessionActions(
     managerUserName: string;
     currentUserId: string | null;
     start: Mutations["start"];
+    onStarted: (outcome: OneTapStartResponse) => void;
   }>,
 ) {
-  const { start } = props;
+  const { start, onStarted } = props;
 
   /**
    * J1 — the idempotency fence. ONE token per start GESTURE, minted on the
@@ -343,13 +379,16 @@ function NoSessionActions(
       start.mutate(
         { idempotencyToken, managerUserId, managerUserName },
         {
-          onSuccess: () => {
+          onSuccess: (outcome) => {
             tokenRef.current = null;
+            // Reported UPWARD because this component unmounts the moment the
+            // session becomes active — the outcome has to outlive it.
+            onStarted(outcome);
           },
         },
       );
     },
-    [start],
+    [start, onStarted],
   );
 
   return (
@@ -528,6 +567,7 @@ export function CodeBlueActions() {
    * be read. Only a session appearing or ending clears it.
    */
   const activeSessionId = sessionQuery.data?.session?.id ?? null;
+  const [startOutcome, setStartOutcome] = useState<OneTapStartResponse | null>(null);
   const resetStart = mutations.start.reset;
   useEffect(() => {
     resetStart();
@@ -577,15 +617,23 @@ export function CodeBlueActions() {
         managerUserName={managerUserName}
         currentUserId={currentUserId}
         start={mutations.start}
+        onStarted={setStartOutcome}
       />
     );
   }
 
   return (
-    <ActiveSessionActions
-      session={session}
-      isManager={canEndCodeBlue(currentUserId, session.managerUserId)}
-      mutations={mutations}
-    />
+    <>
+      {/* Scoped to the arrest it describes — a warning carried into the NEXT
+          Code Blue is the same defect as the stale error banner above. */}
+      <StartOutcomeNotice
+        outcome={startOutcome?.sessionId === session.id ? startOutcome : null}
+      />
+      <ActiveSessionActions
+        session={session}
+        isManager={canEndCodeBlue(currentUserId, session.managerUserId)}
+        mutations={mutations}
+      />
+    </>
   );
 }

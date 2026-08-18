@@ -38,6 +38,9 @@ const REQUIRED_ACTION_KEYS = [
   "managersLoadError",
 ] as const;
 
+/** The one-tap outcome notice — silence here is a silent degradation. */
+const REQUIRED_NOTICE_KEYS = ["noCartReserved", "pagingFailed"] as const;
+
 describe.each([
   ["en", en],
   ["he", he],
@@ -54,6 +57,13 @@ describe.each([
   it.each(REQUIRED_ACTION_KEYS.map((k) => [k]))("has non-empty actions.%s", (key) => {
     expect(typeof actions?.[key]).toBe("string");
     expect((actions?.[key] ?? "").trim().length).toBeGreaterThan(0);
+  });
+
+  const notice = (bundle as { codeBlue?: { notice?: Record<string, string> } }).codeBlue?.notice;
+
+  it.each(REQUIRED_NOTICE_KEYS.map((k) => [k]))("has non-empty notice.%s", (key) => {
+    expect(typeof notice?.[key]).toBe("string");
+    expect((notice?.[key] ?? "").trim().length).toBeGreaterThan(0);
   });
 
   it("the three start-conflict strings are all DISTINCT (no silent collapse)", () => {

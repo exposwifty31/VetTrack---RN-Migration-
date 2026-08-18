@@ -238,6 +238,10 @@
       "invalidManager": "That manager is no longer available. Pick someone else.",
       "startPending": "Your Code Blue is still starting. Wait a moment, then try again — trying again will not create a second one.",
       "startSuperseded": "A newer start attempt took over. This screen will show the active Code Blue in a moment."
+    },
+    "notice": {
+      "noCartReserved": "No ready crash cart was reserved — check availability before you need it.",
+      "pagingFailed": "The team page did not go out. Call the team directly."
     }
   },
   "menu": {
