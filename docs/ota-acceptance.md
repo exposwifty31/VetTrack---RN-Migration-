@@ -145,7 +145,7 @@ going further.
 ### P2 — Install the updates client
 
 ```bash
-cd the RN migration checkout
+cd "/absolute/path/to/VetTrack-RN-Migration"   # <-- replace with your checkout
 npx expo install expo-updates
 ```
 
@@ -245,7 +245,7 @@ slip.
 Run once per session, from the repo root:
 
 ```bash
-cd the RN migration checkout
+cd "/absolute/path/to/VetTrack-RN-Migration"   # <-- replace with your checkout
 export BRANCH=preview
 export CHANNEL=preview
 eas whoami            # expect: exposwifty31

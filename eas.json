@@ -24,6 +24,7 @@
       }
     },
     "production": {
+      "environment": "production",
       "channel": "production",
       "env": {
         "EXPO_PUBLIC_ENABLE_MEASURE": "false"

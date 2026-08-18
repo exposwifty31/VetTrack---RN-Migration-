@@ -149,14 +149,12 @@ describe("channel-bound profiles carry the variables their OTA payload needs", (
     expect(channelBound.map(([n]) => n).sort()).toEqual(["preview", "production"]);
   });
 
-  // EAS INFERS the environment from the profile NAME when `environment` is
-  // absent — which is exactly what made `preview` wrong: its name resolved to
-  // the empty `preview` environment, while `production`'s name resolves
-  // correctly by accident. Assert the EFFECTIVE value, so a profile is right
-  // for a stated reason rather than by what it happens to be called.
-  it.each(channelBound.map(([n]) => n))("build.%s resolves to the production environment", (name) => {
-    const effective = easJson.build[name]?.environment ?? name;
-    expect(effective).toBe("production");
+  // EXPLICIT, never inferred. EAS's inference is not name-based — it derives
+  // from `distribution`/`developmentClient` — so any fallback this test writes
+  // down is a second implementation of somebody else's rules, wrong the day
+  // they change. A channel-bound profile states its environment or fails here.
+  it.each(channelBound.map(([n]) => n))("build.%s declares environment: production explicitly", (name) => {
+    expect(easJson.build[name]?.environment).toBe("production");
   });
 });
 
