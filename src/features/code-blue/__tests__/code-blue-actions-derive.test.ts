@@ -241,3 +241,44 @@ describe("canInitiateCodeBlue — gate 1 reads the EFFECTIVE (shift) role, falli
     expect(canInitiateCodeBlue("", "senior_technician")).toBe(true);
   });
 });
+
+/**
+ * POST /api/code-blue/sessions runs `requireClinicalUser` BEFORE
+ * `requireClinicalAuthority` (server/routes/code-blue.ts:288-305). It is a
+ * separate gate reading a separate field — `req.authUser.role`, the PERMANENT
+ * identity — against `CLINICAL_ROLES = {admin, vet, senior_technician,
+ * technician}` (server/middleware/auth.ts:962, 974). That set is NOT the
+ * authority allow-list, and crucially it does not carry the legacy aliases
+ * `normalizeShiftRoleToClinical` accepts (`vet_tech -> technician`,
+ * `lead_technician -> senior_technician`, server/lib/authority-roles.ts:40-44).
+ *
+ * So a `vet_tech` rostered onto a technician shift resolves an effective role
+ * the authority gate would accept, and is still hard-denied one middleware
+ * earlier. Both roles are first-class in this client (main-tab-set,
+ * menu-routes, tasks-derive), so the mis-offer is reachable.
+ */
+describe("canInitiateCodeBlue — the identity gate (requireClinicalUser), which runs FIRST", () => {
+  it("denies a permanent VET_TECH on a technician shift — the shift role is fine, the identity role is not in CLINICAL_ROLES", () => {
+    expect(canInitiateCodeBlue("technician", "vet_tech")).toBe(false);
+  });
+
+  it("denies a permanent LEAD_TECHNICIAN on a senior_technician shift — same alias gap, one tier up", () => {
+    expect(canInitiateCodeBlue("senior_technician", "lead_technician")).toBe(false);
+  });
+
+  it("denies an off-shift VET_TECH read through the one-argument contract", () => {
+    expect(canInitiateCodeBlue("vet_tech")).toBe(false);
+  });
+
+  it("still grants the four identity roles the server actually admits", () => {
+    expect(canInitiateCodeBlue("technician", "admin")).toBe(true);
+    expect(canInitiateCodeBlue("technician", "vet")).toBe(true);
+    expect(canInitiateCodeBlue("technician", "senior_technician")).toBe(true);
+    expect(canInitiateCodeBlue("technician", "technician")).toBe(true);
+  });
+
+  it("degrades to the effective role when the identity role is absent — `role` is optional on the /me shape", () => {
+    expect(canInitiateCodeBlue("technician", null)).toBe(true);
+    expect(canInitiateCodeBlue("technician")).toBe(true);
+  });
+});

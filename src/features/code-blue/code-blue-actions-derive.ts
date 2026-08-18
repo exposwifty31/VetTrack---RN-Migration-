@@ -11,13 +11,21 @@ import { EmergencyOfflineError } from "@/lib/emergency-block";
  * first two are unconditional, they do NOT read the same field, and the
  * difference is the whole reason a picker exists.
  *
- *   Gate 1 — INITIATOR (the caller). `requireClinicalUser` +
- *     `requireClinicalAuthority({ allow: ["vet","senior_technician",
- *     "technician"], allowSystemAdmin: false,
- *     allowPermanentClinicalRoleForEmergency: true })`
- *     (server/routes/code-blue.ts:288-305). Matched against the SHIFT-derived
- *     `effectiveClinicalRole` — see `canInitiateCodeBlue`.
- *     Denies 403 INSUFFICIENT_ROLE / reason INSUFFICIENT_CLINICAL_AUTHORITY.
+ *   Gate 1 — INITIATOR (the caller). TWO middlewares, in this order, reading
+ *     two DIFFERENT fields (server/routes/code-blue.ts:288-305):
+ *       1a `requireClinicalUser` — the PERMANENT identity `req.authUser.role`
+ *          against `CLINICAL_ROLES` (server/middleware/auth.ts:962). Denies 403
+ *          code ACCESS_DENIED / reason INSUFFICIENT_ROLE.
+ *       1b `requireClinicalAuthority({ allow: ["vet","senior_technician",
+ *          "technician"], allowSystemAdmin: false,
+ *          allowPermanentClinicalRoleForEmergency: true })` — the SHIFT-derived
+ *          `effectiveClinicalRole`. Denies 403 code INSUFFICIENT_ROLE / reason
+ *          INSUFFICIENT_CLINICAL_AUTHORITY.
+ *     `canInitiateCodeBlue` mirrors BOTH. Collapsing them loses the alias gap:
+ *     1a rejects `vet_tech` / `lead_technician`, which 1b's normalizer accepts.
+ *     Note the two envelopes disagree on which field carries the useful string,
+ *     which is why `codeBlueMutationErrorKey` reads `reason` before `code` — a
+ *     code-only mapper would send 1a's ACCESS_DENIED to the generic banner.
  *
  *   Gate 2 — MANAGER (the nominated `managerUserId`). An unconditional DB
  *     check on the manager's PERMANENT role:
@@ -58,8 +66,30 @@ export function canSelfManageCodeBlue(role: string | null | undefined): boolean 
   return typeof role === "string" && CODE_BLUE_MANAGER_ROLES.has(role);
 }
 
-/** Gate 1's allow-list, verbatim from the route. */
+/** Gate 1b's allow-list, verbatim from the route. */
 const CODE_BLUE_INITIATOR_ROLES: ReadonlySet<string> = new Set([
+  "vet",
+  "senior_technician",
+  "technician",
+]);
+
+/**
+ * Gate 1a — `requireClinicalUser`'s `CLINICAL_ROLES`, verbatim
+ * (server/middleware/auth.ts:962). A SEPARATE set from the authority
+ * allow-list above, on a SEPARATE field (`req.authUser.role`, the permanent
+ * identity), checked one middleware EARLIER.
+ *
+ * Two differences, both load-bearing:
+ *   - it contains "admin" (an admin identity clears this gate and is then
+ *     judged on their shift role at 1b), and
+ *   - it does NOT contain the legacy aliases `normalizeShiftRoleToClinical`
+ *     happily accepts — `vet_tech` and `lead_technician`
+ *     (server/lib/authority-roles.ts:40-44). So those two identities can hold
+ *     a perfectly valid technician / senior_technician SHIFT role, clear 1b on
+ *     paper, and still be hard-denied at 1a.
+ */
+const CODE_BLUE_IDENTITY_ROLES: ReadonlySet<string> = new Set([
+  "admin",
   "vet",
   "senior_technician",
   "technician",
@@ -83,7 +113,11 @@ const CODE_BLUE_INITIATOR_ROLES: ReadonlySet<string> = new Set([
  *     rescue it because that path needs EZSHIFT_NONE. A vet on an admin shift
  *     is denied.
  *   - A permanent STUDENT is denied unconditionally and FIRST, even holding an
- *     active clinical shift row (server/lib/authority.ts:10-13).
+ *     active clinical shift row (server/lib/authority.ts:10-13) — and is
+ *     already excluded by gate 1a, which is checked first here too.
+ *   - A permanent VET_TECH or LEAD_TECHNICIAN is denied by gate 1a however
+ *     good their shift role is; the shift-role mirror alone would offer them
+ *     a picker that always 403s.
  *
  * `||` rather than `??` on purpose: an empty-string effective role is "not
  * resolved" and must fall back, which `??` would not do.
@@ -95,7 +129,16 @@ export function canInitiateCodeBlue(
   effectiveRole: string | null | undefined,
   permanentRole?: string | null,
 ): boolean {
-  if (permanentRole === "student") return false;
+  // Gate 1a first, in the server's own order. This subsumes the student
+  // hard-stop ("student" is not a CLINICAL_ROLE) and additionally catches the
+  // alias gap that a shift-role-only mirror cannot see. `?? effectiveRole`
+  // honours the one-argument contract AND the fact that `role` is optional on
+  // the /me shape — an absent identity role degrades to the effective one
+  // rather than hiding Start from a legitimate responder mid-arrest.
+  const identityRole = permanentRole ?? effectiveRole;
+  if (typeof identityRole !== "string" || !CODE_BLUE_IDENTITY_ROLES.has(identityRole)) {
+    return false;
+  }
   const resolved = effectiveRole || permanentRole;
   return typeof resolved === "string" && CODE_BLUE_INITIATOR_ROLES.has(resolved);
 }
