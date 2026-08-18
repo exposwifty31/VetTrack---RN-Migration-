@@ -85,6 +85,7 @@ function mockIdentity(overrides: Partial<MeUser> | null, pending = false) {
 
 type FakeMutation = {
   mutate: jest.Mock;
+  reset: jest.Mock;
   isPending: boolean;
   isError: boolean;
   isSuccess: boolean;
@@ -94,6 +95,7 @@ type FakeMutation = {
 function fakeMutation(overrides: Partial<FakeMutation> = {}): FakeMutation {
   return {
     mutate: jest.fn(),
+    reset: jest.fn(),
     isPending: false,
     isError: false,
     isSuccess: false,
@@ -797,5 +799,85 @@ describe("CodeBlueActions — one-tap conflict reasons render distinctly", () =>
     await render(<CodeBlueActions />);
     expect(screen.getByTestId("code-blue-offline-banner")).toBeTruthy();
     expect(screen.queryByTestId("code-blue-error-banner")).toBeNull();
+  });
+});
+
+/**
+ * ULTRAREVIEW finding 2 — a failed start must not haunt the NEXT arrest.
+ *
+ * `useCodeBlueMutations()` lives in `CodeBlueActions`, which stays mounted
+ * across session transitions; the start banner lives in `NoSessionActions`,
+ * which mounts only while there is NO active session. react-query keeps
+ * `isError` until the mutation is reset or re-fired, so:
+ *
+ *   press Start -> 409 (someone else won the race) -> banner, correctly
+ *   -> their session opens, NoSessionActions unmounts
+ *   -> 20 minutes later that session ends, NoSessionActions REMOUNTS
+ *   -> the banner returns, telling the next responder "a Code Blue already
+ *      exists" while none does.
+ *
+ * Wrong information at the one moment it costs the most. The reset is keyed on
+ * the session identity, NOT on mount, so a fresh error raised while the screen
+ * is still session-less survives long enough to be read.
+ */
+describe("CodeBlueActions — a stale start error does not cross sessions", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("resets the start mutation when a session appears", async () => {
+    const reset = jest.fn();
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: NO_ACTIVE });
+    mockMutations({
+      start: { isError: true, error: new ApiCodedError(409, "ACTIVE_SESSION_EXISTS"), reset },
+    });
+    const view = await render(<CodeBlueActions />);
+
+    expect(screen.getByText("codeBlue.errors.conflict")).toBeTruthy();
+    reset.mockClear(); // the mount-time reset must not satisfy this assertion
+
+    mockSessionQuery({ data: ACTIVE });
+    await act(async () => {
+      view.rerender(<CodeBlueActions />);
+    });
+
+    expect(reset).toHaveBeenCalled();
+  });
+
+  it("resets again when that session ends, so the next arrest starts clean", async () => {
+    const reset = jest.fn();
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: ACTIVE });
+    mockMutations({ start: { reset } });
+    const view = await render(<CodeBlueActions />);
+    reset.mockClear();
+
+    mockSessionQuery({ data: NO_ACTIVE });
+    await act(async () => {
+      view.rerender(<CodeBlueActions />);
+    });
+
+    expect(reset).toHaveBeenCalled();
+  });
+
+  it("does NOT reset a fresh error while the screen is still session-less", async () => {
+    // The failure mode of an over-eager fix: clearing on every render would
+    // erase the banner before anyone read it.
+    const reset = jest.fn();
+    mockIdentity({ id: "user-1", role: "vet", name: "Dr. Cohen" });
+    mockSessionQuery({ data: NO_ACTIVE });
+    mockMutations({
+      start: { isError: true, error: new ApiCodedError(409, "ACTIVE_SESSION_EXISTS"), reset },
+    });
+    const view = await render(<CodeBlueActions />);
+    reset.mockClear();
+
+    await act(async () => {
+      view.rerender(<CodeBlueActions />);
+    });
+
+    expect(reset).not.toHaveBeenCalled();
+    expect(screen.getByText("codeBlue.errors.conflict")).toBeTruthy();
   });
 });

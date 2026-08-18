@@ -48,7 +48,7 @@
  *   - Log entries are freeform "note" category only; an equipment picker for
  *     "equipment" category entries is a future slice.
  */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -511,6 +511,27 @@ export function CodeBlueActions() {
     queryFn: codeBlueApi.active,
   });
   const mutations = useCodeBlueMutations();
+
+  /**
+   * A failed start must not haunt the NEXT arrest.
+   *
+   * `useCodeBlueMutations` lives here, in a component that stays mounted across
+   * session transitions, while the start banner lives in `NoSessionActions`,
+   * which mounts only while there is no active session. react-query holds
+   * `isError` until the mutation is reset or re-fired, so a 409 raised during
+   * one arrest is still set when `NoSessionActions` remounts after that session
+   * ends — telling the next responder "a Code Blue already exists" when none
+   * does, at the moment that costs most.
+   *
+   * Keyed on the session IDENTITY, deliberately not on every render: an error
+   * raised while the screen is still session-less has to survive long enough to
+   * be read. Only a session appearing or ending clears it.
+   */
+  const activeSessionId = sessionQuery.data?.session?.id ?? null;
+  const resetStart = mutations.start.reset;
+  useEffect(() => {
+    resetStart();
+  }, [activeSessionId, resetStart]);
 
   // Identity + the (shared) session query must resolve before any action can
   // be gated correctly — CodeBlueViewer already renders its own loading state
