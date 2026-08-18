@@ -434,6 +434,31 @@
       "submit": "Send report",
       "success": "Issue reported",
       "error": "Report failed. Try again."
+    },
+    "nfc": {
+      "title": "NFC sticker",
+      "bound": "Sticker bound: {{tagId}}",
+      "notBound": "No sticker bound to this equipment",
+      "write": "Program sticker",
+      "holdSticker": "Hold the sticker against the phone",
+      "writeSuccess": "Sticker programmed",
+      "lock": "Lock sticker permanently",
+      "lockConfirmTitle": "Lock this sticker permanently?",
+      "lockConfirmBody": "A locked sticker can never be rewritten. If this equipment is replaced it will need a new sticker. Hold the sticker against the phone after confirming.",
+      "lockConfirmAction": "Lock permanently",
+      "lockSuccess": "Sticker locked permanently",
+      "lockAlreadyLocked": "This sticker was already locked",
+      "errors": {
+        "id_unencodable": "This equipment cannot be written to a sticker. Report it to an administrator.",
+        "busy": "Another sticker operation is still running. Wait for it to finish.",
+        "session_failed": "The NFC reader stopped. Try again.",
+        "timeout": "No sticker detected. Hold it against the phone and try again.",
+        "write_failed": "Could not write the sticker. Reposition it and try again.",
+        "not_lockable": "This sticker cannot be locked. Program it first.",
+        "lock_failed": "The sticker is NOT locked. Do not mark it as locked — try again.",
+        "bindConflict": "This sticker is already bound to other equipment. Use a blank one.",
+        "bindFailed": "The sticker was programmed, but linking it to this equipment failed. Try again."
+      }
     }
   },
   "scan": {

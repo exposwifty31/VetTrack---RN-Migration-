@@ -37,6 +37,7 @@ import { KeyValueRow } from "./DetailBits";
 import { deriveCustody, statusTone } from "./equipment-detail-derive";
 import { HistoryCard, statusLabel } from "./HistoryCard";
 import { LocationCard } from "./LocationCard";
+import { NfcProvisionCard } from "./NfcProvisionCard";
 import { ReadinessCard } from "./ReadinessCard";
 import { ReportIssueCard } from "./ReportIssueCard";
 import { TransfersCard } from "./TransfersCard";
@@ -184,6 +185,11 @@ export function EquipmentDetailContent({
           <TruthCard equipmentId={equipmentId} />
           <WaitlistCard equipmentId={equipmentId} />
           <ReportIssueCard equipmentId={equipmentId} />
+          {/* Provisioning lives HERE and not on the phone screen, so the tablet
+              two-pane detail gets it too — the iPad is the likeliest sticker
+              station. The card self-gates on admin + NFC hardware and renders
+              null otherwise, so no host needs to know about it. */}
+          <NfcProvisionCard detail={detail} />
           <HistoryCard equipmentId={equipmentId} />
           <TransfersCard equipmentId={equipmentId} />
         </>

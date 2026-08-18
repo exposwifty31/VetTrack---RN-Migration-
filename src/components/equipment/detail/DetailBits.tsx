@@ -45,15 +45,18 @@ type ButtonProps = Readonly<{
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  testID?: string;
 }>;
 
-export function PrimaryButton({ label, onPress, disabled }: ButtonProps) {
+export function PrimaryButton({ label, onPress, disabled, testID }: ButtonProps) {
   return (
     <PressableScale
       className="overflow-hidden rounded-[20px]"
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
+      testID={testID}
       onPress={onPress}
     >
       <View
@@ -67,13 +70,15 @@ export function PrimaryButton({ label, onPress, disabled }: ButtonProps) {
   );
 }
 
-export function QuietButton({ label, onPress, disabled }: ButtonProps) {
+export function QuietButton({ label, onPress, disabled, testID }: ButtonProps) {
   return (
     <PressableScale
       className="min-h-[48px] items-center justify-center rounded-[20px] border border-border bg-surface px-5 py-3"
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
+      testID={testID}
       onPress={onPress}
     >
       <Text className="font-rubik-semibold text-[15px] text-foreground">{label}</Text>

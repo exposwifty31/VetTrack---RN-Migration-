@@ -129,8 +129,17 @@ jest.mock("react-native-nfc-manager", () => {
   // library behaviour, including its quirks (`bytesToString` returns null on
   // malformed UTF-8; astral codepoints truncate through String.fromCharCode), and
   // it cannot drift on upgrade because it IS the library.
-  const uriHelper = require("react-native-nfc-manager/ndef-lib/ndef-uri");
-  const textHelper = require("react-native-nfc-manager/ndef-lib/ndef-text");
+  //
+  // W3B/F1 extends the same reasoning to the WRITE side: the sticker encoder
+  // needs `uriRecord`, `androidApplicationRecord` and `encodeMessage`, and
+  // hand-rolling those bytes here is the identical falsely-green trap. So take
+  // the WHOLE `ndef-lib` barrel (`ndef-lib/index.js`) instead of two leaves —
+  // verified to require only its own siblings (./ndef, ./constants, ./util,
+  // ./ndef-text, ./ndef-uri, ./ndef-wifi-simple, ./stringifier), no native and
+  // no react-native import, so it loads under jest exactly like the leaves did.
+  // `Ndef.uri` / `Ndef.text` are the very same helper objects the barrel
+  // re-exports, so the existing read path is byte-identical to before.
+  const ndefLib = require("react-native-nfc-manager/ndef-lib");
   return {
     __esModule: true,
     default: {
@@ -142,9 +151,23 @@ jest.mock("react-native-nfc-manager", () => {
       setEventListener: jest.fn(),
       unregisterTagEvent: jest.fn(async () => {}),
       registerTagEvent: jest.fn(async () => {}),
+      // Write/lock surface (src/NfcManager.js:119-124 -> src/NfcTech/NdefHandler.js).
+      // Defaults are deliberately INERT: `getNdefStatus` reports NotSupported so a
+      // test that forgets to stage a tag cannot accidentally exercise the lock
+      // path, and write/lock resolve undefined (the iOS one-arg-callback shape).
+      ndefHandler: {
+        writeNdefMessage: jest.fn(async () => undefined),
+        makeReadOnly: jest.fn(async () => undefined),
+        getNdefStatus: jest.fn(async () => ({ status: 1, capacity: 0 })),
+      },
     },
     NfcTech: { Ndef: "Ndef", NfcA: "NfcA", MifareUltralight: "MifareUltralight" },
     NfcEvents: { DiscoverTag: "NfcManagerDiscoverTag", SessionClosed: "NfcManagerSessionClosed" },
-    Ndef: { uri: uriHelper, text: textHelper },
+    // Real enum values from index.d.ts:28-32 (and src/NfcTech/NdefHandler.js:5-9).
+    // Omitting it would make `status === NdefStatus.ReadOnly` compare against
+    // `undefined` — the already-locked branch would never fire while the suite
+    // stayed green. That is precisely the bug this mock must not hide.
+    NdefStatus: { NotSupported: 1, ReadWrite: 2, ReadOnly: 3 },
+    Ndef: ndefLib,
   };
 });
