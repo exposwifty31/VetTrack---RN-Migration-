@@ -258,7 +258,10 @@
     "notificationsPlaceholder": "העדפות ההתראות יתווספו בקרוב.",
     "about": "אודות",
     "version": "גרסה {{version}}",
-    "privacyPolicy": "מדיניות פרטיות"
+    "privacyPolicy": "מדיניות פרטיות",
+    "notificationsGranted": "התרעות קוד כחול יכולות להגיע למכשיר הזה.",
+    "notificationsDeniedBody": "ההתראות של VetTrack כבויות. התרעות קוד כחול לא יגיעו למכשיר הזה עד שתאשרו אותן בהגדרות המערכת.",
+    "openSystemSettings": "פתיחת הגדרות המערכת"
   },
   "account": {
     "displayName": "שם תצוגה",
@@ -456,16 +459,25 @@
     "notFound": "הציוד לא נמצא.",
     "failed": "הפעולה לא הושלמה. נסה שוב."
   },
+  "offlineQueue": {
+    "paused": "הסנכרון מושהה — ננסה שוב אוטומטית.",
+    "failed": "חלק מהשינויים לא נשמרו. נסה שוב.",
+    "pending": "{{count}} שינויים ממתינים לסנכרון",
+    "pending_one": "שינוי אחד ממתין לסנכרון",
+    "pending_two": "שני שינויים ממתינים לסנכרון",
+    "pending_other": "{{count}} שינויים ממתינים לסנכרון"
+  },
   "signIn": {
     "title": "התחברות",
     "subtitle": "Clerk-Expo · מטמון אסימונים ב-SecureStore",
     "email": "אימייל",
     "password": "סיסמה",
     "submit": "התחבר",
-    "missingKey": "הגדר EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ב-.env, בנה מחדש, ואז התחבר כדי לפענח azp מול resolveClerkAuthorizedParties.",
+    "missingKey": "ההתחברות אינה זמינה כעת. נסה שוב מאוחר יותר.",
     "signedInTitle": "מחובר",
     "goHome": "מעבר לבית",
-    "incomplete": "ההתחברות לא הושלמה: סטטוס={{status}}"
+    "incomplete": "ההתחברות לא הושלמה: סטטוס={{status}}",
+    "error": "ההתחברות נכשלה. בדוק את הפרטים ונסה שוב."
   },
   "apiSmoke": {
     "title": "בדיקת API",

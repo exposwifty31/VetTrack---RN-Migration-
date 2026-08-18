@@ -13,7 +13,7 @@
  */
 import { useState } from "react";
 import Constants from "expo-constants";
-import { ScrollView, Text, View } from "react-native";
+import { Linking, ScrollView, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import * as WebBrowser from "expo-web-browser";
 import { Uniwind } from "uniwind";
@@ -26,6 +26,7 @@ import {
   resolveInitialTheme,
   type ThemeMode,
 } from "@/features/account/theme-resolver";
+import { usePushPermissionStatus } from "@/infrastructure/push/push-permission-status";
 
 /** Store-required policy page (from the shared app metadata; opened in-app). */
 const PRIVACY_POLICY_URL = "https://vettrack.uk/privacy";
@@ -45,14 +46,7 @@ export function SettingsScreen() {
         <AppearanceCard />
         <LanguageCard />
 
-        <SectionCard>
-          <Text className="font-rubik text-[12.5px] text-text-tertiary">
-            {t("settings.notifications")}
-          </Text>
-          <Text className="mt-2 font-rubik text-[15px] text-muted">
-            {t("settings.notificationsPlaceholder")}
-          </Text>
-        </SectionCard>
+        <NotificationsCard />
 
         <SectionCard>
           <Text className="font-rubik text-[12.5px] text-text-tertiary">{t("settings.about")}</Text>
@@ -71,6 +65,58 @@ export function SettingsScreen() {
         </SectionCard>
       </View>
     </ScrollView>
+  );
+}
+
+/**
+ * Notifications — the OS permission state, and the one repair the OS permits.
+ *
+ * This is deliberately NOT a preferences panel. The server has the toggles
+ * (`PATCH /api/push/subscribe`), but `alertsEnabled` is the flag `sendPushToAll`
+ * checks, and `sendPushToAll` is how `code_blue_broadcast` is delivered — so an
+ * "alerts" switch here would be a control that silently turns off Code Blue.
+ * There is also no GET, so it could not display the server's actual value even
+ * if it were safe to offer. Both are recorded for the owner rather than guessed
+ * at in a settings row.
+ *
+ * The permission state, by contrast, is already owned by the app and is the
+ * thing that actually goes wrong: one "Don't Allow" used to end in a silent
+ * `return` inside PushBridge, and nothing could report it afterwards. Same
+ * treatment the camera gets in QrScanner — name the state, route to Settings,
+ * and say nothing at all before the OS has been asked.
+ */
+function NotificationsCard() {
+  const { t } = useTranslation();
+  const status = usePushPermissionStatus();
+
+  return (
+    <SectionCard>
+      <Text className="font-rubik text-[12.5px] text-text-tertiary">
+        {t("settings.notifications")}
+      </Text>
+      {status === "denied" ? (
+        <>
+          <Text className="mt-2 font-rubik text-[15px] text-danger">
+            {t("settings.notificationsDeniedBody")}
+          </Text>
+          <PressableScale
+            accessibilityRole="button"
+            className="mt-3 min-h-[44px] items-center justify-center rounded-md border border-border bg-surface px-4"
+            onPress={() => void Linking.openSettings()}
+          >
+            <Text className="font-rubik-semibold text-[15px] text-foreground">
+              {t("settings.openSystemSettings")}
+            </Text>
+          </PressableScale>
+        </>
+      ) : (
+        <Text className="mt-2 font-rubik text-[15px] text-muted">
+          {status === "granted"
+            ? t("settings.notificationsGranted")
+            : t("settings.notificationsPlaceholder")}
+        </Text>
+      )}
+    </SectionCard>
   );
 }
 

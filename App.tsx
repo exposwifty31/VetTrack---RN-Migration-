@@ -25,8 +25,10 @@ import { RealtimeBridge } from "./src/infrastructure/realtime/RealtimeBridge";
 import { i18n } from "./src/i18n";
 import { resolveInitialTheme } from "./src/features/account/theme-resolver";
 import { installDevAuthSeam } from "./src/lib/dev-auth";
+import { OfflineQueueBanner } from "./src/lib/offline-queue/OfflineQueueBanner";
 import { OfflineQueueBridge } from "./src/lib/offline-queue/OfflineQueueBridge";
 import { queryClient } from "./src/lib/query-client";
+import { linking } from "./src/navigation/linking";
 import { flushPendingNavTarget, navigationRef } from "./src/navigation/navigationRef";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 
@@ -92,10 +94,13 @@ export default function App() {
           <ThemedStatusBar />
           <RealtimeBridge />
           <OfflineQueueBridge />
+          {/* Failure surface for the offline write-queue: shows a paused-circuit /
+              dropped-write / pending-backlog banner (offline-queue-status). */}
+          <OfflineQueueBanner />
           {/* Clerk-free + nav-context-free (drives tap navigation via navigationRef);
               sits in the shared tree like RealtimeBridge so it runs in both branches. */}
           <PushBridge />
-          <NavigationContainer ref={navigationRef} onReady={flushPendingNavTarget}>
+          <NavigationContainer ref={navigationRef} linking={linking} onReady={flushPendingNavTarget}>
             {publishableKey ? <ClerkTokenBridge /> : null}
             <RootNavigator />
           </NavigationContainer>

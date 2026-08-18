@@ -13,9 +13,14 @@ import {
   classifyEmergencyEndpoint,
   EmergencyOfflineError,
   emergencyOfflineErrorFromFailedDispatch,
+  getEmergencyBlockCounts,
   isNetworkFailure,
   readEmergencyBlockBuffer,
 } from "../emergency-block";
+
+function totalBlockCount(): number {
+  return Object.values(getEmergencyBlockCounts()).reduce((sum, n) => sum + (n ?? 0), 0);
+}
 
 afterEach(() => {
   _clearEmergencyBlockBufferForTests();
@@ -188,5 +193,47 @@ describe("diagnostic FIFO buffer", () => {
     const snapshot = readEmergencyBlockBuffer();
     (snapshot[0] as { path: string }).path = "/tampered";
     expect(readEmergencyBlockBuffer()[0].path).toBe("/api/code-blue/sessions");
+  });
+});
+
+describe("offline-emergency block counter (C5)", () => {
+  const networkErr = new TypeError("Network request failed");
+
+  it("counts blocked emergency mutations per class", () => {
+    emergencyOfflineErrorFromFailedDispatch(networkErr, "/api/code-blue/sessions", "POST"); // start
+    emergencyOfflineErrorFromFailedDispatch(networkErr, "/api/code-blue/one-tap", "POST"); // start
+    expect(getEmergencyBlockCounts().start).toBe(2);
+  });
+
+  it("keeps counting past the 200-entry buffer cap — the count is the fleet-visible signal that survives eviction", () => {
+    for (let i = 0; i < 205; i++) {
+      emergencyOfflineErrorFromFailedDispatch(
+        networkErr,
+        `/api/code-blue/sessions/s-${i}/logs`,
+        "POST",
+      );
+    }
+    expect(readEmergencyBlockBuffer()).toHaveLength(200);
+    expect(totalBlockCount()).toBe(205);
+  });
+
+  it("does not count non-emergency or non-network failures", () => {
+    emergencyOfflineErrorFromFailedDispatch(networkErr, "/api/equipment/scan", "POST");
+    emergencyOfflineErrorFromFailedDispatch(new Error("boom"), "/api/code-blue/sessions", "POST");
+    expect(totalBlockCount()).toBe(0);
+  });
+
+  it("returns a detached snapshot that later blocks do not mutate", () => {
+    emergencyOfflineErrorFromFailedDispatch(networkErr, "/api/code-blue/sessions", "POST");
+    const before = getEmergencyBlockCounts();
+    emergencyOfflineErrorFromFailedDispatch(networkErr, "/api/code-blue/sessions", "POST");
+    expect(before.start).toBe(1);
+    expect(getEmergencyBlockCounts().start).toBe(2);
+  });
+
+  it("is cleared by the test reset helper", () => {
+    emergencyOfflineErrorFromFailedDispatch(networkErr, "/api/code-blue/sessions", "POST");
+    _clearEmergencyBlockBufferForTests();
+    expect(totalBlockCount()).toBe(0);
   });
 });

@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 
 import { useIdentity } from "@/app/useIdentity";
 import type { PushDeviceToken, PushPort } from "@/core/ports/push.port";
@@ -12,6 +13,7 @@ import {
 } from "./active-registration";
 import { getDefaultPushPort } from "./defaultPush";
 import { resolvePushNavTarget } from "./push-deep-link";
+import { getPushPermissionStatus, recordPushPermission } from "./push-permission-status";
 
 type AuthChangeSubscribe = (listener: (change: AuthChange) => void) => () => void;
 
@@ -67,6 +69,11 @@ export function PushBridge({
   const identityReady = identity.isSuccess && !!getCurrentUserId();
   const userId = identity.data?.id;
   const registeredToken = useRef<PushDeviceToken | null>(null);
+  // Bumped when a previously-DENIED permission is granted while the app runs, to
+  // re-run the registration effect below. See the app-active effect at the end.
+  const [permissionEpoch, setPermissionEpoch] = useState(0);
+  // One recovery check at a time — see the app-active effect at the end.
+  const recoveryInFlight = useRef(false);
 
   // Foreground handler + tap navigation (ALERT-ONLY). getInitialResponseData covers
   // a cold start launched from a tap; navigate* queue the target until the container
@@ -162,7 +169,18 @@ export function PushBridge({
       await port.ensureEmergencyChannel();
       if (cancelled) return;
       const granted = await port.requestPermission();
-      if (!granted || cancelled) return;
+      // `cancelled` is tested BEFORE recording, not folded into one condition:
+      // an unmount / identity swap mid-prompt must not leave a "denied" behind
+      // that Settings would then show forever — same reason it does not register
+      // a token here. Only a real OS answer is recorded.
+      if (cancelled) return;
+      // B7: a denial used to end in a bare `return`. Right as control flow —
+      // no permission, no token, nothing to register — and wrong as product
+      // behaviour, because ADR-009 makes this the Code Blue alert channel, so
+      // one "Don't Allow" silenced emergency alerting with nothing able to say
+      // so. Recording it is what lets SettingsScreen surface and repair it.
+      recordPushPermission(granted);
+      if (!granted) return;
       const token = await port.getDeviceToken();
       if (!token || cancelled) return;
       submitAllowed = true;
@@ -181,7 +199,50 @@ export function PushBridge({
       cancelled = true;
       stopTokenListener();
     };
-  }, [port, identityReady, userId]);
+  }, [port, identityReady, userId, permissionEpoch]);
+
+  // Repair a denial without a cold start.
+  //
+  // SettingsScreen sends the user to `Linking.openSettings()` because that is
+  // the ONLY place the OS lets a denial be undone — but coming back does not
+  // restart the effect above. So the grant landed, the card kept reading
+  // "denied", and no token was registered for the rest of the session: the
+  // repair path this app offers led nowhere.
+  //
+  // Only a DENIAL is repairable this way. Re-running on every foreground would
+  // re-register pointlessly, and on Android 13+ could re-prompt. Bumping the
+  // epoch re-runs the registration effect above rather than duplicating its
+  // channel → permission → token → register sequence, which carries the
+  // rotation-ordering and cancellation contracts that are already tested.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      if (getPushPermissionStatus() !== "denied") return;
+      // Serialized: two `active` events can land before the first check settles
+      // — foreground → background → foreground is an ordinary gesture, and the
+      // OS permission dialog itself backgrounds the app. Unguarded, each success
+      // bumps the epoch and each bump re-runs registration, so the same device
+      // token is POSTed twice.
+      if (recoveryInFlight.current) return;
+      recoveryInFlight.current = true;
+      void port
+        .requestPermission()
+        .then((granted) => {
+          if (!granted) return; // still denied — nothing changed, stay quiet
+          recordPushPermission(true);
+          setPermissionEpoch((epoch) => epoch + 1);
+        })
+        .catch((err) => {
+          console.warn("[push] permission re-check failed (non-fatal):", err);
+        })
+        .finally(() => {
+          // Cleared on every path, so a rejected check does not wedge recovery
+          // shut for the rest of the session.
+          recoveryInFlight.current = false;
+        });
+    });
+    return () => subscription.remove();
+  }, [port]);
 
   // Take-once fallback deregister on "cleared" (see the header caveat — the
   // authenticated path already ran in the sign-out UI, making this a no-op).

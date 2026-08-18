@@ -10,7 +10,7 @@
  */
 import { memo } from "react";
 import { Text } from "react-native";
-import { useTranslation } from "react-i18next";
+import { useT, type TFn } from "@/types/tfn";
 
 import { PressableScale } from "@/components/PressableScale";
 import { haptics } from "@/lib/haptics";
@@ -22,7 +22,7 @@ export type RowPressHandler = (item: EquipmentRowType) => void;
 
 function metaLabel(
   meta: NonNullable<ReturnType<typeof equipmentRowMeta>>,
-  t: ReturnType<typeof useTranslation>["t"],
+  t: TFn,
 ): string {
   if (meta.kind === "never_seen") return t("equipment.neverSeen");
   if (meta.days === 0) return t("equipment.seenToday");
@@ -40,7 +40,7 @@ export const EquipmentRow = memo(function EquipmentRow({
   /** "Now" for the stale meta tier = when the list data landed (dataUpdatedAt). */
   sampledAtMs: number;
 }>) {
-  const { t } = useTranslation();
+  const t = useT();
   const status = equipmentRowStatus(item);
   const meta = equipmentRowMeta(item.lastSeen, sampledAtMs);
 

@@ -8,7 +8,6 @@
 import type { EquipmentTruthResponse } from "@vettrack/shared";
 import { Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
 
 import { Chip } from "@/components/ui/Chip";
 import { ErrorNote } from "@/components/ui/ErrorNote";
@@ -19,9 +18,9 @@ import { api, equipmentKeys } from "@/lib/api";
 import { SectionTitle } from "./DetailBits";
 import { confidenceTone } from "./equipment-detail-derive";
 
-const LTR = { writingDirection: "ltr" } as const;
+import { useT, type TFn } from "@/types/tfn";
 
-type TFn = ReturnType<typeof useTranslation>["t"];
+const LTR = { writingDirection: "ltr" } as const;
 
 function confidenceLabel(t: TFn, tone: ReturnType<typeof confidenceTone>): string {
   switch (tone) {
@@ -37,7 +36,7 @@ function confidenceLabel(t: TFn, tone: ReturnType<typeof confidenceTone>): strin
 }
 
 export function TruthCard({ equipmentId }: Readonly<{ equipmentId: string }>) {
-  const { t } = useTranslation();
+  const t = useT();
 
   const query = useQuery<EquipmentTruthResponse>({
     queryKey: equipmentKeys.truth(equipmentId),

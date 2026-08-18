@@ -2,7 +2,7 @@ import type { EquipmentTruthResponse, EquipmentWaitlistSnapshot } from "@vettrac
 import * as Crypto from "expo-crypto";
 
 import type { PushDeviceToken } from "@/core/ports/push.port";
-import { ApiCodedError } from "@/lib/api/coded-error";
+import { requestJson } from "@/lib/api/coded-error";
 import { authFetch } from "@/lib/auth-fetch";
 import { setCurrentUserId } from "@/lib/auth-store";
 import type {
@@ -24,23 +24,13 @@ import type {
   ScanResult,
 } from "@/types/api";
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await authFetch(path, init);
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
-    // ApiCodedError (extends Error) with the EXACT legacy message: callers reading
-    // `.message` see no change, while gates can branch on `.status` (the stale-session
-    // 401/403-on-identity case needs a reauth affordance, not a blind retry).
-    throw new ApiCodedError(
-      res.status,
-      typeof body.code === "string" ? body.code : `HTTP_${res.status}`,
-      null,
-      body.error ?? `HTTP ${res.status} for ${path}`,
-    );
-  }
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
-}
+/**
+ * W2b (H6): the throwing JSON normalizer is now the SINGLE shared `requestJson`
+ * from `@/lib/api/coded-error` (imported above). The old file-local copy that
+ * hardcoded `reason: null` was deleted so an import can no longer pick the wrong
+ * one — the two are collapsed into one behaviour (envelope `reason`/`details`
+ * surfaced; 204 → `undefined`).
+ */
 
 /** Canonical equipment query key — the single invalidation target for the hero flow. */
 export const equipmentKeys = {

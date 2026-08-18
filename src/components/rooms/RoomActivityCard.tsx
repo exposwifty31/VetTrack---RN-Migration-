@@ -5,7 +5,7 @@
  */
 import { Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useTranslation } from "react-i18next";
+import { useT } from "@/types/tfn";
 
 import { ltrIsolate, SectionTitle } from "@/components/equipment/detail/DetailBits";
 import { statusLabel } from "@/components/equipment/detail/HistoryCard";
@@ -20,7 +20,7 @@ import { roomKeys, roomsApi, type RoomActivityEntry } from "@/lib/api/rooms";
 import { formatDateTime } from "@/lib/datetime";
 
 function ActivityRow({ entry }: Readonly<{ entry: RoomActivityEntry }>) {
-  const { t } = useTranslation();
+  const t = useT();
   const when = formatDateTime(entry.timestamp);
   // userName is admin-only (server-stripped otherwise); email is guaranteed
   // Latin → force LTR isolate.
@@ -67,7 +67,7 @@ function ActivityRow({ entry }: Readonly<{ entry: RoomActivityEntry }>) {
 }
 
 export function RoomActivityCard({ roomId }: Readonly<{ roomId: string }>) {
-  const { t } = useTranslation();
+  const t = useT();
   const activityQuery = useQuery<RoomActivityEntry[]>({
     queryKey: roomKeys.activity(roomId),
     queryFn: () => roomsApi.activity(roomId),

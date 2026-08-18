@@ -3,6 +3,7 @@
  * RN has no cookie jar — Bearer-only (no credentials: "include").
  */
 
+import { resolveInitialLocale } from "@/i18n/locale-resolver";
 import { resolveApiUrl } from "@/lib/api-origin";
 import {
   bumpIdentityRevision,
@@ -244,40 +245,112 @@ export class AuthFetchError extends Error {
 }
 
 /**
+ * Client-side request budget. The RN fetch layer previously had NO timeout, so a
+ * hung server or dead-air connection left a request pending forever (a query
+ * spinner that never resolves). A timed-out request aborts with an `AbortError`
+ * — deliberately NOT a network failure, so it is neither queued for offline
+ * replay nor converted to an emergency block (see `isNetworkFailure`).
+ */
+export const REQUEST_TIMEOUT_MS = 15000;
+
+/**
+ * Arm an AbortController that fires after `REQUEST_TIMEOUT_MS`, composed with an
+ * optional caller signal (React-Query cancellation / unmount) so either source
+ * aborts the request. `cleanup()` MUST run once the request settles, to clear
+ * the timer and detach the caller listener.
+ */
+function armRequestTimeout(callerSignal: AbortSignal | null | undefined): {
+  signal: AbortSignal;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  const forwardCallerAbort = () => controller.abort((callerSignal as { reason?: unknown })?.reason);
+  if (callerSignal) {
+    if (callerSignal.aborted) controller.abort((callerSignal as { reason?: unknown }).reason);
+    else callerSignal.addEventListener("abort", forwardCallerAbort);
+  }
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      clearTimeout(timer);
+      callerSignal?.removeEventListener("abort", forwardCallerAbort);
+    },
+  };
+}
+
+/** The abort reason, or an AbortError-shaped Error when the runtime supplies none. */
+function abortReason(signal: AbortSignal): unknown {
+  const reason = (signal as { reason?: unknown }).reason;
+  return reason ?? Object.assign(new Error("Aborted"), { name: "AbortError" });
+}
+
+/**
+ * Settle `work` OR the abort, whichever comes first.
+ *
+ * The request budget has to cover every await between entry and exit, not just
+ * the fetch. Token resolution is the one that bites: `resolveAuthSnapshot()`
+ * calls Clerk's `getToken()`, which reads a keychain and can hit the network, so
+ * a stalled getter left authFetch pending forever with a fully-armed timeout
+ * sitting one line below it — the request never reached the fetch the timeout
+ * was guarding. The listener is removed on every path so a long-lived caller
+ * signal does not accumulate one per request.
+ */
+function withAbort<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(abortReason(signal));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(abortReason(signal));
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(resolve, reject).finally(() => signal.removeEventListener("abort", onAbort));
+  });
+}
+
+/**
  * Authenticated fetch — attaches Bearer only for valid 3-segment JWTs.
  * Uses RN's global `fetch` (set EXPO_PUBLIC_USE_RN_FETCH=1; avoid expo/fetch races).
  */
 export async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const resolvedUrl = resolveApiUrl(path);
+  const { signal, cleanup } = armRequestTimeout(options.signal);
 
-  if (path.startsWith("/api/")) {
-    // Atomic snapshot (CodeRabbit PR #51 critical fix) — token and userId
-    // MUST come from the same identity generation; see resolveAuthSnapshot's
-    // doc for why a sequential resolveToken()-then-getCurrentUserId() read
-    // (the pre-fix shape) is unsafe.
-    const snapshot = await resolveAuthSnapshot();
-    if (!snapshot || !isValidJwt(snapshot.token)) {
-      throw new AuthFetchError("AUTH_INVALID: invalid token");
+  try {
+    if (path.startsWith("/api/")) {
+      // Atomic snapshot (CodeRabbit PR #51 critical fix) — token and userId
+      // MUST come from the same identity generation; see resolveAuthSnapshot's
+      // doc for why a sequential resolveToken()-then-getCurrentUserId() read
+      // (the pre-fix shape) is unsafe.
+      // Raced against `signal`: the budget must cover the token, not just the fetch.
+      const snapshot = await withAbort(resolveAuthSnapshot(), signal);
+      if (!snapshot || !isValidJwt(snapshot.token)) {
+        throw new AuthFetchError("AUTH_INVALID: invalid token");
+      }
+
+      // Bootstrap: /api/users/me may run before setCurrentUserId; other routes require it.
+      const userId = snapshot.userId?.trim();
+      if (!userId && path !== "/api/users/me") {
+        throw new AuthFetchError("AUTH_INVALID: missing userId");
+      }
+
+      const headers = new Headers(options.headers ?? {});
+      headers.set("Authorization", `Bearer ${snapshot.token}`);
+      if (!headers.has("Content-Type") && options.body && typeof options.body === "string") {
+        headers.set("Content-Type", "application/json");
+      }
+      // Carry the user's UI locale so server-localized strings match their choice
+      // (Capacitor parity). A caller-supplied X-Locale wins.
+      if (!headers.has("X-Locale")) {
+        headers.set("X-Locale", resolveInitialLocale());
+      }
+
+      const res = await dispatchFetch(resolvedUrl, path, { ...options, headers, signal }, userId ?? null);
+      if (res.status === 401) {
+        throw new AuthFetchError("UNAUTHORIZED", 401);
+      }
+      return res;
     }
 
-    // Bootstrap: /api/users/me may run before setCurrentUserId; other routes require it.
-    const userId = snapshot.userId?.trim();
-    if (!userId && path !== "/api/users/me") {
-      throw new AuthFetchError("AUTH_INVALID: missing userId");
-    }
-
-    const headers = new Headers(options.headers ?? {});
-    headers.set("Authorization", `Bearer ${snapshot.token}`);
-    if (!headers.has("Content-Type") && options.body && typeof options.body === "string") {
-      headers.set("Content-Type", "application/json");
-    }
-
-    const res = await dispatchFetch(resolvedUrl, path, { ...options, headers }, userId ?? null);
-    if (res.status === 401) {
-      throw new AuthFetchError("UNAUTHORIZED", 401);
-    }
-    return res;
+    return await dispatchFetch(resolvedUrl, path, { ...options, signal }, null);
+  } finally {
+    cleanup();
   }
-
-  return dispatchFetch(resolvedUrl, path, options, null);
 }
