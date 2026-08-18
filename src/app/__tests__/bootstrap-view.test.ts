@@ -95,3 +95,43 @@ describe("resolveBootstrapView", () => {
     ).toEqual({ kind: "reauth", canSignIn: false, canReauth: false, canRetry: true });
   });
 });
+
+describe("sticky readiness — a transient flap must not unmount a live Home (iPad rotation bug, 2026-08-19)", () => {
+  const base = {
+    isPending: false,
+    isSuccess: false,
+    hasUserId: false,
+    effectiveRole: null,
+    hasActiveSession: false,
+  } as const;
+
+  it("stays ready through a transient failure once latched, while identity data is still present", () => {
+    expect(
+      resolveBootstrapView({ ...base, wasReady: true, hasData: true }),
+    ).toEqual({ kind: "ready" });
+  });
+
+  it("a settled 401/403 still flips a latched gate to reauth — real session death wins", () => {
+    expect(
+      resolveBootstrapView({
+        ...base,
+        hasActiveSession: true,
+        isAuthError: true,
+        wasReady: true,
+        hasData: true,
+      }),
+    ).toEqual({ kind: "reauth", canSignIn: false, canReauth: true, canRetry: false });
+  });
+
+  it("a cold start never latches — signed-out still routes to SignIn", () => {
+    expect(
+      resolveBootstrapView({ ...base, wasReady: false, hasData: false }),
+    ).toEqual({ kind: "reauth", canSignIn: true, canReauth: false, canRetry: false });
+  });
+
+  it("latched but data evaporated -> not sticky (nothing to render Home from)", () => {
+    expect(
+      resolveBootstrapView({ ...base, wasReady: true, hasData: false }),
+    ).toEqual({ kind: "reauth", canSignIn: true, canReauth: false, canRetry: false });
+  });
+});

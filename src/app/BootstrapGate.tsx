@@ -12,7 +12,7 @@
  * in the pure `resolveBootstrapView` so it is unit-tested.
  */
 import type { ReactNode } from "react";
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useNavigation } from "@react-navigation/native";
@@ -32,6 +32,11 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const identity = useIdentity();
   const hasActiveSession = useSyncExternalStore(subscribeAuthSession, isAuthSessionActive);
+  // Sticky latch — see resolveBootstrapView.wasReady. Per-mount state,
+  // deliberately NOT persisted: a fresh mount must earn readiness again.
+  // (State, not a ref: react-hooks/refs forbids render-time ref access; the
+  // render-phase setState below is React's sanctioned adjust-during-render.)
+  const [wasReady, setWasReady] = useState(false);
 
   const view = resolveBootstrapView({
     isPending: identity.isPending,
@@ -42,7 +47,10 @@ export function BootstrapGate({ children }: { children: ReactNode }) {
     isAuthError:
       identity.error instanceof ApiCodedError &&
       (identity.error.status === 401 || identity.error.status === 403),
+    wasReady,
+    hasData: identity.data != null,
   });
+  if (view.kind === "ready" && !wasReady) setWasReady(true);
 
   if (view.kind === "loading") {
     return (
