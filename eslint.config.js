@@ -33,7 +33,11 @@ module.exports = defineConfig([
     // scripts/release-config/*.js. Declared here rather than with an
     // `/* eslint-env node */` comment, which flat config no longer honors (it
     // warns today and becomes an error in ESLint 10).
-    files: ["scripts/**/*.js", "scripts/**/*.mjs"],
+    // .js ONLY. `scripts/**/*.mjs` is ESM, where __dirname and __filename do
+    // not exist — declaring them as globals there would let ESLint accept a
+    // reference that throws ReferenceError at run time. The one .mjs that wants
+    // __dirname (vendor-vettrack.mjs) derives it from import.meta.url itself.
+    files: ["scripts/**/*.js"],
     languageOptions: {
       globals: { __dirname: "readonly", __filename: "readonly" },
     },

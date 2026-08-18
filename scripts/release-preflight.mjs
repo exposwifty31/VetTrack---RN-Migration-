@@ -86,24 +86,32 @@ function redact(text) {
  * the version the env contract was verified against (see env-contract.js).
  * Raise both together, deliberately, or not at all.
  */
-const EAS_CLI_VERSION = "22.0.0";
+const EAS_BIN = path.join(ROOT, "node_modules", ".bin", "eas");
 
 /**
- * Resolved from the RUNNING interpreter, never from PATH (javascript:S4036).
- * `npx` is installed alongside the `node` binary in every standard
- * distribution, so `dirname(process.execPath)` is a fixed location the caller
- * cannot shadow by prepending a writable directory. No plain-"npx" fallback:
- * falling back would reintroduce exactly the PATH lookup this avoids, so an
- * unusual layout fails loudly instead of quietly running something else.
+ * The repo-owned binary, not `npx` — the same rule ci.yml states for `expo` and
+ * `patch-package` ("not `npx`, which can fetch an unpinned release and run its
+ * scripts"). This gate had the strongest reason of the three to follow it: it
+ * runs in a job holding EXPO_TOKEN, so a lifecycle script executing there runs
+ * beside a credential. `npm ci --ignore-scripts` now covers eas-cli too, and the
+ * lockfile carries an integrity hash for every package in its tree.
+ *
+ * HONEST COST, measured not assumed: vendoring eas-cli takes `npm audit` from
+ * 21 advisories to 33 (+1 low, +9 moderate, +2 high). Those packages were ALWAYS
+ * executed — `npx eas-cli@22.0.0` fetches the identical tree — so this does not
+ * add runtime risk; it makes existing risk visible to audit and lets
+ * --ignore-scripts apply to it. The real cost is that `npm ci` on every CI run
+ * now installs a tree only the workflow_dispatch job uses.
  */
-const NPX_BIN = path.join(path.dirname(process.execPath), "npx");
-
 function eas(args) {
-  const res = spawnSync(NPX_BIN, [`eas-cli@${EAS_CLI_VERSION}`, ...args], {
+  const res = spawnSync(EAS_BIN, args, {
     cwd: ROOT,
     encoding: "utf8",
     maxBuffer: 32 * 1024 * 1024,
     env: process.env,
+    // No default timeout on spawnSync either; a hung CLI would otherwise sit
+    // until the workflow's job cap and report nothing.
+    timeout: 5 * 60 * 1000,
   });
   return {
     ok: res.status === 0,
@@ -167,7 +175,15 @@ function checkEnvAccounting() {
   }
 
   const declared = contract.declaredInEasJson();
-  const derived = new Map([...shipped.reads, ...config.reads]);
+  // UNION the file lists, do not overwrite. `new Map([...a, ...b])` keeps only
+  // the last value per key, so a name read in BOTH shipped source and
+  // app.config.js reported only the app.config.js sites — and the audit line
+  // below, whose whole job is to say where each name is read, would have hidden
+  // one of them.
+  const derived = new Map();
+  for (const [name, files] of [...shipped.reads, ...config.reads]) {
+    derived.set(name, [...new Set([...(derived.get(name) ?? []), ...files])]);
+  }
   if (derived.size === 0) {
     fail("the source scan found ZERO env reads — the walk is broken, not the app");
   }
@@ -308,6 +324,14 @@ function priorBuildVersions(platform) {
       fail(`eas build:list --platform ${platform} did not return JSON`);
       return null;
     }
+    // Same defect class as assetlinksCoverage: the try covers only the parse,
+    // so a well-formed JSON object (rather than an array) reached .map and threw
+    // outside it. Fixing that one instance and not this sibling is how a class
+    // of bug survives a fix.
+    if (!Array.isArray(builds)) {
+      fail(`eas build:list --platform ${platform} did not return a JSON array`);
+      return null;
+    }
     collected.push(...builds.map((b) => b.appBuildVersion));
     if (builds.length < PAGE) break;
   }
@@ -354,7 +378,14 @@ async function checkAssetLinks() {
     const url = `https://${host}/.well-known/assetlinks.json`;
     let servedDoc;
     try {
-      const res = await fetch(url, { headers: { accept: "application/json" } });
+      // Node's fetch has NO default timeout. A host that accepts the connection
+      // and never answers would block until the workflow's 15-minute job cap,
+      // producing no result for ANY host. The existing catch reports the abort
+      // as a fetch failure.
+      const res = await fetch(url, {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(15_000),
+      });
       if (!res.ok) {
         fail(`${url} returned HTTP ${res.status} — autoVerify cannot succeed`);
         continue;

@@ -124,6 +124,8 @@ import * as ts from "typescript";
  * trusted as written. Corrected here for the same reason as the block above: a
  * stale number in a comment is indistinguishable from a current one.)
  */
+import type * as EnvContract from "../../scripts/release-config/env-contract.js";
+
 declare const __dirname: string;
 declare const require: (moduleName: string) => unknown;
 
@@ -212,14 +214,11 @@ const declaredEnv = collectDeclaredEnv();
  * written, checked-in statement that a human ran `npx eas env:list <env>` and
  * saw the variable; `npm run release:preflight` is what actually verifies it.
  */
-const envContract = require("../../scripts/release-config/env-contract.js") as {
-  expoPublicEasEnvironmentRegistry(): Record<string, string>;
-  expoPublicIntentionallyUnset(): Record<string, string>;
-  deriveShippedPublicEnvReads(): {
-    reads: Map<string, string[]>;
-    parseFailures: string[];
-  };
-};
+// Shape comes from scripts/release-config/env-contract.d.ts — declared once,
+// so a signature change breaks compilation instead of drifting silently.
+const envContract = require(
+  "../../scripts/release-config/env-contract.js",
+) as typeof EnvContract;
 
 const PROVIDED_BY_EAS_ENVIRONMENT: Record<string, string> =
   envContract.expoPublicEasEnvironmentRegistry();

@@ -192,7 +192,20 @@ function knownGapsFor(environment) {
  * found" and "file did not parse" are indistinguishable without checking.
  */
 function parseDiagnosticsOf(sourceFile) {
-  return sourceFile.parseDiagnostics ?? [];
+  const diagnostics = sourceFile.parseDiagnostics;
+  if (diagnostics === undefined) {
+    // ABSENT is not EMPTY. If a TypeScript upgrade drops this internal
+    // property, `?? []` would report "no parse failures" for every file
+    // forever — the check would go permanently, silently green, which is worse
+    // than the drift it was written to catch. Fail loudly instead; the caller
+    // turns this into a hard error, not a skip.
+    throw new Error(
+      "SourceFile.parseDiagnostics is unavailable (TypeScript internal API " +
+        `changed; ts ${ts.version}). Switch to program.getSyntacticDiagnostics ` +
+        "before trusting this check again.",
+    );
+  }
+  return diagnostics;
 }
 
 /** True when `node` is `process.env` written as a member expression. */

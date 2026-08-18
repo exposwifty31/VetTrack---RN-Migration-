@@ -14,6 +14,8 @@
  * lets the networked half stay owner-triggered without leaving the PR side bare.
  */
 
+import type * as EnvContract from "../../scripts/release-config/env-contract.js";
+
 declare const require: (moduleName: string) => unknown;
 
 type EnvComparison = {
@@ -68,18 +70,10 @@ const appLinks = require("../../scripts/release-config/android-app-links.js") as
   autoVerifiedHosts(appJson: unknown): string[];
 };
 
-const contract = require("../../scripts/release-config/env-contract.js") as {
-  EAS_ENVIRONMENTS: string[];
-  EXPECTED_IN_EAS_ENVIRONMENT: Record<
-    string,
-    { environments: string[]; knownGapEnvironments?: string[]; why: string; gap?: string }
-  >;
-  INTENTIONALLY_UNSET: Record<string, string>;
-  requiredNamesFor(environment: string): string[];
-  knownGapsFor(environment: string): { name: string; gap: string }[];
-  deriveShippedPublicEnvReads(): { reads: Map<string, string[]>; parseFailures: string[] };
-  deriveConfigEnvReads(): { reads: Map<string, string[]>; parseFailures: string[] };
-};
+// Same single declaration the manifest suite uses (env-contract.d.ts).
+const contract = require(
+  "../../scripts/release-config/env-contract.js",
+) as typeof EnvContract;
 
 // ---------------------------------------------------------------------------
 // (A) EAS environment drift
@@ -431,14 +425,29 @@ describe("(C) Android App Links", () => {
  * verification stamp in env-contract.js.
  */
 describe("the preflight pins its eas-cli", () => {
-  it("never resolves the CLI version at run time", () => {
+  it("invokes the vendored, exactly-pinned CLI — never npx", () => {
     const { readFileSync } = require("node:fs") as typeof import("node:fs");
     const { join } = require("node:path") as typeof import("node:path");
     const source = readFileSync(
       join(__dirname, "..", "..", "scripts", "release-preflight.mjs"),
       "utf8",
     );
-    expect(source).not.toContain("eas-cli@latest");
-    expect(source).toMatch(/const EAS_CLI_VERSION = "\d+\.\d+\.\d+";/);
+    // The invariant moved: the CLI is no longer fetched at all, it is a pinned
+    // devDependency invoked through node_modules/.bin — so guard BOTH halves.
+    // Either one alone can be satisfied while the other regresses.
+    // The INVOCATION, not the word: the file's own comment explains why npx is
+    // not used, and a bare `not.toContain("npx")` forbade saying so.
+    // Target SYNTAX, not vocabulary. Two earlier drafts of this guard asserted
+    // the file must not CONTAIN "npx", then not contain "eas-cli@" — and both
+    // failed on the comment that explains why neither is used. A source-text
+    // guard that cannot tell "does it" from "mentions it" fails on its own
+    // documentation.
+    expect(source).not.toMatch(/spawnSync\(\s*["'`]npx/);
+    expect(source).toContain('path.join(ROOT, "node_modules", ".bin", "eas")');
+
+    const pkg = JSON.parse(
+      readFileSync(join(__dirname, "..", "..", "package.json"), "utf8"),
+    ) as { devDependencies: Record<string, string> };
+    expect(pkg.devDependencies["eas-cli"]).toMatch(/^\d+\.\d+\.\d+$/); // exact, no ^ or ~
   });
 });

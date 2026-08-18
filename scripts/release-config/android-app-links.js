@@ -95,7 +95,12 @@ function autoVerifiedHosts(appJson) {
   const hosts = new Set();
   for (const filter of filters) {
     if (filter?.autoVerify !== true) continue;
-    for (const datum of filter.data ?? []) {
+    // Expo's schema accepts `data` as a SINGLE OBJECT or an array, and both
+    // build correctly. Ours is an array today, so `for..of` worked — on the
+    // object form it would have thrown "is not iterable" and taken the gate
+    // down instead of reporting on the hosts it could read.
+    const data = Array.isArray(filter?.data) ? filter.data : [filter?.data];
+    for (const datum of data) {
       if (datum?.scheme === "https" && datum?.host) hosts.add(datum.host);
     }
   }

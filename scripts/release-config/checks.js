@@ -60,7 +60,14 @@ function compareEnvPresence({ required, present }) {
  * @returns {number} -1 | 0 | 1, or NaN when either side is not a version string.
  */
 function compareBuildVersions(a, b) {
-  const parse = (v) => String(v).trim().split(".").map(Number);
+  // Decimal digits ONLY, then Number. Bare `Number` accepts "0x1E", "1e3" and
+  // "" — so `compareBuildVersions("0x1E", "0")` returned 1 and the version-field
+  // check called "0x1E" well-formed, while Apple rejects it as CFBundleVersion.
+  const parse = (v) =>
+    String(v)
+      .trim()
+      .split(".")
+      .map((part) => (/^\d+$/.test(part) ? Number(part) : Number.NaN));
   const pa = parse(a);
   const pb = parse(b);
   if ([...pa, ...pb].some((n) => !Number.isFinite(n))) return Number.NaN;

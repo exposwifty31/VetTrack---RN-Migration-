@@ -78,7 +78,7 @@ remediation working, not drift, but it reads like noise.
 
 Standing finding, live as of 2026-08-18:
 
-```
+```text
 ios      local=28 priorBuilds=2 highestConsumed=28 -> REFUSED
 android  local=10300 priorBuilds=0 highestConsumed=none -> ok
 ```
