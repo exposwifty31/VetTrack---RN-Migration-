@@ -135,7 +135,13 @@ export const api = {
           row !== null &&
           typeof (row as CodeBlueManager).id === "string" &&
           (row as CodeBlueManager).id.length > 0 &&
-          typeof (row as CodeBlueManager).name === "string",
+          typeof (row as CodeBlueManager).name === "string" &&
+          // NON-BLANK. A whitespace-only name passes a typeof check, and
+          // ManagerPicker renders it as a blank DISABLED row — while
+          // `managers.length !== 0` keeps the "no eligible managers" state from
+          // rendering. All-blank rows would therefore show a technician a list
+          // of unclickable blanks with no explanation, mid-arrest.
+          (row as CodeBlueManager).name.trim().length > 0,
       );
     },
   },

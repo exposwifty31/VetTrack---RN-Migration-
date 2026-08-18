@@ -49,7 +49,24 @@ describe("Code Blue start has exactly one dispatch point", () => {
     // Shape, not one exact expression: pinning the literal argument list made
     // any reformatting — or a legitimate change to how the token ref is scoped —
     // fail with a message that named neither cause.
-    expect(source).toMatch(/resolveOneTapStartToken\s*\(/);
+    // The resolver being CALLED proves nothing on its own — a future change
+    // could keep the call and dispatch a freshly minted token through another
+    // variable. So bind the ASSIGNED identifier to the dispatched payload.
+    //
+    // Written as code rather than one regex because the payload uses ES
+    // shorthand (`{ idempotencyToken, ... }`), and a single pattern that also
+    // covers `idempotencyToken: name` is unreadable. The reviewer's proposed
+    // regex assumed the explicit form and did not match this file.
+    const assignment = /const\s+([A-Za-z_$][\w$]*)\s*=\s*resolveOneTapStartToken\s*\([^;]*\bCrypto\.randomUUID\b[^;]*\)/.exec(
+      source,
+    );
+    expect(assignment).not.toBeNull();
+    const tokenName = assignment?.[1] ?? "";
+
+    const payload = source.slice(source.indexOf("start.mutate("));
+    const explicit = new RegExp(`\\bidempotencyToken\\s*:\\s*${tokenName}\\b`).test(payload);
+    const shorthand = tokenName === "idempotencyToken" && /\bidempotencyToken\s*[,}]/.test(payload);
+    expect(explicit || shorthand).toBe(true);
     expect(source).not.toMatch(/idempotencyToken:\s*Crypto\.randomUUID\(\)/);
   });
 });

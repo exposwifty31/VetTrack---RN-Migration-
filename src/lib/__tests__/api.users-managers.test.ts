@@ -66,6 +66,7 @@ describe("api.users.managers", () => {
           { id: "u-1", name: "Dr. Cohen", role: "vet" },
           { id: "u-2", name: null, role: "vet" },
           { id: "", name: "No Id", role: "vet" },
+          { id: "u-3", name: "   ", role: "vet" },
           null,
           "not an object",
         ],
