@@ -28,8 +28,11 @@ import type { RootStackParamList, RootStackScreenProps } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-// Measurement builds (the G3 exit-pass) opt G2Measure back in via this env; a
-// real release leaves it unset, so G2Measure is neither registered nor listed.
+// Measurement builds (the G3 exit-pass) opt G2Measure back in via this env — the
+// eas.json `measure` profile sets it, and only that profile does. A store build
+// declares it "false", so G2Measure is neither registered nor listed there. The
+// comparison is STRICT against "true" on purpose: "false" is a truthy string, so
+// any loose test would ship the measurement screen to users.
 const MEASURE_ENABLED = process.env.EXPO_PUBLIC_ENABLE_MEASURE === "true";
 
 // The scan path must not mount before identity resolves: `ScanScreen` starts

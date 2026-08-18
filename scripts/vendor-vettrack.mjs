@@ -13,7 +13,7 @@ const vendorRoot = path.join(root, ".vendor");
 const repoDir = path.join(vendorRoot, "vettrack");
 
 /** Pin — bump when intentionally refreshing contracts/shared from vettrack main. */
-const VETTRACK_SHA = "dc10c79962fcc39d5d77e4039e54de6ed2419ceb";
+const VETTRACK_SHA = "8d379facce797f77a814a556c4f4fd7dc374f055";
 const VETTRACK_REMOTE = "https://github.com/exposwifty31/vettrack.git";
 const SPARSE_PATHS = ["packages/contracts", "shared"];
 
