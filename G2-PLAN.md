@@ -121,7 +121,7 @@ The single spec executable independently, and the gate the entire G2 UI track re
 
 ### STEP 2 — Hero flow (spec: hero-flow — verdict: needs-fix; DONE hard-gated on Step 1)
 
-Scan→checkout on the real backend. **Not staging — that tier was removed 2026-08-19** (vettrack `chore/remove-staging`); point `EXPO_PUBLIC_API_ORIGIN` at production or a local server and say which in the results, because the two answer different questions about latency. **Do not start the animated centerpiece until Step 1 step-4 bundles green** — hard sequencing block, not soft dependency.
+Scan→checkout on the real backend. **Not staging — that tier was removed 2026-08-19** (vettrack `chore/remove-staging`). The backend is **not a choice**: `docs/g2-preregistration.md` §2 locks it to **production `https://vettrack.uk`, same account and data for both apps**, and that lock is frozen by the pre-reg commit SHA. A local server is fine for development and smoke work, but **local numbers cannot satisfy O1–O5** — a different backend measures a different network, which is most of the latency being gated. Set `EXPO_PUBLIC_API_ORIGIN` accordingly and record it in the results either way. **Do not start the animated centerpiece until Step 1 step-4 bundles green** — hard sequencing block, not soft dependency.
 
 Ground-truth corrections folded — **restated 2026-08-19, the earlier version of this line was wrong.** The **delight stack** (Reanimated / Gesture Handler / FlashList / haptics) is genuinely absent; that is what STEP 1 exists to land. **SSE and i18n are NOT absent — both are merged and on `main`:** `src/infrastructure/realtime/{SseAdapter.ts,RealtimeBridge.tsx,defaultRealtime.ts}` (`getDefaultRealtimePort()` returns the shared `RealtimePort`) and `src/i18n/{config.ts,rtl.ts}` (`i18n` default export, `isRtlLocale` / `applyRtlDirection` / `isRtlReloadPending`). **Verify and reuse those APIs; do not build a second one.** A per-feature `EventSource` would break the frozen "one SSE connection per clinic" contract, and an inline strings module would bypass i18n entirely — both are worse than the gap they would be filling. Keep the degrade-gracefully fallback only for a *specific symbol* confirmed missing at build time. Backend contracts (`POST /api/equipment/scan` toggle semantics, 409 `checkedOutByEmail`, `undoToken`, list ETag/304) are sourced from `~/vettrack`, **not verified against this RN repo** — the must-fixes below enforce verification before the blind test.
 
@@ -167,7 +167,7 @@ STEP 1  Delight-stack de-risk  ◀── SINGLE LYNCHPIN, run FIRST
         ┌──────────────────────────┴───────────────────────────┐
         ▼                                                        ▼
 STEP 2  Hero flow build (blocked on Step 1 green)      TECH-DEBT (parallelizable, Step-1-independent):
-        └─ instrumented, on-sim, backend contract         ├─ 2A docs-sync PR      (ci.yml-free)
+        └─ instrumented, on-sim, locked-backend contract  ├─ 2A docs-sync PR      (ci.yml-free)
                                    │                        └─ 2B+2C COMBINED CI PR (lint + export step)
                                    ▼                            └─ whichever merges 2nd rebases on origin/main
 STEP 3  G2 measurement + blind test  ◀── OWNER-BLOCKED
