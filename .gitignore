@@ -48,6 +48,18 @@ yarn-error.*
 # Git worktrees (agent isolation)
 .worktrees/
 
+# Agent scaffolding — non-source, already excluded by eslint.config.js and by jest's
+# modulePathIgnorePatterns. `.claude/worktrees/` holds LIVE linked git worktrees (multi-MB sibling
+# checkouts) that sit inside this repo directory; without this rule a single `git add -A` commits one
+# whole into history. `settings.local.json` is per-machine and is never shared.
+#
+# Deliberately NOT a blanket `.claude/*`: the sibling vettrack repo tracks agent config under
+# `.claude/agents|commands|skills|rules`, and a blanket rule would make `git add -A` silently skip
+# those here if this repo ever adopts the same convention. Ignore the two known-unshareable paths
+# only. `.claude/settings.json` stays tracked (`git ls-files .claude/`).
+.claude/worktrees/
+.claude/settings.local.json
+
 # Store credentials (never commit; *.p8 is covered above)
 google-service-account.json
 credentials.json

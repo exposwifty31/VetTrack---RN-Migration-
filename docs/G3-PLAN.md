@@ -295,10 +295,18 @@ npx expo run:ios          # or run:android — booted-device smoke per AGENTS.md
 
 ### Parallel track (optional, per gated plan line 450) — Offline read-cache for equipment/rooms
 
-The gated plan places the offline **read**-cache in G3 (in this repo that means an op-sqlite read-through seam in the equipment/rooms fetch path plus the consuming UI cache states — the plan's original Dexie wording described the Capacitor client; the engine decision below supersedes it). It is not required for the daily-driver verdict if the owner accepts online-only reads for G3, but it is sanctioned to build in parallel any time after Slice 1:
+The gated plan places the offline **read**-cache in G3 (in this repo that means an MMKV read-through seam in the equipment/rooms fetch path plus the consuming UI cache states — the plan's original Dexie wording described the Capacitor client; the engine decision below supersedes it). It is not required for the daily-driver verdict if the owner accepts online-only reads for G3, but it is sanctioned to build in parallel any time after Slice 1:
 
 - Define `OfflineStorePort` in `src/core/ports/` (mirror existing port style, fail-loud).
-- Engine decision is **closed: op-sqlite** (caveats pre-verified: reactivity keys on rowid not PK; transaction-only callbacks; expo-updates Podfile clash fixed via `"expo.updates.useThirdPartySQLitePod": "true"`).
+- Engine decision is **closed: MMKV** (`react-native-mmkv`), via the existing `StoragePort`.
+  **Corrected 2026-08-19 — this line previously read "closed: op-sqlite".** That was never true of this
+  repo: `package.json` has `react-native-mmkv@^4.3.2` and **no** `op-sqlite`/`expo-sqlite` dependency at
+  all, so the op-sqlite caveats it listed (rowid-vs-PK reactivity keys, transaction-only callbacks, the
+  `"expo.updates.useThirdPartySQLitePod": "true"` Podfile clash workaround) do not apply and no such
+  workaround is configured. Evidence: `src/lib/offline-queue/offline-queue-store.ts:1-15` records the
+  empirical reversal (verified 2026-08-11, when the write-queue landed on MMKV); `docs/parity-triage.md:250-253`
+  records the decision explicitly and warns that re-adopting op-sqlite now would add a native dependency,
+  a config plugin and the Podfile workaround for a cache that demonstrably fits in an MMKV JSON blob.
 - Scope: equipment list/detail + rooms read-through cache only. **The write queue / mutation replay is explicitly NOT G3** (see G4 memo — it must wait for the api.ts idempotency/conflict surface to settle). **Never cache any emergency endpoint** (`EMERGENCY_CACHE_BYPASS_PATHS` in vendored contracts is the source of truth).
 - Size: L. One PR, separate agent, no shared files with Slices 2–12 except a read-through seam in the equipment fetch path (coordinate with whoever owns `api.ts` that week).
 

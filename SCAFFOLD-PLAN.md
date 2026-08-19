@@ -11,6 +11,11 @@
 - State: **Zustand** (client) + **TanStack Query** (server) — no React Context for high-frequency state
 - UI: **Uniwind 1.10.0** (Tailwind v4, CSS-first — adopted in slice 1b, replaced the NativeWind v4 mandate), **FlashList 2.x** (mandatory for lists), **Reanimated 4.x** + **Gesture Handler 3.x**
 - Persistence: **op-sqlite** (WatermelonDB forbidden). Storage access **only via a Port adapter (MMKV)** — **fail-loud**, never silent no-op
+  > **Correction 2026-08-19 (superseded — kept as written for the historical record):** op-sqlite never shipped.
+  > The app's persistence engine is **MMKV** (`react-native-mmkv@^4.3.2`); `package.json` contains **no**
+  > `op-sqlite`/`expo-sqlite` dependency and never has. The Port-adapter half of this line is correct and still
+  > binding. Evidence: `src/lib/offline-queue/offline-queue-store.ts:1-15` (empirical reversal, verified
+  > 2026-08-11); `docs/parity-triage.md:250-253` (decision record). Live truth: `AGENTS.md` §Frozen stack.
 - Auth: **@clerk/clerk-expo**. Realtime: **react-native-sse** (foreground-only). i18n: i18next + **I18nManager RTL**
 
 ## Current repo state (verified 2026-08-04)
@@ -67,4 +72,7 @@ vettrack SHA via `scripts/vendor-vettrack.mjs` + `file:.vendor/...` deps.
 ## Gates that stay respected throughout
 - No autonomous commit/push/PR (Anchor). Five RN skills are the standing lens each slice.
 - op-sqlite × expo-updates Podfile clash → `"expo.updates.useThirdPartySQLitePod": "true"` when op-sqlite lands (Decision 1c).
+  > **Correction 2026-08-19: this gate is moot.** op-sqlite never landed — persistence is MMKV — so the clash
+  > cannot occur and the flag is deliberately **not** set (`grep -rn useThirdPartySQLitePod app.json` = no match
+  > at commit a06cbb5). Do not add it. See the Frozen-stack correction above.
 - Reanimated/FlashList/Gesture Handler are the G2 delight stack — installed when the hero flow needs them, not slice 1.

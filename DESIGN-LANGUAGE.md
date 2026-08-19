@@ -67,4 +67,4 @@ break the 90fps floors.
 
 ## Process addendum (2026-08-07)
 
-Every remaining G2.5 work item (device verification passes, theme-seam work, any Aurora refinement) falls under the standing five-React-skills mandate: load the applicable subset (`react-native-best-practices` + `react-native-architecture` + `react-native-design` for UI work; `argent-react-native-app-workflow` for device/emulator loops) via the Skill tool before the work, and record a "Skills compliance" note in the PR body.
+Every remaining G2.5 work item (device verification passes, theme-seam work, any Aurora refinement) falls under the standing RN-migration skills mandate (renamed 2026-08-19 — it was the "five-React-skills mandate" until the owner directive of 2026-08-09 superseded that narrower rule with an expanded roster; the skills named below remain valid members of it): load the applicable subset (`react-native-best-practices` + `react-native-architecture` + `react-native-design` for UI work; `argent-react-native-app-workflow` for device/emulator loops) via the Skill tool before the work, and record a "Skills compliance" note in the PR body.

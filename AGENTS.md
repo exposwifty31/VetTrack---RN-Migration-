@@ -29,8 +29,14 @@ isolated and never touches it.**
 - **State:** Zustand (client) + TanStack Query (server). No React Context for high-frequency state.
 - **UI:** Uniwind 1.10.0 (Tailwind v4, CSS-first — replaced NativeWind, which is incompatible with SDK 57's Metro) ·
   FlashList 2.x (mandatory for lists) · Reanimated 4.x + Gesture Handler 3.x.
-- **Persistence:** op-sqlite (WatermelonDB forbidden). Storage access **only via a Port adapter (MMKV)** —
-  **fail-loud, never a silent no-op.**
+- **Persistence:** **MMKV** (`react-native-mmkv`) — WatermelonDB forbidden. Storage access **only via a Port
+  adapter** (`StoragePort` in `src/core/ports/storage.port.ts`, implemented by
+  `src/infrastructure/storage/MmkvStorageAdapter.ts`) — **fail-loud, never a silent no-op.**
+  *Corrected 2026-08-19 (this line previously read "op-sqlite"):* no `op-sqlite`/`expo-sqlite` dependency has
+  ever existed in this repo — `package.json` carries `react-native-mmkv@^4.3.2` and no SQLite package at all.
+  Evidence: `src/lib/offline-queue/offline-queue-store.ts:1-15` records the empirical reversal (verified
+  2026-08-11); `docs/parity-triage.md:250-253` records the decision. The op-sqlite reference was aspirational
+  web-side contract text, never this codebase's state.
 - **Auth:** `@clerk/clerk-expo`. **Realtime:** `react-native-sse` (foreground-only). **i18n:** i18next +
   `I18nManager` RTL (Hebrew-first, same convention as the Capacitor repo).
 
