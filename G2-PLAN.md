@@ -187,7 +187,27 @@ STEP 3  G2 measurement + blind test  ◀── OWNER-BLOCKED
 **The very next action is executable and read-only-safe up to the git-commit boundary.** Step 1 is **DONE (PASS)** iff ALL of:
 
 1. `node -e "require.resolve('babel-preset-expo')"` prints a path (precondition hoisted).
-2. `npx expo install` yielded exactly: reanimated **4.5.1**, worklets **0.10.1** (NOT 0.11.x), gesture-handler **~2.32.x** (NOT 3.x), flash-list **2.0.2**, **expo-haptics `~57.0.1`**; `npm ls` shows no ERESOLVE. (haptics is installed at step 2 above and required by the hero flow's `EquipmentRow` tick — omitting it from this gate let Step 1 be marked PASS with a package the next step depends on missing.)
+2. `npx expo install` yielded exactly: reanimated **4.5.1**, worklets **0.10.1** (NOT 0.11.x), gesture-handler **~2.32.x** (NOT 3.x), flash-list **2.0.2**, **expo-haptics `~57.0.1`**. (haptics is installed at step 2 above and required by the hero flow's `EquipmentRow` tick — omitting it from this gate let Step 1 be marked PASS with a package the next step depends on missing.)
+
+   **Peer-dependency check — "`npm ls` shows no ERESOLVE" was not a gate.** `.npmrc` sets
+   `legacy-peer-deps=true`, so npm ignores peer conflicts by construction and ERESOLVE can
+   never fire. Two real checks instead, both measured against this tree on 2026-08-19 so the
+   bar is known-achievable rather than aspirational:
+
+   ```bash
+   npm install --dry-run --no-legacy-peer-deps --strict-peer-deps   # must exit 0
+   npm ls --all --json > /tmp/ls-after.json; echo "exit=$?"
+   ```
+
+   - The strict dry-run **passes today (exit 0, zero ERESOLVE)**. That makes it a live gate:
+     if a Step 1 install introduces a genuine peer conflict, this catches it while
+     `legacy-peer-deps` hides it from the normal install.
+   - `npm ls --all` **exits 1 today with 10 pre-existing problems** — 2 `invalid`
+     (`@react-navigation/native`, `ajv`), 1 `invalid` typescript, `@react-native/metro-config`
+     missing for worklets, and 6 unmet Solana peers pulled in transitively. So the gate is
+     **"no NEW problems"**, not "zero problems": capture the baseline before Step 1 and diff.
+     Writing "must exit 0" here would have been an unrunnable gate — red before Step 1 starts,
+     and therefore ignored on its first run.
 3. `babel.config.js` exists at root with `babel-preset-expo` preset and `react-native-worklets/plugin` as the **LAST** plugin; **no** React Compiler plugin.
 4. **Bisect (step 4): a bundle is actually REQUESTED and comes back green** with a trivial worklet Reanimated animation active — no `transformFile`-undefined / transform-worker init crash. `npx expo start -c` alone does not satisfy this: it starts Metro and waits, and no transform runs until a client asks for a bundle, so a green-looking terminal proves nothing. Satisfy it with `npx expo export` (transforms the whole graph headlessly) **or** by launching a client against Metro and recording that the worklet animation ran.
 5. Full four-library set coexists: `GestureHandlerRootView` outermost, `withUniwindConfig` outermost, FlashList 2 rendering, bundle still green.
