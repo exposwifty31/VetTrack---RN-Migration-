@@ -1,11 +1,14 @@
 name: CI
 
 # Quality gate for the VetTrack RN migration.
-# Runs on every PR and on pushes to main. `npm ci` triggers the repo's
-# preinstall (vendor-vettrack.mjs: sparse-clones the PUBLIC vettrack repo at a
-# pinned SHA into .vendor/ for @vettrack/contracts + @vettrack/shared) and
-# postinstall (patch-package: applies the react-native-nfc-manager #833 patch),
-# so a clean CI checkout reproduces the exact local toolchain.
+# Runs on every PR and on pushes to main. The install path reproduces the exact
+# local toolchain: vendor-vettrack.mjs sparse-clones the PUBLIC vettrack repo at a
+# pinned SHA into .vendor/ for @vettrack/contracts + @vettrack/shared, then
+# patch-package applies the react-native-nfc-manager #833 patch.
+#
+# The two jobs below are independent and run in parallel. `quality` keeps its
+# original job name ("typecheck + test") because it is a required status check on
+# main — renaming it would silently un-gate the branch.
 on:
   pull_request:
   push:
@@ -24,8 +27,8 @@ jobs:
   quality:
     name: typecheck + test
     runs-on: ubuntu-latest
-    # 20 (was 15) to cover the Expo export bundle step (~1-2 min).
-    timeout-minutes: 20
+    # 15 is ample now that the ~35s Expo export moved to its own parallel job.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -37,6 +40,16 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+
+      # .vendor/ is a pinned sparse clone of another repo — it changes only when
+      # VETTRACK_SHA in the script changes, so key the cache on the script itself.
+      # vendor-vettrack.mjs is already idempotent (it no-ops when the pin matches),
+      # so a hit turns a network clone into a stat.
+      - name: ♻️ Cache vendored @vettrack packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .vendor
+          key: vendor-vettrack-${{ hashFiles('scripts/vendor-vettrack.mjs') }}
 
       # githubactions:S6505 — run `npm ci` with --ignore-scripts so no dependency
       # lifecycle script auto-executes, then run this repo's REQUIRED first-party
@@ -53,11 +66,17 @@ jobs:
           # fetch an unpinned release and run its scripts — githubactions:S6505/S8543).
           ./node_modules/.bin/patch-package
 
-      - name: Type check
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
+      # Typecheck and lint touch no shared state and are the two slowest non-test
+      # steps; running them concurrently hides the shorter one entirely. `wait -n`
+      # is not used — we want BOTH exit codes, not the first to finish.
+      - name: Type check + Lint
+        run: |
+          npm run typecheck & tc=$!
+          npm run lint & ln=$!
+          rc=0
+          wait $tc || rc=1
+          wait $ln || rc=1
+          exit $rc
 
       - name: Test
         run: npm test
@@ -72,8 +91,49 @@ jobs:
       - name: Release config (offline half)
         run: npm run release:preflight:offline
 
-      # Bundle gate: proves the production Metro bundle resolves end-to-end
-      # (regression guard for the clerk-expo -> clerk-react -> react-dom peer).
+  # Bundle gate: proves the production Metro bundle resolves end-to-end
+  # (regression guard for the clerk-expo -> clerk-react -> react-dom peer).
+  # Split out of `quality` because it shares nothing with the tests and was
+  # adding its full ~35s to the critical path.
+  bundle:
+    name: expo export (bundle gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: ♻️ Cache vendored @vettrack packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .vendor
+          key: vendor-vettrack-${{ hashFiles('scripts/vendor-vettrack.mjs') }}
+
+      - name: Install
+        run: |
+          node scripts/vendor-vettrack.mjs
+          npm ci --ignore-scripts
+          ./node_modules/.bin/patch-package
+
+      # Metro's transform cache is content-addressed, so a stale entry is not a
+      # correctness risk — a miss just costs what today's cold run already costs.
+      - name: ♻️ Cache Metro transform cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/metro-cache
+          key: metro-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            metro-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+            metro-${{ runner.os }}-
+
       # Call the local binary directly, never `npx` (githubactions:S6505/S8543).
       - name: Expo export (bundle gate)
         run: ./node_modules/.bin/expo export --platform ios --output-dir /tmp/expo-export-check
+        env:
+          METRO_CACHE_ROOT: ${{ runner.temp }}/metro-cache
