@@ -1,5 +1,4 @@
 
-
 # VetTrack RN Migration — G2 + Tech-Debt Closure Plan
 
 ## 1. Executive read
@@ -32,41 +31,55 @@ Ordered. Steps that persist anything land through **slice-PR discipline**: PR �
 > **⚠ Pre-flight (do first, once):** the specs assume `SonarCloud` is a required branch-protection context, but there is **no** sonar workflow/config file in the repo — only rule-ID comments. Confirm the *actual* required contexts before relying on "keep job name `typecheck + test`" or "Sonar passes trivially": `gh api repos/exposwifty31/VetTrack---RN-Migration-/branches/main/protection --jq '.required_status_checks.contexts'`. Low risk, but verify, don't infer.
 
 ### 2A. Worktree + branch hygiene → doc-sync PR (spec: debt-closure-hygiene — verdict: sound)
+
 Repo: `/Users/dan/VetTrack-RN-Migration`. All 5 worktrees verified clean + merged; local `main` is 15 behind origin (pure FF); the two uncommitted doc edits (README, SCAFFOLD-PLAN) are base-identical between `63783b0` and origin/main → stash-pop is conflict-free.
 
 - [ ] **Re-verify before mutating** (abort if any prints porcelain lines or `NOT-MERGED`):
+
   ```bash
   cd /Users/dan/VetTrack-RN-Migration && git fetch origin --quiet && for w in 2 3 4 5 7; do d=.worktrees/g1-slice-$w; echo "== $d =="; git -C "$d" status --porcelain; c=$(git -C "$d" rev-parse HEAD); git merge-base --is-ancestor "$c" origin/main && echo MERGED || echo NOT-MERGED-STOP; done
   ```
+
 - [ ] **Remove the 5 clean worktrees** (no `--force`; fails loud if dirty):
+
   ```bash
   for w in 2 3 4 5 7; do git worktree remove .worktrees/g1-slice-$w; done && git worktree prune && git worktree list
   ```
+
 - [ ] **Snapshot the doc edits** before switching branches:
+
   ```bash
   git stash push -m "g1-complete doc drift fixes (README+SCAFFOLD)" -- README.md SCAFFOLD-PLAN.md
   ```
+
 - [ ] **Branch off origin/main** (never local main — it's 15 behind → phantom commits):
+
   ```bash
   git checkout -b docs/g1-complete-drift origin/main && git stash pop && git diff --stat
   ```
+
 - [ ] Confirm `git stash list` no longer shows the entry (pop consumed it); never `git stash drop` manually. Recovery if needed: `git fsck --lost-found`.
 - [ ] **[NEEDS EXPLICIT OWNER OK]** Commit (new commit only — no amend/force/`--no-verify`), push, open docs-only PR `--base main`:
+
   ```bash
   git add README.md SCAFFOLD-PLAN.md && git commit -m "docs: mark G1 complete (slices 0-7 merged), next G2"
   git push -u origin docs/g1-complete-drift && gh pr create --base main --head docs/g1-complete-drift --title "docs: G1 complete — sync README + SCAFFOLD-PLAN" --body "Founder-review drift fix. Docs-only, no code change."
   ```
+
 - [ ] **Optional hygiene (last):** FF local main (`git branch -f main origin/main`); delete merged branches with **`-d` only** (refuses unmerged), looping over the 8 merged branches. **Never touch** `backup/superseded-slice-5-alt-2026-08-04` (intentionally unmerged) or `main`.
 - [ ] Keep the synthesized **G2-PLAN.md in a SEPARATE later PR** — do not bundle it behind the trivial drift fix.
 
 ### 2B. ESLint flat config → CI (spec: eslint — verdict: needs-fix: CI collision)
+
 - [ ] Add devDeps: `eslint@^9`, `eslint-config-expo@~57.0.1`. Do **not** add typescript-eslint / react-hooks / react / import / globals directly — expo-config-57 pins them. **The `^9` pin is load-bearing:** the config's `require('eslint/config')` only exists in ESLint 9+, and the package peer (`>=8.10`) won't enforce it.
 - [ ] Create `eslint.config.js` (CommonJS — repo has no `"type":"module"`): `defineConfig([ require('eslint-config-expo/flat'), { ignores: ['dist/*','.vendor/*','.worktrees/*','node_modules/*','**/*.d.ts'] } ])`. **Must ignore `.vendor/`** (vendor-vettrack populates it pre-install in CI) and generated `.d.ts`. Use the `/flat` subpath — the default export is legacy `.eslintrc`.
 - [ ] Add script `"lint": "eslint . --max-warnings=0"`; run and drive to zero (fix at source; downgrade a genuinely RN-inappropriate rule in the rules block with a one-line justification, never blanket-disable).
 - [ ] Wire lint as a **step inside the existing `quality` job** (`name: typecheck + test`) — do NOT add a new job or rename (would mint an unmatched required context). `--ignore-scripts` is safe (eslint + plugins have no lifecycle scripts).
 
 ### 2C. expo-export bundle fix (spec: expo-export-fix — verdict: sound; collides with 2B on ci.yml)
+
 Root cause reproduced: `@clerk/clerk-expo` declares `react-dom` a non-optional peer and pulls `@clerk/clerk-react` (which `require('react-dom')`) transitively; react-dom is simply absent → Metro bundle fails. Real tech debt — **not** a types issue.
+
 - [ ] Install the declared peer, exact-pinned: `npx expo install react-dom` (yields 19.2.3, lockstep with react@19.2.3). **Reject** any metro resolver shim/alias/blocklist — it weakens the withUniwindConfig chain the Operating Constraint forbids.
 - [ ] Verify locally (this is the real DONE gate, unprovable read-only): `npx expo export --platform ios --output-dir /tmp/expo-export-check && rm -rf /tmp/expo-export-check`. If a *second* missing peer surfaces (Metro aborts on first), install it and re-run.
 - [ ] Add an **`Expo export (bundle gate)` step inside the same existing `quality` job**, after Test: `./node_modules/.bin/expo export --platform ios --output-dir /tmp/expo-export-check`. **No `npx`** (SonarCloud S6505/S8543 policy — mirror the existing `./node_modules/.bin/patch-package` call). Bump the job `timeout-minutes` (15→~20) for the ~1-2 min bundle.
@@ -75,6 +88,7 @@ Root cause reproduced: `@clerk/clerk-expo` declares `react-dom` a non-optional p
 > **CI COLLISION (both critics):** 2B and 2C both add a step to the same `ci.yml` `quality` job. Landed in parallel they merge-conflict. **Land them as ONE combined CI PR** (lint step + export step together), or sequence 2C to rebase on 2B. The docs PR (2A) is docs-only and doesn't touch ci.yml, but whichever of the three merges later must rebase on origin/main.
 
 ### 2D. Slice-8 NFC — **OWNER-BLOCKED** ⛔
+
 Not closeable by agent. Requires physical NTAG tag + physical iPhone (see §5). Prep I can do read-only now: the NDEF payload spec (equipment-sticker URL record + AAR matching `src/lib/nfc-platform.ts` `buildEquipmentStickerRecords`) and write instructions. **Landmine:** `react-native-nfc-manager@3.17.2` carries a local patch (`patches/…+3.17.2.patch`, the #833 getTag guard) — a fresh install without `patch-package` re-run reintroduces the bug; the slice-8 read path depends on it.
 
 ---
@@ -82,6 +96,7 @@ Not closeable by agent. Requires physical NTAG tag + physical iPhone (see §5). 
 ## 3. Top-5 G2 implementation (sequenced, dependency-gated)
 
 ### STEP 1 — Delight-stack de-risk (THE LYNCHPIN — spec: delight-stack-derisk — verdict: sound)
+
 The single spec executable independently, and the gate the entire G2 UI track rests on. The original NativeWind `transformFile`-undefined crash was **never isolated** between NativeWind's babel plugin and worklets-under-SDK-57 Metro. Uniwind is architecturally clean (adds *zero* babel plugin; delegates every non-CSS file to the Expo transform-worker which runs `babel-preset-expo` + the worklets plugin), but that does **not** prove worklets 0.10.1 is safe on the SDK-57 worker. This step proves it empirically via a bisected build.
 
 1. **PRECONDITION — check it AFTER a clean install, not before.** `package.json` already declares `babel-preset-expo` at `~57.0.0` as a direct dependency (verified 2026-08-19), and the worktree this was originally written in had **no `node_modules` at all** — so the `MODULE_NOT_FOUND` that produced the "confirmed failing today" note proved nothing about the manifest. Do NOT edit `package.json` on the strength of a failed `require.resolve` in an uninstalled tree; that is a dependency edit chasing a phantom.
@@ -97,11 +112,13 @@ The single spec executable independently, and the gate the entire G2 UI track re
 **Uniwind guardrails (rules 6 & 7, non-negotiable):** `withUniwindConfig` stays outermost; **never** wrap RN/Reanimated components (`Animated.View`, `Pressable`, `FlashList`) with `withUniwind` — they already support `className`. Do NOT "fix" a perceived Uniwind/Babel conflict by editing metro.config.js. The babel.config.js + package.json changes here are **real committed artifacts** — they land via slice-PR discipline with explicit owner approval, same as §2.
 
 ### STEP 2 — Hero flow (spec: hero-flow — verdict: needs-fix; DONE hard-gated on Step 1)
+
 Scan→checkout on the real backend (staging). **Do not start the animated centerpiece until Step 1 step-4 bundles green** — hard sequencing block, not soft dependency.
 
 Ground-truth corrections folded — **restated 2026-08-19, the earlier version of this line was wrong.** The **delight stack** (Reanimated / Gesture Handler / FlashList / haptics) is genuinely absent; that is what STEP 1 exists to land. **SSE and i18n are NOT absent — both are merged and on `main`:** `src/infrastructure/realtime/{SseAdapter.ts,RealtimeBridge.tsx,defaultRealtime.ts}` (`getDefaultRealtimePort()` returns the shared `RealtimePort`) and `src/i18n/{config.ts,rtl.ts}` (`i18n` default export, `isRtlLocale` / `applyRtlDirection` / `isRtlReloadPending`). **Verify and reuse those APIs; do not build a second one.** A per-feature `EventSource` would break the frozen "one SSE connection per clinic" contract, and an inline strings module would bypass i18n entirely — both are worse than the gap they would be filling. Keep the degrade-gracefully fallback only for a *specific symbol* confirmed missing at build time. Backend contracts (`POST /api/equipment/scan` toggle semantics, 409 `checkedOutByEmail`, `undoToken`, list ETag/304) are sourced from `~/vettrack`, **not verified against this RN repo** — the must-fixes below enforce verification before the blind test.
 
 Build order:
+
 1. **Verify the seam files exist first** (critics flagged unverified): `src/infrastructure/auth/ClerkTokenBridge.tsx`, `src/lib/query-client.ts`, and `api.ts` helpers (`requestJson`/`authFetch`/`setCurrentUserId`). If absent, the auth-bootstrap/409-typing work has no foundation — build or adjust accordingly.
 2. **Typed API surface** in `src/lib/api.ts` + `src/types/api.ts`: `equipment.list()` (do NOT send `If-None-Match` — `requestJson` calls `res.json()` unconditionally; a bodiless 304 throws) and `equipment.scan()` (the hero action — **use `POST /api/equipment/scan`, NOT `/:id/toggle`** which hardcodes `isPluggedIn`). Type the 409 as a first-class `ConflictResult` carrying `checkedOutByEmail`, not a thrown error.
 3. **Auth bootstrap:** prefetch `users.me` (sets `currentUserId`) BEFORE any scan/list; `authFetch` throws `AUTH_INVALID: missing userId` on every non-/me route otherwise. Gate the Scan CTA until populated.
@@ -114,9 +131,11 @@ Build order:
 10. **E2E on sim against staging** (DONE gate — contingent on Step 1 green): drive Scan→search/NFC→FlashList→CheckoutConfirm→server-confirmed toggle, capturing all three instrumentation outputs. **Before the blind test, run the step-2 staging contract check for real** (scan semantics, 409 shape, undoToken) and verify tag payload on device.
 
 ### STEP 3 — G2 gate machinery — **OWNER-BLOCKED verdict** (spec: g2-gate-prereg — verdict: needs-fix: version drift)
+
 Honestly ownerBlocked (hardware + humans + the pre-reg commit-lock). **Version must-fix folded:** the spec's landmine #4 + step 5 repeat the brief's wrong `worklets 0.11.x`/`GH 3.x` — **corrected to the pin table** (0.10.1 / ~2.32.x) so the pre-registration locks numbers against a stack that actually builds.
 
 Agent-preparable now (read-only, buildable on approval):
+
 - Pre-registration doc **template** (`docs/g2-preregistration.md`) with thresholds parameterized by the named device's refresh budget (60Hz=16.67ms · 90Hz=11.11ms · 120Hz=8.33ms): p95 frame ≤ device budget AND <1% frames over; tap→response <100ms; cold-TTI <2s (cold only); blind ≥70% of ≥5 staff prefer RN with a concrete reason; hero task-time ≤ Capacitor.
 - Measurement harness (`react-native-performance` markers) + trace-capture scripts (Perfetto/Android Studio Profiler + adb; Instruments Time Profiler + os_signpost; RN DevTools Performance panel) + results CSV schema.
 - Blind-preference kit: counterbalanced A/B, unlabeled identical chassis, standardized spoken prompt, per-participant capture sheet, reason-coding rubric ("concrete" = a named speed/tap/feel difference, not "looks nicer").
