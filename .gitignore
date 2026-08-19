@@ -50,8 +50,8 @@ yarn-error.*
 
 # Agent scaffolding — non-source, already excluded by eslint.config.js and by jest's
 # modulePathIgnorePatterns. `.claude/worktrees/` holds LIVE linked git worktrees (multi-MB sibling
-# checkouts) that sit inside this repo directory; without this rule a single `git add -A` commits one
-# whole into history. `settings.local.json` is per-machine and is never shared.
+# checkouts) that sit inside this repo directory; without this rule a single `git add -A` stages an
+# entire sibling checkout for the next commit. `settings.local.json` is per-machine and is never shared.
 #
 # Deliberately NOT a blanket `.claude/*`: the sibling vettrack repo tracks agent config under
 # `.claude/agents|commands|skills|rules`, and a blanket rule would make `git add -A` silently skip

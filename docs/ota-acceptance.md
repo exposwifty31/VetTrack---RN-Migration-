@@ -45,7 +45,7 @@ Everything below was checked live, not assumed. Re-check anything that looks sta
 | Fact | Evidence |
 | --- | --- |
 | ~~`expo-updates` is **not installed**~~ → **`expo-updates` IS installed** (corrected 2026-08-19) | `package.json:29` → `"expo-updates": "~57.0.15"`, resolved to `57.0.15` in `package-lock.json`. Installed by commit `017ae43` "feat(ota): install expo-updates" (2026-08-18 21:50), **51 minutes after** this doc's last edit `534049c` (2026-08-18 20:59) — i.e. the doc was accurate when written and was never revisited after the very next commit closed its own P2 action item. |
-| No channel has ever existed | `eas channel:list --json --non-interactive` → `{"currentPage": []}` |
+| No channel exists **as of 2026-08-19** | `eas channel:list --json --non-interactive` → `{"currentPage": []}`. An empty list is a point-in-time read: it cannot distinguish "never created" from "created and deleted", and EAS exposes no channel history to settle it. Scoped to the observation rather than overstated. |
 | iOS builds 27 and 28 are `FINISHED`, both `1.3.0`, both with **no channel and no runtimeVersion** | `eas build:list --platform ios --json --non-interactive` |
 | `runtimeVersion` and `updates` now resolve | `eas config --profile preview --platform ios --json` → `{"policy":"fingerprint"}` and the `updates` block |
 | `{"policy":"fingerprint"}` is valid on SDK 57 | live app-config schema, `definitions.RuntimeVersion` |
@@ -78,8 +78,11 @@ profile (`"channel": "preview"` in `preview`, `"channel": "production"` in
 another branch is editing `eas.json` concurrently — and because `eas.json` is itself a
 fingerprint input, so whatever that merge produces changes the runtime version.
 
-Nothing here installs `expo-updates`. That is a `package.json` + lockfile change and
-belongs to the owner, from the repo root — see [P2](#p2--install-the-updates-client).
+~~Nothing here installs `expo-updates`.~~ **Superseded 2026-08-19:** commit `017ae43` installed
+it (`package.json:29` → `~57.0.15`). Kept, struck through, because the surrounding paragraph
+explains *why* the install is a repo-root `package.json` + lockfile change rather than something
+this procedure does — which is still true of any future dependency here. See
+[P2](#p2--install-the-updates-client), now closed.
 
 ### Why `checkAutomatically: "NEVER"`
 
@@ -142,12 +145,20 @@ Three consequences that bite:
 
 ### P1 — One authoritative lockfile
 
-An untracked `pnpm-lock.yaml` sits beside the tracked `package-lock.json`. The
+> **DONE 2026-08-19 — no action left here.** The premise below was false. `package-lock.json` is
+> the only lockfile in the tree, tracked or untracked (`find . -name pnpm-lock.yaml -not -path
+> '*/node_modules/*'` returns nothing, and there is no `yarn.lock`), and it resolves
+> `expo@57.0.9`, matching `package.json`'s `~57.0.9`. Where the `57.0.12` figure came from was
+> never established — see the corrected last row of the verified-state table. The original text
+> is struck through below rather than deleted, because the *principle* still governs every step
+> that follows.
+
+~~An untracked `pnpm-lock.yaml` sits beside the tracked `package-lock.json`. The
 tracked lockfile resolves `expo@57.0.9`; the installed tree is `57.0.12`; EAS cloud
-installs a third tree neither local state predicts. **A fingerprint is only
-reproducible when the dependency graph is.** Delete or commit one lockfile, reinstall
-clean, and confirm `require('expo/package.json').version` matches the lockfile before
-going further.
+installs a third tree neither local state predicts.~~ **A fingerprint is only
+reproducible when the dependency graph is** — so before relying on any fingerprint below,
+reinstall clean and confirm `require('expo/package.json').version` matches the lockfile.
+That check is still worth running; it is the lockfile *conflict* that no longer exists.
 
 ### P2 — Install the updates client
 

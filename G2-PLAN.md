@@ -35,24 +35,24 @@ Ordered. Steps that persist anything land through **slice-PR discipline**: PR �
 Repo: `/Users/dan/VetTrack-RN-Migration`. All 5 worktrees verified clean + merged; local `main` is 15 behind origin (pure FF); the two uncommitted doc edits (README, SCAFFOLD-PLAN) are base-identical between `63783b0` and origin/main → stash-pop is conflict-free.
 
 - [ ] **Re-verify before mutating** (abort if any prints porcelain lines or `NOT-MERGED`):
-  ```
+  ```bash
   cd /Users/dan/VetTrack-RN-Migration && git fetch origin --quiet && for w in 2 3 4 5 7; do d=.worktrees/g1-slice-$w; echo "== $d =="; git -C "$d" status --porcelain; c=$(git -C "$d" rev-parse HEAD); git merge-base --is-ancestor "$c" origin/main && echo MERGED || echo NOT-MERGED-STOP; done
   ```
 - [ ] **Remove the 5 clean worktrees** (no `--force`; fails loud if dirty):
-  ```
+  ```bash
   for w in 2 3 4 5 7; do git worktree remove .worktrees/g1-slice-$w; done && git worktree prune && git worktree list
   ```
 - [ ] **Snapshot the doc edits** before switching branches:
-  ```
+  ```bash
   git stash push -m "g1-complete doc drift fixes (README+SCAFFOLD)" -- README.md SCAFFOLD-PLAN.md
   ```
 - [ ] **Branch off origin/main** (never local main — it's 15 behind → phantom commits):
-  ```
+  ```bash
   git checkout -b docs/g1-complete-drift origin/main && git stash pop && git diff --stat
   ```
 - [ ] Confirm `git stash list` no longer shows the entry (pop consumed it); never `git stash drop` manually. Recovery if needed: `git fsck --lost-found`.
 - [ ] **[NEEDS EXPLICIT OWNER OK]** Commit (new commit only — no amend/force/`--no-verify`), push, open docs-only PR `--base main`:
-  ```
+  ```bash
   git add README.md SCAFFOLD-PLAN.md && git commit -m "docs: mark G1 complete (slices 0-7 merged), next G2"
   git push -u origin docs/g1-complete-drift && gh pr create --base main --head docs/g1-complete-drift --title "docs: G1 complete — sync README + SCAFFOLD-PLAN" --body "Founder-review drift fix. Docs-only, no code change."
   ```
@@ -84,7 +84,8 @@ Not closeable by agent. Requires physical NTAG tag + physical iPhone (see §5). 
 ### STEP 1 — Delight-stack de-risk (THE LYNCHPIN — spec: delight-stack-derisk — verdict: sound)
 The single spec executable independently, and the gate the entire G2 UI track rests on. The original NativeWind `transformFile`-undefined crash was **never isolated** between NativeWind's babel plugin and worklets-under-SDK-57 Metro. Uniwind is architecturally clean (adds *zero* babel plugin; delegates every non-CSS file to the Expo transform-worker which runs `babel-preset-expo` + the worklets plugin), but that does **not** prove worklets 0.10.1 is safe on the SDK-57 worker. This step proves it empirically via a bisected build.
 
-1. **PRECONDITION (confirmed failing today):** `node -e "require.resolve('babel-preset-expo')"` throws MODULE_NOT_FOUND — it's nested-only under `node_modules/expo/node_modules`. A root `babel.config.js` will die before worklets is even exercised. Fix: add `babel-preset-expo` at the **same version Expo nests (`~57.0.5`)** to devDependencies (avoids a duplicate version in the tree) or clean-reinstall to hoist. **Gate:** `require.resolve('babel-preset-expo')` prints a path.
+1. **PRECONDITION — check it AFTER a clean install, not before.** `package.json` already declares `babel-preset-expo` at `~57.0.0` as a direct dependency (verified 2026-08-19), and the worktree this was originally written in had **no `node_modules` at all** — so the `MODULE_NOT_FOUND` that produced the "confirmed failing today" note proved nothing about the manifest. Do NOT edit `package.json` on the strength of a failed `require.resolve` in an uninstalled tree; that is a dependency edit chasing a phantom.
+   Run `npm ci` first, *then* `node -e "require.resolve('babel-preset-expo')"`. **Gate:** it prints a path. Only if it still fails after a clean install is there a real hoisting problem to fix (pin the version Expo nests, or reinstall clean) — and a root `babel.config.js` does die before worklets is exercised, which is why the gate is here at all.
 2. **Install via expo install only:** `npx expo install react-native-reanimated react-native-worklets react-native-gesture-handler @shopify/flash-list expo-haptics`. Verify package.json shows the pin-table versions (worklets **0.10.1**, GH **~2.32.x** — not the brief's numbers).
 3. **Create `babel.config.js`** (`npx expo customize babel.config.js`, then edit): `presets:['babel-preset-expo']`, `plugins:['react-native-worklets/plugin']` as the **LAST** plugin. **DEFER React Compiler** entirely (it would add a second unproven variable to the same bisect and must be FIRST if ever added).
 4. **BISECT — the actual falsification.** Before touching GH/FlashList, add ONE trivial worklet animation (`useSharedValue`+`useAnimatedStyle`+`withSpring` on an `Animated.View`, per react-native-design quick-start) and `npx expo start -c`. **This isolates "does worklets 0.10.1 crash the SDK-57 transform-worker" from any GH/FlashList interaction.**
@@ -98,7 +99,7 @@ The single spec executable independently, and the gate the entire G2 UI track re
 ### STEP 2 — Hero flow (spec: hero-flow — verdict: needs-fix; DONE hard-gated on Step 1)
 Scan→checkout on the real backend (staging). **Do not start the animated centerpiece until Step 1 step-4 bundles green** — hard sequencing block, not soft dependency.
 
-Ground-truth corrections folded: **SSE, i18n, and the whole delight stack are ABSENT** in this repo (verified) — consume them as seams that degrade gracefully. Backend contracts (`POST /api/equipment/scan` toggle semantics, 409 `checkedOutByEmail`, `undoToken`, list ETag/304) are sourced from `~/vettrack`, **not verified against this RN repo** — the must-fixes below enforce verification before the blind test.
+Ground-truth corrections folded — **restated 2026-08-19, the earlier version of this line was wrong.** The **delight stack** (Reanimated / Gesture Handler / FlashList / haptics) is genuinely absent; that is what STEP 1 exists to land. **SSE and i18n are NOT absent — both are merged and on `main`:** `src/infrastructure/realtime/{SseAdapter.ts,RealtimeBridge.tsx,defaultRealtime.ts}` (`getDefaultRealtimePort()` returns the shared `RealtimePort`) and `src/i18n/{config.ts,rtl.ts}` (`i18n` default export, `isRtlLocale` / `applyRtlDirection` / `isRtlReloadPending`). **Verify and reuse those APIs; do not build a second one.** A per-feature `EventSource` would break the frozen "one SSE connection per clinic" contract, and an inline strings module would bypass i18n entirely — both are worse than the gap they would be filling. Keep the degrade-gracefully fallback only for a *specific symbol* confirmed missing at build time. Backend contracts (`POST /api/equipment/scan` toggle semantics, 409 `checkedOutByEmail`, `undoToken`, list ETag/304) are sourced from `~/vettrack`, **not verified against this RN repo** — the must-fixes below enforce verification before the blind test.
 
 Build order:
 1. **Verify the seam files exist first** (critics flagged unverified): `src/infrastructure/auth/ClerkTokenBridge.tsx`, `src/lib/query-client.ts`, and `api.ts` helpers (`requestJson`/`authFetch`/`setCurrentUserId`). If absent, the auth-bootstrap/409-typing work has no foundation — build or adjust accordingly.
@@ -108,8 +109,8 @@ Build order:
 5. **ScanScreen:** primary scan CTA (NFC via existing manager seam / camera-barcode from delight stack) + uncontrolled debounced search (`useDeferredValue` — no re-render per keystroke) + recent equipment. NFC stays **advisory** (frozen surface): a read pre-fills, human confirms in the sheet, never auto-commits custody. Tag-payload fallback: if payload matches the id format → deep-link to CheckoutConfirm; else resolve via `equipment.list({q:payload})`.
 6. **FlashList v2 list** (no `estimatedItemSize`): `EquipmentRow` with Reanimated press-scale + expo-haptics tick, `renderItem` outside render, `getItemType` by status.
 7. **CheckoutConfirm** (delight centerpiece): Reanimated shared-element-style transition + Gesture Handler dismiss. `useScanToggle` with `onMutate` optimistic status flip + snapshot, `onError` rollback + loud toast, **always reconcile to the server-returned action**. 409 = first-class conflict screen naming the holder. Success = checkmark/haptic + Undo wired to `undoToken`. **Equipment custody is NOT emergency state → optimistic-with-rollback is allowed** (the no-optimistic rule is Code-Blue-only); but the scan route is **online-only — fail loud offline, never queue**.
-8. **Realtime seam — 🔒 FROZEN-CONTRACT MUST-FIX (2nd critic, anchor violation):** `useEquipmentRealtimeSync` must **SUBSCRIBE to the single shared per-clinic SSE connection** and only `invalidateQueries(['equipment'])` on relevant events — it must **NOT instantiate its own EventSource** (a per-feature connection breaks the frozen "one SSE connection per clinic" contract even on the same transport). Absent the SSE client seam, degrade to `refetchOnWindowFocus` + invalidate-on-mutation only. **PROHIBITED:** any `refetchInterval`/`setInterval` polling to fake "live" (doctrine violation) — grep must confirm zero.
-9. **i18n/RTL seam:** route all copy through `t()` (Hebrew default); bind to the i18n workstream if it lands, else a minimal inline strings module — **no hardcoded literals**. Logical spacing (`ps-`/`pe-`, `I18nManager.isRTL`); RTL flip needs an app reload (frozen).
+8. **Realtime seam — 🔒 FROZEN-CONTRACT MUST-FIX (2nd critic, anchor violation):** `useEquipmentRealtimeSync` must **SUBSCRIBE to the single shared per-clinic SSE connection** and only `invalidateQueries(['equipment'])` on relevant events — it must **NOT instantiate its own EventSource** (a per-feature connection breaks the frozen "one SSE connection per clinic" contract even on the same transport). The SSE client seam **exists** (`getDefaultRealtimePort()` in `src/infrastructure/realtime/defaultRealtime.ts`) — subscribe through it. Degrade to `refetchOnWindowFocus` + invalidate-on-mutation only if a specific required symbol turns out to be missing, not as the default path. **PROHIBITED:** any `refetchInterval`/`setInterval` polling to fake "live" (doctrine violation) — grep must confirm zero.
+9. **i18n/RTL seam:** route all copy through `t()` (Hebrew default) against the **existing** `src/i18n/config.ts` — it is merged, so there is no "if it lands" and no inline strings module to write. **no hardcoded literals**. Logical spacing (`ps-`/`pe-`, `I18nManager.isRTL`); RTL flip needs an app reload (frozen).
 10. **E2E on sim against staging** (DONE gate — contingent on Step 1 green): drive Scan→search/NFC→FlashList→CheckoutConfirm→server-confirmed toggle, capturing all three instrumentation outputs. **Before the blind test, run the step-2 staging contract check for real** (scan semantics, 409 shape, undoToken) and verify tag payload on device.
 
 ### STEP 3 — G2 gate machinery — **OWNER-BLOCKED verdict** (spec: g2-gate-prereg — verdict: needs-fix: version drift)
@@ -127,7 +128,7 @@ Owner-only (see §5). **Verdict rule (binding, from the Anchor):** PASS requires
 
 ## 4. Sequenced timeline
 
-```
+```bash
 NOW (read-only + local proofs, no git side-effects):
   ├─ Verify actual branch-protection required contexts (pre-flight)
   ├─ Prep G2 templates (pre-reg doc, harness, blind kit, NDEF spec)   [parallel, no deps]
