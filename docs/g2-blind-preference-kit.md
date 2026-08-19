@@ -5,7 +5,7 @@ Runs the S1 subjective floor: **≥70% of ≥6 staff prefer RN with a concrete r
 ## 1. Setup — identical chassis
 
 - Both apps installed on **two physically identical devices** (same model/refresh/SoC/RAM as the pre-registration §2 gate device), OR the same single device with apps swapped between rounds. Package names differ (Capacitor `uk.vettrack.app` vs RN `uk.vettrack.rnmigration`) so both coexist.
-- Same clinic, same lighting, same equipment item, same seeded backend/staging data. Neither app shows its name/branding on the hero screen during the test (cover the app icon; launch directly into Scan).
+- Same clinic, same lighting, same equipment item, same seeded backend data — and the **same backend for both apps**, which matters more now that there is no staging tier to hold it constant. Neither app shows its name/branding on the hero screen during the test (cover the app icon; launch directly into Scan).
 - **Foreground-read requirement (critical — prevents A/B contamination):** because the sticker's universal-link/AAR association resolves to the Capacitor app, a tag tapped while an app is backgrounded will open Capacitor and poison the result. Every round MUST be: **launch app → tap the Scan CTA (NFC session now active) → THEN present the tag.** Never present a tag to a backgrounded phone.
 
 ## 2. Counterbalancing and blinding
