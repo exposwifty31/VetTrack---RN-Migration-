@@ -1,0 +1,130 @@
+{
+  "$comment": "Claims that cannot be checked against THIS tree, each with a reason a reader can audit. Two rules keep the file from becoming the place claims go to stop being checked: an entry that no live claim matches FAILS the gate (orphan), and an entry whose claim would now verify on its own FAILS the gate too (obsolete). See scripts/verify/claims.js.",
+  "entries": [
+    {
+      "kind": "dependency",
+      "match": "@clerk/react",
+      "reason": "transitive peer of @clerk/expo (the clerk-expo -> clerk-react -> react-dom chain the bundle gate guards); never a direct dependency"
+    },
+    {
+      "kind": "package",
+      "match": "@react-native/metro-config",
+      "reason": "ships inside react-native, not a direct dependency of this package.json"
+    },
+    {
+      "kind": "dependency",
+      "match": "@expo/config-plugins",
+      "reason": "ships inside expo, not a direct dependency of this package.json; cited as upstream evidence for prebuild behaviour"
+    },
+    {
+      "kind": "package",
+      "match": "@expo/cli",
+      "reason": "ships inside expo, not a direct dependency of this package.json"
+    },
+    {
+      "kind": "package",
+      "match": "@expo/config",
+      "reason": "ships inside expo, not a direct dependency of this package.json"
+    },
+    {
+      "kind": "path-lines",
+      "match": "RequiresFullScreen.js",
+      "reason": "source file inside the @expo/config-plugins package under node_modules, cited as upstream evidence; node_modules is not part of this tree"
+    },
+    {
+      "kind": "path",
+      "match": "src/lib/api/crash-cart.ts",
+      "reason": "planned artifact of the Crash-cart PORT item (parity row 2), not built yet; the entry must be deleted the day the file lands - the obsolescence rule in scripts/verify/claims.js enforces that"
+    },
+    {
+      "kind": "path",
+      "match": "ipad-01-equipment.png",
+      "reason": "App Store Connect screenshot asset from the Capacitor submission lane; never checked into either repo (searched both trees 2026-08-20)"
+    },
+    {
+      "kind": "path",
+      "match": "credentials.json",
+      "reason": "EAS local credentials file; the sentence asserts its ABSENCE (no release keystore on disk), and it must never be committed"
+    },
+    {
+      "kind": "path",
+      "match": "src/lib/api/equipment.ts",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at src/lib/api/equipment.ts on 2026-08-20. Qualifying it as `vettrack/src/lib/api/equipment.ts` in the document would retire this entry."
+    },
+    {
+      "kind": "path",
+      "match": "ShiftChatArchive.tsx",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at src/features/shift-chat/components/ShiftChatArchive.tsx on 2026-08-20. Qualifying it as `vettrack/src/features/shift-chat/components/ShiftChatArchive.tsx` in the document would retire this entry."
+    },
+    {
+      "kind": "path",
+      "match": "native-oauth.ts",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at src/lib/native-oauth.ts on 2026-08-20. Qualifying it as `vettrack/src/lib/native-oauth.ts` in the document would retire this entry."
+    },
+    {
+      "kind": "path",
+      "match": "components/layout.tsx",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at src/components/layout.tsx on 2026-08-20. Qualifying it as `vettrack/src/components/layout.tsx` in the document would retire this entry."
+    },
+    {
+      "kind": "path",
+      "match": "components/skeletons/equipment-detail-skeleton.tsx",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at src/components/skeletons/equipment-detail-skeleton.tsx on 2026-08-20. Qualifying it as `vettrack/src/components/skeletons/equipment-detail-skeleton.tsx` in the document would retire this entry."
+    },
+    {
+      "kind": "path",
+      "match": "src/lib/nfc-capgo-decode.ts",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at src/lib/nfc-capgo-decode.ts on 2026-08-20. Qualifying it as `vettrack/src/lib/nfc-capgo-decode.ts` in the document would retire this entry."
+    },
+    {
+      "kind": "path-lines",
+      "match": "native-nav-model.ts",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at src/lib/routes/native-nav-model.ts on 2026-08-20. Qualifying it as `vettrack/src/lib/routes/native-nav-model.ts` in the document would retire this entry."
+    },
+    {
+      "kind": "path-lines",
+      "match": "resolver/location.ts",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at server/domain/equipment/evidence/resolver/location.ts on 2026-08-20. Qualifying it as `vettrack/server/domain/equipment/evidence/resolver/location.ts` in the document would retire this entry."
+    },
+    {
+      "kind": "path-lines",
+      "match": "routes.tsx",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at src/app/routes.tsx on 2026-08-20. Qualifying it as `vettrack/src/app/routes.tsx` in the document would retire this entry."
+    },
+    {
+      "kind": "path-lines",
+      "match": "whats-new.tsx",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at src/pages/whats-new.tsx on 2026-08-20. Qualifying it as `vettrack/src/pages/whats-new.tsx` in the document would retire this entry."
+    },
+    {
+      "kind": "path-lines",
+      "match": "StartOfShiftCard.tsx",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at src/features/today/surfaces/StartOfShiftCard.tsx on 2026-08-20. Qualifying it as `vettrack/src/features/today/surfaces/StartOfShiftCard.tsx` in the document would retire this entry."
+    },
+    {
+      "kind": "path-lines",
+      "match": "middleware/equipment-replay-idempotency.ts",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at server/middleware/equipment-replay-idempotency.ts on 2026-08-20. Qualifying it as `vettrack/server/middleware/equipment-replay-idempotency.ts` in the document would retire this entry."
+    },
+    {
+      "kind": "path-lines",
+      "match": "equipment-detail.tsx",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at src/pages/equipment-detail.tsx on 2026-08-20. Qualifying it as `vettrack/src/pages/equipment-detail.tsx` in the document would retire this entry."
+    },
+    {
+      "kind": "path-lines",
+      "match": "layout.tsx",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at src/components/layout.tsx on 2026-08-20. Qualifying it as `vettrack/src/components/layout.tsx` in the document would retire this entry."
+    },
+    {
+      "kind": "path-lines",
+      "match": "clerk-appearance.ts",
+      "reason": "vettrack-side file in a two-repo parity table; confirmed present in the Capacitor repo at src/lib/clerk-appearance.ts on 2026-08-20. Qualifying it as `vettrack/src/lib/clerk-appearance.ts` in the document would retire this entry."
+    },
+    {
+      "kind": "glob",
+      "match": "scripts/verify/*.cjs",
+      "reason": "the SIBLING repo's copy of the shared engine — the Capacitor vettrack repo carries it under that extension; this repo carries .js. Named here to explain the fingerprint contract, and verifiable only from that repo."
+    }
+  ]
+}

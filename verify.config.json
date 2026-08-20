@@ -1,0 +1,121 @@
+{
+  "$comment": "Scope + policy for the claim-verification gate. See scripts/verify/README.md. Everything the gate looks at is named HERE — a document that is not listed is deliberately ungoverned, not accidentally missed.",
+  "packageManager": "npm",
+  "defaultBranch": "main",
+  "governedDocs": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    "SCAFFOLD-PLAN.md",
+    "G2-PLAN.md",
+    "DESIGN-LANGUAGE.md",
+    "docs/G3-PLAN.md",
+    "docs/parity-triage.md",
+    "docs/release-config.md",
+    "docs/ota-acceptance.md",
+    "docs/device-test-w3b.md",
+    "docs/g2-ntag-ndef-spec.md"
+  ],
+  "statusDocs": [
+    "SCAFFOLD-PLAN.md",
+    "G2-PLAN.md",
+    "docs/G3-PLAN.md"
+  ],
+  "ungoverned": {
+    "$comment": "Not scanned, and each exclusion is a reason rather than an oversight.",
+    "docs/Research/**": "imported research dumps — a record of what was read, not a claim this repo makes",
+    "docs/g2-raw/**": "raw preference-study output; numbers, not assertions about the codebase",
+    "docs/g2_5-raw/**": "same",
+    "docs/g2-results.csv": "same",
+    "docs/g2_5-results.md": "study results — assertions about a study, not about this tree",
+    "docs/g3-results.md": "same",
+    "docs/g2-preregistration.md": "pre-registered study protocol, frozen by design",
+    "docs/g2-blind-preference-kit.md": "study instrument",
+    "docs/design/aurora-home/**": "design artifacts + screenshots",
+    "docs/VetTrack-Readiness-Review.md": "point-in-time external review; superseded by the gate itself"
+  },
+  "ignoredPathPrefixes": [
+    ".vendor/",
+    "ios/",
+    "android/",
+    "node_modules/",
+    ".worktrees/",
+    ".expo/",
+    "dist/",
+    "wt-audit/",
+    "docs/audit/evidence-run.json"
+  ],
+  "dependencyAliases": {
+    "Expo SDK": "expo",
+    "React Native": "react-native",
+    "React": "react",
+    "Uniwind": "uniwind",
+    "FlashList": "@shopify/flash-list",
+    "Reanimated": "react-native-reanimated",
+    "Gesture Handler": "react-native-gesture-handler",
+    "TanStack Query": "@tanstack/react-query",
+    "Zustand": "zustand"
+  },
+  "treeBlocks": [
+    {
+      "file": "AGENTS.md",
+      "afterHeading": "## Structure"
+    }
+  ],
+  "evidenceGates": [
+    {
+      "id": "typecheck",
+      "command": "npm run typecheck"
+    },
+    {
+      "id": "lint",
+      "command": "npm run lint"
+    },
+    {
+      "id": "release-preflight-offline",
+      "command": "npm run release:preflight:offline"
+    }
+  ],
+  "registry": "docs/claims-registry.json",
+  "attestations": "docs/attestations.json",
+  "evidenceReport": "docs/audit/evidence-run.json",
+  "includeDotDirs": [
+    ".github"
+  ],
+  "crossRepoPrefixes": [
+    {
+      "prefix": "server/",
+      "reason": "cross-repo: Express server lives in the vettrack (Capacitor) repo, which this repo deliberately never touches"
+    },
+    {
+      "prefix": "src/pages/",
+      "reason": "cross-repo: vettrack's web page components; RN has no src/pages"
+    },
+    {
+      "prefix": "packages/",
+      "reason": "cross-repo: vettrack workspace package; reachable here only as the gitignored .vendor/ snapshot"
+    },
+    {
+      "prefix": "shared/",
+      "reason": "cross-repo: vettrack's shared/ workspace; vendored, not checked in"
+    },
+    {
+      "prefix": "migrations/",
+      "reason": "cross-repo: vettrack SQL migrations"
+    },
+    {
+      "prefix": "vettrack/",
+      "reason": "cross-repo: explicitly prefixed vettrack path"
+    },
+    {
+      "prefix": "src/native/",
+      "reason": "cross-repo: vettrack's Capacitor shell composition; RN has no src/native"
+    }
+  ],
+  "crossRepoNames": [
+    "vettrack"
+  ],
+  "prLedger": "docs/pr-ledger.json",
+  "siblingRepo": "exposwifty31/vettrack (the Capacitor repo; same engine as scripts/verify/*.cjs)",
+  "engineFingerprint": "2a8f510951c78d2b58fec1465c91fbe306091ec95c65a54d3ed0d916e2583906"
+}

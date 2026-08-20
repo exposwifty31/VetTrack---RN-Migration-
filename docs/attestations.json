@@ -1,0 +1,35 @@
+{
+  "$comment": "Layer 4 - claims this repository cannot prove on its own: a physical device, a simulator run, the EAS server-side environment store. Each entry is a written, checked-in statement of what a human observed, with a date, an expiry, and the recipe to observe it again. A governed document points at one with <!-- vt-claim: attested <id> -->. An entry past its budget FAILS the gate, and so does an entry no document references. Device claims are NOT auto-detected from prose: the marker is how such a claim enters the ledger (see scripts/verify/scan.js for why a heuristic was rejected - it produced four false alarms out of six matches on this repo's own docs).",
+  "entries": [
+    {
+      "id": "g1-device-smoke",
+      "claim": "G1 navigation runs on the iPhone 17 simulator, and NFC reports isSupported=true on a physical Pixel 7 under the New Architecture",
+      "target": "physical-device",
+      "evidence": "SCAFFOLD-PLAN.md",
+      "attestedBy": "repo owner (recorded in SCAFFOLD-PLAN.md, Current repo state)",
+      "attestedAt": "2026-08-04",
+      "staleAfterDays": 120,
+      "reverifyWith": "docs/device-test-w3b.md"
+    },
+    {
+      "id": "slice-1b-uniwind-sim",
+      "claim": "The Uniwind theme renders on the iPhone 17 simulator: HomeScreen and NfcSpikeScreen both drew, bundle 5.58 MB, tsc 0",
+      "target": "sim",
+      "evidence": "SCAFFOLD-PLAN.md",
+      "attestedBy": "repo owner (recorded in SCAFFOLD-PLAN.md, slice 1b)",
+      "attestedAt": "2026-08-04",
+      "staleAfterDays": 120,
+      "reverifyWith": "npm run ios"
+    },
+    {
+      "id": "eas-production-env",
+      "claim": "The EAS production environment supplies EXPO_PUBLIC_API_ORIGIN and EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to the build",
+      "target": "eas-store",
+      "evidence": "src/__tests__/manifest-vs-code.test.ts",
+      "attestedBy": "recorded in manifest-vs-code.test.ts from `npx eas config --profile production --platform ios` (eas-cli 21.x)",
+      "attestedAt": "2026-08-15",
+      "staleAfterDays": 90,
+      "reverifyWith": "npm run release:preflight"
+    }
+  ]
+}

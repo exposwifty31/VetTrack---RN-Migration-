@@ -70,6 +70,8 @@
     "web": "expo start --web",
     "test": "jest --watchman=false --forceExit",
     "typecheck": "tsc --noEmit",
+    "verify:claims": "node scripts/verify-claims.mjs",
+    "verify:evidence": "node scripts/verify-evidence.mjs",
     "vendor:vettrack": "node scripts/vendor-vettrack.mjs",
     "preinstall": "node scripts/vendor-vettrack.mjs",
     "postinstall": "patch-package",
