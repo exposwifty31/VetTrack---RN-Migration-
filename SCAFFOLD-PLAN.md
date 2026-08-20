@@ -20,9 +20,9 @@
   > 2026-08-11); `docs/parity-triage.md:250-253` (decision record). Live truth: `AGENTS.md` §Frozen stack.
 - Auth: **@clerk/expo**. Realtime: **react-native-sse** (foreground-only). i18n: i18next + **I18nManager RTL**
   > *Corrected 2026-08-20 (this line previously read ~~@clerk/clerk-expo~~):* the SDK was swapped to
-  > `@clerk/expo@^4.5.0` in commit `2672a6e`. Caught by CodeRabbit on PR #85, not by the claim gate —
-  > the package was named in **bold prose** rather than a code span, which the scanner did not read.
-  > That gap is closed in the same stack (`scripts/verify/scan.js` now reads `@scope/name` from prose).
+  > `@clerk/expo@^4.5.0` in commit `2672a6e`. Caught by CodeRabbit on PR #85, not by the automated
+  > claim pass — the package was named in **bold prose** rather than a code span, and the scanner only
+  > read code spans. That gap is closed in the PR that introduces the scanner.
 
 ## Current repo state (verified 2026-08-04)
 - `main` holds **slices 0 / 1 / 1b / 2 / 3 / 4 / 5 / 6 / 7 — all MERGED.** RN PRs #2–#5 (storage / contracts / Clerk / API) were un-stuck and merged in dependency order (#3→#2→#4→#5) on 2026-08-04; then slice 5 (SSE, #6) + slice 6 (i18n/RTL, #8) landed, plus the jest-preset fix (#7) and CI (#9). `tsc --noEmit` = 0 and CI (typecheck + test) is green on `main` after `npm install` (incl. `@vettrack/contracts` + `@vettrack/shared` resolving).
