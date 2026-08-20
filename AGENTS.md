@@ -131,6 +131,13 @@ verify on its own — a planned file that gets built forces its own registry ent
 - **Device claims in prose are NOT auto-detected.** A heuristic was tried and produced four false alarms out
   of six matches on these very docs, so the marker is the only way a device claim enters the ledger. Adding
   the attestation is the author's job.
+- **A marker inside `` `backticks` `` is an example, not a claim** — which is what makes the line above safe to
+  write. A live marker sits in the prose on its own. Reading demonstrations as live meant an `attested <id>`
+  example satisfied the "referenced by a governed document" rule by itself, and a stale attestation would
+  never have been reported.
+- **Close every `~~strikethrough~~` you open.** An unterminated run blanks the rest of the document, and its
+  claims would vanish with no failure; the gate reports the run instead. A `` `~~` `` inside a code span is
+  literal text and does not open one.
 
 Scope lives in `verify.config.json` — governed documents, ignored prefixes, cross-repo prefixes, evidence
 gates. A document that is not listed is deliberately ungoverned, not accidentally missed.

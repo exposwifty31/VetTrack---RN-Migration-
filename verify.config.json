@@ -117,5 +117,5 @@
   ],
   "prLedger": "docs/pr-ledger.json",
   "siblingRepo": "exposwifty31/vettrack (the Capacitor repo; same engine as scripts/verify/*.cjs)",
-  "engineFingerprint": "d966e164862184bb15286a599f499c3279222c60078babd77ddde2a7e956b048"
+  "engineFingerprint": "af19a9b1bf4fb190f53187a8d42d580b5e456f338727bfdcf72a4d6a946f9b87"
 }

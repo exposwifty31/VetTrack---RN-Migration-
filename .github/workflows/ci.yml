@@ -76,7 +76,8 @@ jobs:
       # normally brings it, but a fork PR or a re-run can leave the remote-tracking
       # ref unset; fetching it explicitly keeps the gate from failing on plumbing.
       - name: Fetch default branch (claim verification, layer 2)
-        run: git fetch --no-tags origin main:refs/remotes/origin/main || true
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
+          || echo "::warning::could not fetch origin/main — claim verification will report layer 2 as unavailable"
 
       # Runs typecheck + lint + the offline release-config gate CONCURRENTLY (the
       # shape the two separate steps below used to have) and records the result in
