@@ -20,7 +20,7 @@
   > 2026-08-11); `docs/parity-triage.md:250-253` (decision record). Live truth: `AGENTS.md` §Frozen stack.
 - Auth: **@clerk/expo**. Realtime: **react-native-sse** (foreground-only). i18n: i18next + **I18nManager RTL**
   > *Corrected 2026-08-20 (this line previously read ~~@clerk/clerk-expo~~):* the SDK was swapped to
-  > `@clerk/expo@^4.5.0` in commit `2672a6e`. Caught by CodeRabbit on PR #85, not by the automated
+  > `@clerk/expo@^4.5.0` in commit `2672a6e`. Caught in review on this stack, not by the automated
   > claim pass — the package was named in **bold prose** rather than a code span, and the scanner only
   > read code spans. That gap is closed in the PR that introduces the scanner.
 
