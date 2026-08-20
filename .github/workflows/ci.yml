@@ -35,6 +35,12 @@ jobs:
           # No git push happens here; don't leave the token in .git/config where
           # a lifecycle script could read it.
           persist-credentials: false
+          # Full history: the claim gate's layer 2 resolves every "MERGED"/
+          # "landed" citation in the plan docs against real history — a commit
+          # must exist AND be an ancestor of main. On the default shallow clone
+          # those objects are absent, and scripts/verify/git-facts.js fails loud
+          # rather than passing a check it could not perform.
+          fetch-depth: 0
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -66,30 +72,28 @@ jobs:
           # fetch an unpinned release and run its scripts — githubactions:S6505/S8543).
           ./node_modules/.bin/patch-package
 
-      # Typecheck and lint touch no shared state and are the two slowest non-test
-      # steps; running them concurrently hides the shorter one entirely. `wait -n`
-      # is not used — we want BOTH exit codes, not the first to finish.
-      - name: Type check + Lint
-        run: |
-          npm run typecheck & tc=$!
-          npm run lint & ln=$!
-          rc=0
-          wait $tc || rc=1
-          wait $ln || rc=1
-          exit $rc
+      # origin/main is what layer 2 measures "landed" against. fetch-depth: 0
+      # normally brings it, but a fork PR or a re-run can leave the remote-tracking
+      # ref unset; fetching it explicitly keeps the gate from failing on plumbing.
+      - name: Fetch default branch (claim verification, layer 2)
+        run: git fetch --no-tags origin main:refs/remotes/origin/main || true
 
+      # Runs typecheck + lint + the offline release-config gate CONCURRENTLY (the
+      # shape the two separate steps below used to have) and records the result in
+      # docs/audit/evidence-run.json, bound to this tree. The claim gate in `npm
+      # test` then refuses any documented "green" that this report does not back —
+      # which is why the evidence must be produced BEFORE the tests read it.
+      - name: Evidence gates (typecheck + lint + release config)
+        run: npm run verify:evidence
+
+      # Includes src/__tests__/claims-ledger.test.ts — the claim gate. This job
+      # produced the evidence report in the step above, so it is also the job
+      # allowed to demand one: VT_ENFORCE_EVIDENCE=1 binds layer 3 here, and a
+      # stale, dirty or missing report fails.
       - name: Test
         run: npm test
-
-      # Release-config gate, OFFLINE half: every build-time env name the source
-      # reads (including the non-EXPO_PUBLIC_ ones app.config.js reads) must have
-      # a declared disposition, and the version fields must be well-formed.
-      # Needs no credentials and no network, so it runs on fork PRs too.
-      # The EAS-backed half asserts against live remote state a PR cannot change
-      # and needs a secret fork PRs never receive — it lives in
-      # .github/workflows/release-preflight.yml (workflow_dispatch).
-      - name: Release config (offline half)
-        run: npm run release:preflight:offline
+        env:
+          VT_ENFORCE_EVIDENCE: "1"
 
   # Bundle gate: proves the production Metro bundle resolves end-to-end
   # (regression guard for the clerk-expo -> clerk-react -> react-dom peer).
