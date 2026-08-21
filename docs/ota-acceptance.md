@@ -223,8 +223,14 @@ profile, and nothing in this repo bumps a version. `refusesDuplicateBuildNumber`
 as ALREADY CONSUMED.
 
 **Done 2026-08-21:** `ios.buildNumber` is `"29"` and `android.versionCode` is
-`10301`, and `checkShippedBuildFloor()` now enforces this offline on every PR
-(see `docs/release-config.md`, (B1)). **`eas build:list` is not filtered by profile**, so the internal
+`10301`. `checkShippedBuildFloor()` enforces the **iOS** floor offline on every PR
+(see `docs/release-config.md`, (B1)); it reads `ios.buildNumber` only. Offline,
+Android gets well-formedness from `validateVersionFields` and nothing more — its
+monotonicity is checked solely by the full run's `checkBuildNumbers()`, via
+`eas build:list`. That asymmetry is correct only while no AAB has ever been
+uploaded, so `refusesDuplicateBuildNumber` has no prior to collide with. **The
+first Play upload is the trigger to add an Android floor**; until then an empty
+one would assert nothing. **`eas build:list` is not filtered by profile**, so the internal
 preview build you are about to make consumes that number for good — the next
 production build must go above it. Leave `expo.version` alone; the `fingerprint`
 policy does not read it.
