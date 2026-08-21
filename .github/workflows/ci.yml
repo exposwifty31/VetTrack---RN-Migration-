@@ -76,8 +76,13 @@ jobs:
       # normally brings it, but a fork PR or a re-run can leave the remote-tracking
       # ref unset; fetching it explicitly keeps the gate from failing on plumbing.
       - name: Fetch default branch (claim verification, layer 2)
+        # NO FALLBACK. The warning form exited 0, so a failed fetch let the job
+        # run on whatever `main` ref happened to be present. That is not "layer 2
+        # unavailable" — measured with the remote ref gone, this repository's own
+        # documents resolved against a stale local `refs/heads/main` and produced
+        # 100 failures, every one a true sentence about work that had landed. A
+        # fetch that cannot get the ground truth fails the job.
         run: git fetch --no-tags origin main:refs/remotes/origin/main
-          || echo "::warning::could not fetch origin/main — claim verification will report layer 2 as unavailable"
 
       # Runs typecheck + lint + the offline release-config gate CONCURRENTLY (the
       # shape the two separate steps below used to have) and records the result in
