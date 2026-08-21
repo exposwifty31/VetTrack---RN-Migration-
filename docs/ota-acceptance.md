@@ -230,10 +230,20 @@ monotonicity is checked solely by the full run's `checkBuildNumbers()`, via
 `eas build:list`. That asymmetry is correct only while no AAB has ever been
 uploaded, so `refusesDuplicateBuildNumber` has no prior to collide with. **The
 first Play upload is the trigger to add an Android floor**; until then an empty
-one would assert nothing. **`eas build:list` is not filtered by profile**, so the internal
-preview build you are about to make consumes that number for good — the next
-production build must go above it. Leave `expo.version` alone; the `fingerprint`
-policy does not read it.
+one would assert nothing.
+
+**`eas build:list` is not filtered by profile.** The internal preview build you
+are about to make therefore consumes 29 / 10301 in the EAS oracle exactly as a
+production build would, permanently — while never reaching App Store Connect.
+**The submission build is therefore 30 / 10302**, and once 29 is spent the full
+run's `checkBuildNumbers()` enforces that unaided. Do not read the counter as
+free above the floor: the Capacitor lane has already claimed 29
+(`CURRENT_PROJECT_VERSION = 29` in `vettrack/ios/App/App.xcodeproj/project.pbxproj`),
+and the two lanes share one `CFBundleVersion`. The full cross-lane rule — raise
+the floor here, then raise the other lane above it — is in
+`docs/release-config.md`, (B1) "Forward numbering".
+
+Leave `expo.version` alone; the `fingerprint` policy does not read it.
 
 ### P5 — Decide code signing before you build, not after
 

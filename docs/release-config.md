@@ -149,6 +149,33 @@ Three rules, each proved by a refusal in `src/__tests__/release-config-checks.te
   number above it. A safety net that trips on a number collision during an
   incident is the worst failure mode this file has.
 
+### Forward numbering — decided here, not at submission
+
+Where both lanes actually stand, read from their own files rather than recalled:
+
+| Lane | Local number | Recorded as shipped |
+|---|---|---|
+| this repo (Expo) | `app.json` — `ios.buildNumber "29"`, `android.versionCode 10301` | `scripts/release-config/ios-shipped-build-floor` = 28 |
+| Capacitor shell | `CURRENT_PROJECT_VERSION = 29` in `vettrack/ios/App/App.xcodeproj/project.pbxproj` | `vettrack/ios/.last-shipped-build` = 28 |
+
+**29 is already claimed by the Capacitor lane.** So the acceptance run in
+`docs/ota-acceptance.md` — `preview` profile, internal distribution — spends
+29 / 10301 and never reaches App Store Connect. `eas build:list` is **not**
+filtered by profile, so an internal build consumes the number in the EAS oracle
+exactly as a production one does, and permanently.
+
+**The submission build is therefore 30 / 10302.** Nothing has to remember that:
+once 29 is consumed, the full run's `checkBuildNumbers()` refuses it unaided.
+It is written down so the number is settled before the build minutes are spent
+rather than discovered at upload.
+
+**The floor mirrors App Store truth, and that truth is recorded in the other
+lane** — `vettrack/ios/.last-shipped-build`. After an upload from either lane,
+both halves move together: raise the floor here, then raise the *other* lane's
+local number above it. Once this repo ships 30, the Capacitor lane goes from 29
+to 31. Doing only the first half is what turns a shared counter into a
+collision, which is why the rule is written here instead of remembered.
+
 ---
 
 ## (C) Android App Links — standing blocker
