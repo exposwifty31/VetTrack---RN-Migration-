@@ -65,9 +65,11 @@ npm run release:preflight   # the same plus the networked half (needs EXPO_TOKEN
 ```
 
 **`lint` and `release:preflight:offline` are CI-enforced, but only indirectly — which is exactly why
-they are easy to miss.** Neither is named in `.github/workflows/ci.yml`; the `Evidence gates` step
-runs `npm run verify:evidence`, which executes the gates declared in `verify.config.json` — among
-them `lint` and `release-preflight-offline`. A slice that passes `typecheck` + `test` can still be
+they are easy to miss.** Neither has a `run:` line of its own in `.github/workflows/ci.yml` —
+grepping it finds them only inside a step *name*, `Evidence gates (typecheck + lint + release
+config)`, which is not what executes them. That step runs `npm run verify:evidence`, which executes
+the gates declared in `verify.config.json` — among them `lint` (`verify.config.json:71-72`) and
+`release-preflight-offline` (`verify.config.json:75-76`). A slice that passes `typecheck` + `test` can still be
 refused by either, so run both before pushing.
 
 **Native builds go through Expo prebuild** (`expo run:ios` / `expo run:android` regenerate `ios/`+`android/` from
