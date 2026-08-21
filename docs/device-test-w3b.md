@@ -615,7 +615,7 @@ Result: ☐ pass ☐ fail — NOT RUN.
 
 | Stage | Steps | Result |
 |---|---|---|
-| 0 — Gate | 0.1–0.5 | ☑ pass ☐ fail — 0.5 reached detail by deep link, not the tab route it documented |
+| 0 — Gate | 0.1–0.5 | ☑ pass ☐ fail — 0.5 reached detail by deep link; the step's instruction has since been corrected to match |
 | 1 — Diagnostic (nothing written) | 1.1–1.7 | ☐ pass ☑ **fail** — 1.5 split: preview recovers, iOS torch does not re-arm (D1). 1.1–1.4, 1.6, 1.7 pass |
 | 2 — Reversible writes | 2.1–2.7 | ☑ pass ☐ fail — 2.1–2.4 pass — 2.5 and 2.6 not run (optional), 2.7 deferred to the Stage 3 session |
 | 3 — Irreversible | 3.1–3.3 | ☐ pass ☐ fail ☑ not reached — deferred; `makeReadOnly` has still never been invoked from this codebase |
