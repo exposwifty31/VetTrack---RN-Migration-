@@ -188,7 +188,13 @@ function parseShippedBuildFloor(raw) {
 
   const values = String(raw)
     .split("\n")
-    .map((line) => line.replace(/#.*$/, "").trim())
+    // No `$`: without the `m` flag it anchors to end-of-INPUT, so on a string that
+    // still contains a newline after a `#` the engine backtracks through every
+    // position `.*` consumed — super-linear (sonar javascript:S8786). It also buys
+    // nothing, since `.` already excludes newline and `.*` therefore stops at the
+    // end of the line on its own. Dropping it is both linear and more correct: the
+    // comment is now stripped even if this is ever handed unsplit text.
+    .map((line) => line.replace(/#.*/, "").trim())
     .filter((line) => line !== "");
 
   if (values.length === 0) {
