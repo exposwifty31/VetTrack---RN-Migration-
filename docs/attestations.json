@@ -43,7 +43,7 @@
     },
     {
       "id": "text-size-cap-selectable",
-      "claim": "At iOS AX5 the 200% text ceiling reaches RN's NativeSelectableText branch: the Settings version line (<AppText selectable>) stayed the smallest text on the screen and proportional to its base size, while an uncapped label on the Menu screen at the same setting filled its card. That element is the one with no automated coverage asserting the ceiling reaches it. Re-verify by re-running step 1.6 at iOS AX5.",
+      "claim": "At iOS AX5 the 200% text ceiling reaches RN's NativeSelectableText branch: the Settings version line (<AppText selectable>) stayed the smallest text on the screen and proportional to its base size, and Menu/AccountSection capped alongside it, while Home — which carries no cap (step 1.7) — kept growing and clipped at the same setting. That contrast is what makes 1.6 a measurement rather than a false pass. The selectable version line is the element with no automated coverage asserting the ceiling reaches it. Re-verify by re-running steps 1.6 and 1.7 at iOS AX5.",
       "target": "physical-device",
       "evidence": "docs/device-test-w3b.md",
       "attestedBy": "repo owner, screenshot comparison at the same AX5 setting across two screens",

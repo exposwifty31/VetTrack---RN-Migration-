@@ -132,7 +132,7 @@ equipment rows with **no sticker bound**.
 **Fail looks like:** empty lists (no session — sign in again, do not read it as
 a data bug), or the card absent (see 0.5).
 
-Result: ☑ pass ☐ fail — account used: Apple SSO, after the owner added `vettrack://sso-callback` to the PRODUCTION Clerk allowlist (see F1). Equipment list populated, 65 ready, W3B-TEST-1/2/3 present.
+Result: ☑ pass ☐ fail — account used: Apple SSO, after the owner added `vettrack://sso-callback` to the PRODUCTION Clerk allowlist (see *Closed by this run*, below). Equipment list populated, 65 ready, W3B-TEST-1/2/3 present.
 
 ### 0.4 — Build integrity
 
@@ -154,7 +154,12 @@ Result: ☑ pass ☐ fail — `react-native-nfc-manager@3.17.2 ✔` (patch appli
 
 ### 0.5 — The card is actually on screen
 
-Open any equipment detail (Equipment tab → tap a unit).
+Open any equipment detail. **On a phone the Equipment tab does not reach detail** —
+every equipment list routes a row press to checkout by deliberate Slice-1 design
+(`src/screens/EquipmentListScreen.tsx:54-56`; recorded under *Not defects*, below).
+Use the deep link `vettrack://equipment/<id>`, taking the id from the equipment list.
+On a tablet the row press selects and the detail pane renders, so the tab route works
+there.
 
 **Expect:** a card titled **"NFC sticker"** with the line **"No sticker bound to
 this equipment"**, a **"Program sticker"** button and a **"Lock sticker
@@ -170,7 +175,8 @@ The card rendering nothing is a **deliberate** design (a wrong flash is worse
 than a delay). Do not report its absence as "the feature is missing" without
 ruling out both causes above.
 
-Result: ☑ pass ☐ fail — card present with both buttons. **The route in this step is wrong for a phone** — reached via a `vettrack://equipment/<id>` deep link instead; see F3.
+Result: ☑ pass ☐ fail — card present with both buttons. **The route in this step is wrong for a phone** — reached via a `vettrack://equipment/<id>` deep link instead; see *Not defects*, below.
+The instruction at the top of this step has since been corrected to name that route.
 
 ---
 
@@ -314,7 +320,8 @@ stop growing at ~2x, same as Settings.
 the `AppText` migration did not take on that file, despite the grep. Record it
 as a separate finding from 1.6's Settings result.
 
-Result (Menu / Account): ☐ pass ☐ fail — ...................................
+Result (Menu / Account): ☑ pass ☐ fail — Menu/AccountSection capped at the same AX5
+setting as Settings; recorded together with the Settings result below.
 **Fail looks like:** text that keeps growing past ~2x on this screen (the cap is
 not applying through Uniwind's `Text` wrapper — this is the single thing the
 jest coverage cannot prove, because jest renders RN's `Text` while the app
@@ -608,12 +615,12 @@ Result: ☐ pass ☐ fail — NOT RUN.
 
 | Stage | Steps | Result |
 |---|---|---|
-| 0 — Gate | 0.1–0.5 | ☐ pass ☐ fail |
-| 1 — Diagnostic (nothing written) | 1.1–1.7 | ☐ pass ☐ fail |
-| 2 — Reversible writes | 2.1–2.7 | ☐ pass ☐ fail |
-| 3 — Irreversible | 3.1–3.3 | ☐ pass ☐ fail ☐ not reached |
+| 0 — Gate | 0.1–0.5 | ☑ pass ☐ fail — 0.5 reached detail by deep link, not the tab route it documented |
+| 1 — Diagnostic (nothing written) | 1.1–1.7 | ☐ pass ☑ **fail** — 1.5 split: preview recovers, iOS torch does not re-arm (D1). 1.1–1.4, 1.6, 1.7 pass |
+| 2 — Reversible writes | 2.1–2.7 | ☑ pass ☐ fail — 2.1–2.4 pass — 2.5 and 2.6 not run (optional), 2.7 deferred to the Stage 3 session |
+| 3 — Irreversible | 3.1–3.3 | ☐ pass ☐ fail ☑ not reached — deferred; `makeReadOnly` has still never been invoked from this codebase |
 
-**Tags consumed:** ......  **Tags permanently locked:** ......
+**Tags consumed:** 2 (`S2-iOS`, `S2-AND` — both rewritable).  **Tags permanently locked:** 0.
 
 Anything recorded as a failure above is a finding, not a retry instruction —
 carry it back before the branch goes to PR. In particular, an unrecorded step is
