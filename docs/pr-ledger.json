@@ -1,0 +1,12 @@
+{
+  "$comment": "Pull requests that landed WITHOUT a merge commit (rebase or squash merge). The entry supplies only the head sha someone read off the GitHub API; scripts/verify/claims.js proves the merge locally by requiring that sha to be an ancestor of the default branch. An entry whose PR gains a merge commit, or that no document cites, FAILS the gate.",
+  "entries": [
+    {
+      "number": 2,
+      "headSha": "7e135eb0733149f213e46e61ecdec4bd561fd8bf",
+      "mergedAt": "2026-08-04",
+      "title": "feat(scaffold): G1 slice 2 - fail-loud MMKV storage port",
+      "source": "GitHub API, read 2026-08-20: merged=true, merged_at=2026-08-04T08:17:41Z, head.sha=7e135eb0733149f213e46e61ecdec4bd561fd8bf, commits=1 (rebase merge, no merge commit)"
+    }
+  ]
+}
