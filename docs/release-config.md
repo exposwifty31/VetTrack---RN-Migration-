@@ -5,6 +5,7 @@ was checkable from this repository:
 
 1. The launch-critical environment variables are **not in this repo at all**.
    They live in EAS's server-side environment store. Delete one there and every
+   <!-- vt-claim: attested eas-production-env -->
    check here stays green.
 2. **Nothing increments a build number.** `eas.json` sets
    `cli.appVersionSource: "local"` with `autoIncrement: false` on every profile,
