@@ -55,11 +55,20 @@ npm run ios                 # expo run:ios   (prebuild + build + run on simulato
 npm run android             # expo run:android
 npm run web                 # expo start --web
 npm run typecheck           # tsc --noEmit — must be 0 errors
+npm run lint                # eslint . --max-warnings=0 — must be 0 warnings
 npm run verify:claims       # claim gate: every statement in a governed doc must be accounted for
 npm run verify:evidence     # run the declared gates and record the result (layer 3)
-npm test                    # jest --watchman=false
+npm test                    # jest --watchman=false --forceExit
 npm run vendor:vettrack     # vendor @vettrack/contracts + @vettrack/shared from the Capacitor repo
+npm run release:preflight:offline   # EAS env accounting + build-number floor; no credentials needed
+npm run release:preflight   # the same plus the networked half (needs EXPO_TOKEN)
 ```
+
+**`lint` and `release:preflight:offline` are CI-enforced, but only indirectly — which is exactly why
+they are easy to miss.** Neither is named in `.github/workflows/ci.yml`; the `Evidence gates` step
+runs `npm run verify:evidence`, which executes the gates declared in `verify.config.json` — among
+them `lint` and `release-preflight-offline`. A slice that passes `typecheck` + `test` can still be
+refused by either, so run both before pushing.
 
 **Native builds go through Expo prebuild** (`expo run:ios` / `expo run:android` regenerate `ios/`+`android/` from
 `app.json`). Never commit the native dirs and never edit them by hand — change `app.json` / config plugins instead.
@@ -86,7 +95,7 @@ src/
   lib/               Utilities (+ __tests__)
   i18n/              i18next + locales/ (Hebrew-first, RTL)
   core/ports/        Hexagonal ports (storage, etc.) — adapters live under infrastructure/
-  infrastructure/    auth/ · storage/ (MMKV port adapter) · realtime/ (SSE)
+  infrastructure/    auth/ · storage/ (MMKV port adapter) · realtime/ (SSE) · push/ (native APNs/FCM device tokens)
   types/             Shared TypeScript types
 patches/             patch-package patches (applied at postinstall)
 scripts/             vendor-vettrack.mjs + migration scripts
