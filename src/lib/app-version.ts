@@ -74,9 +74,10 @@ export function compareVersions(a: string, b: string): number | null {
  * The version the RUNNING JS bundle was configured with (`app.json`'s
  * `expo.version`), or `null` when unavailable.
  *
- * CAVEAT for whoever adds `expo-updates`: `Constants.expoConfig` is then served
- * from the downloaded update manifest rather than the embedded binary manifest,
- * so this stops meaning "the installed binary's version". The binary version is
+ * LIVE CAVEAT — no longer hypothetical. `expo-updates` is installed (`017ae43`,
+ * ~57.0.15). The moment an update is actually delivered, `Constants.expoConfig` is
+ * served from the downloaded update manifest rather than the embedded binary
+ * manifest, so this stops meaning "the installed binary's version". The binary version is
  * `expo-application`'s `nativeApplicationVersion` — not a dependency today.
  * (`src/screens/SettingsScreen.tsx` reads `expoConfig.version` and inherits the
  * same caveat.)

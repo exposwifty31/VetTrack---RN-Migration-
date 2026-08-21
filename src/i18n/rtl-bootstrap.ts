@@ -23,9 +23,12 @@ function clearReloadGuard(): void {
 /**
  * Trigger the actual JS reload. In dev / Expo Go, DevSettings.reload() restarts
  * the bundle immediately. In a production build a JS-level reload requires
- * expo-updates (Updates.reloadAsync()) — not a dependency of this slice — but the
- * forced RTL flag persists natively, so the next cold launch is already correct.
- * Wire Updates.reloadAsync() here if/when expo-updates is added.
+ * expo-updates (Updates.reloadAsync()). That package IS installed now (`017ae43`,
+ * ~57.0.15), so the "if/when" this comment used to end on has already happened — but
+ * the wiring is deliberately still not done here: calling reloadAsync() mid-session
+ * discards in-flight state, and this slice has no test that would catch that. The
+ * forced RTL flag persists natively, so the next cold launch is already correct, which
+ * is why the gap costs a relaunch rather than a bug.
  */
 function triggerReload(): void {
   if (__DEV__ && typeof DevSettings?.reload === "function") {
