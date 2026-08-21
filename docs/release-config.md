@@ -169,6 +169,24 @@ once 29 is consumed, the full run's `checkBuildNumbers()` refuses it unaided.
 It is written down so the number is settled before the build minutes are spent
 rather than discovered at upload.
 
+**29 / 30 holds only while the Capacitor lane has not uploaded 29.** It is
+claimed locally there, not shipped — `vettrack/ios/.last-shipped-build` is still
+28. The moment that lane uploads, the floor in this repo becomes 29 and
+`checkShippedBuildFloor()` REFUSES `app.json`'s `"29"`, because it requires the
+local number to be strictly above the floor. So the two lanes are ordered, not
+independent:
+
+| Order | Acceptance (preview) | Submission |
+|---|---|---|
+| Expo preview first *(the plan)* | 29 / 10301 | 30 / 10302 |
+| Capacitor uploads 29 first | 30 / 10302 | 31 / 10303 |
+
+Either order is safe; only the first is written down elsewhere. If the Capacitor
+lane ships 29 before the acceptance run, raise the floor here to 29 **and** move
+`app.json` to 30 before building, and read every 29/30 in
+`docs/ota-acceptance.md` as 30/31. The gate will catch it either way — this note
+exists so it is caught before the build minutes, not after.
+
 **The floor mirrors App Store truth, and that truth is recorded in the other
 lane** — `vettrack/ios/.last-shipped-build`. After an upload from either lane,
 both halves move together: raise the floor here, then raise the *other* lane's

@@ -243,6 +243,16 @@ and the two lanes share one `CFBundleVersion`. The full cross-lane rule — rais
 the floor here, then raise the other lane above it — is in
 `docs/release-config.md`, (B1) "Forward numbering".
 
+**Prerequisite, and it is an ordering one:** this 29 / 30 plan assumes the
+Capacitor lane has **not yet uploaded** its build 29 — it has claimed the number
+locally but `vettrack/ios/.last-shipped-build` is still 28. If that lane uploads
+first, the floor in this repo becomes 29 and `checkShippedBuildFloor()` refuses
+`app.json`'s `"29"` outright, since it requires strictly-above. In that case set
+`ios.buildNumber` to `"30"` / `versionCode` `10302` for this acceptance run and
+read the submission build as **31 / 10303**. Check
+`vettrack/ios/.last-shipped-build` before you spend the build minutes; the
+numbering table for both orders is in `docs/release-config.md`, (B1).
+
 Leave `expo.version` alone; the `fingerprint` policy does not read it.
 
 ### P5 — Decide code signing before you build, not after
