@@ -219,11 +219,12 @@ meaning "the installed binary's version". The binary version is
 
 `eas.json` sets `appVersionSource: "local"` with `autoIncrement: false` on every
 profile, and nothing in this repo bumps a version. `refusesDuplicateBuildNumber`
-(`scripts/release-config/checks.js`) already refuses the current `ios.buildNumber`
-of `28` as ALREADY CONSUMED.
+(`scripts/release-config/checks.js`) refused the former `ios.buildNumber` ~~`28`~~
+as ALREADY CONSUMED.
 
-Raise `ios.buildNumber` to `"29"` and `android.versionCode` to `10301` before the
-acceptance build. **`eas build:list` is not filtered by profile**, so the internal
+**Done 2026-08-21:** `ios.buildNumber` is `"29"` and `android.versionCode` is
+`10301`, and `checkShippedBuildFloor()` now enforces this offline on every PR
+(see `docs/release-config.md`, (B1)). **`eas build:list` is not filtered by profile**, so the internal
 preview build you are about to make consumes that number for good — the next
 production build must go above it. Leave `expo.version` alone; the `fingerprint`
 policy does not read it.

@@ -1,0 +1,5 @@
+# The highest iOS build number App Store Connect has ACCEPTED.
+# Offline oracle for the build-number collision gate — nothing offline can ask ASC.
+# Raise this after EVERY upload, from EITHER lane: this app and the Capacitor
+# shell share bundle id uk.vettrack.app, so they share one CFBundleVersion counter.
+28
