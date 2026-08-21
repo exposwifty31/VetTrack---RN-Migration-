@@ -29,9 +29,12 @@
  *     app.json still looks correct to a human reading it. So the resolved
  *     config — what EAS reads — is what is asserted, not the raw JSON.
  *
- * This suite deliberately does NOT import expo-updates. That package is not a
- * dependency yet (docs/ota-acceptance.md, P2, is the owner action that adds it),
- * and the config contract is checkable without it.
+ * This suite deliberately does NOT import expo-updates. It no longer abstains
+ * because the package is absent — `017ae43` added it and it is a direct dependency
+ * at ~57.0.15 — but because the config contract is what this file asserts, and that
+ * contract is checkable without loading a native module into jest. Importing it here
+ * would trade a fast, hermetic config assertion for a mock of the very thing under
+ * test.
  *
  * Node access is typed locally at the boundary, matching
  * src/__tests__/manifest-vs-code.test.ts — tsconfig sets `types: ["jest"]`, so
