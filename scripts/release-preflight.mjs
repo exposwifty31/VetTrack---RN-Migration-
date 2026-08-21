@@ -240,6 +240,60 @@ function checkVersionFields() {
   );
 }
 
+/**
+ * The offline half of the build-number gate.
+ *
+ * `checkBuildNumbers()` below needs `eas build:list` — network and credentials —
+ * so `--offline`, the mode CI runs on every PR, used to skip the collision check
+ * entirely and merely note that it had. A gate that only runs in the mode nobody
+ * runs is not a gate. The recorded floor is the offline oracle; it runs in BOTH
+ * modes because it carries something EAS cannot: what App Store Connect actually
+ * ACCEPTED, as opposed to what EAS happened to build.
+ */
+function checkShippedBuildFloor() {
+  section("(B1) shipped-build floor (offline)");
+  const floorPath = path.join(ROOT, "scripts/release-config/ios-shipped-build-floor");
+  const raw = fs.existsSync(floorPath) ? fs.readFileSync(floorPath, "utf8") : null;
+  const parsed = checks.parseShippedBuildFloor(raw);
+
+  if (!parsed.ok) {
+    fail(
+      `${parsed.problem}\n    Fix: put a single dotted-numeric build number in ` +
+        `scripts/release-config/ios-shipped-build-floor`,
+    );
+    say(`ios      floor=UNREADABLE -> REFUSED`);
+    return;
+  }
+  if (parsed.floor === null) {
+    // Said out loud on purpose. "No floor recorded" is not "ok".
+    say("ios      floor=none recorded -> no offline oracle (nothing to compare against)");
+    notes.push(
+      "no scripts/release-config/ios-shipped-build-floor: the offline build-number gate had nothing to compare against.",
+    );
+    return;
+  }
+
+  const local = appJson.expo?.ios?.buildNumber;
+  const res = checks.refusesDuplicateBuildNumber({
+    platform: "ios",
+    local,
+    prior: [parsed.floor],
+  });
+  say(`ios      local=${local} floor=${parsed.floor} -> ${res.ok ? "ok" : "REFUSED"}`);
+  if (!res.ok) {
+    // Deliberately NOT res.reason: that text names an "existing EAS build",
+    // which is the other caller's oracle. This one compares against what App
+    // Store Connect accepted, and saying EAS here would send the next reader
+    // to the wrong dashboard.
+    fail(
+      `ios: app.json buildNumber "${local}" is not above the recorded shipped-build ` +
+        `floor "${parsed.floor}" — the highest build App Store Connect has accepted. ` +
+        "Uploading it would be rejected at upload, after the build minutes are spent." +
+        `\n    Fix: ${res.suggestion}`,
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // (A) EAS environment drift
 // ---------------------------------------------------------------------------
@@ -431,13 +485,17 @@ async function main() {
   say(`release preflight (${OFFLINE ? "offline" : "full"})`);
   checkEnvAccounting();
   checkVersionFields();
+  checkShippedBuildFloor();
   if (!OFFLINE) {
     requireCredentials();
     checkEasEnvDrift();
     checkBuildNumbers();
     await checkAssetLinks();
   } else {
-    notes.push("--offline: EAS env drift, build-number and assetlinks checks were NOT run.");
+    notes.push(
+      "--offline: EAS env drift and assetlinks checks were NOT run. The build-number " +
+        "gate DID run, against the recorded shipped-build floor rather than eas build:list.",
+    );
   }
   report();
 }

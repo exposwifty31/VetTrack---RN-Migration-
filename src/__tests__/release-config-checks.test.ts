@@ -57,6 +57,11 @@ const checks = require("../../scripts/release-config/checks.js") as {
     versionCode: unknown;
   }): { ok: boolean; problems: string[] };
   compareBuildVersions(a: string | number, b: string | number): number;
+  parseShippedBuildFloor(raw: string | null): {
+    ok: boolean;
+    floor: string | null;
+    problem: string | null;
+  };
 };
 
 const appLinks = require("../../scripts/release-config/android-app-links.js") as {
@@ -259,6 +264,61 @@ describe("(B) build-number collision", () => {
         versionCode: appJson.expo.android.versionCode,
       }),
     ).toEqual({ ok: true, problems: [] });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (B2) Shipped-build floor — the offline half of the collision gate
+// ---------------------------------------------------------------------------
+
+/**
+ * (B) above needs `eas build:list`, so `--offline` — the mode that runs on every
+ * PR — skipped it entirely and printed a note saying so. The gate was therefore
+ * unenforced exactly where it runs most. `scripts/release-config/ios-shipped-build-floor`
+ * is the offline oracle: the highest build number App Store Connect has actually
+ * accepted, maintained by hand because nothing offline can ask ASC.
+ *
+ * A hand-maintained file is a file that can rot, and the failure mode that
+ * matters is not a wrong number — it is a corrupted one that disarms the gate
+ * while still looking green. So malformed input must FAIL HARD, never skip.
+ */
+describe("(B2) shipped-build floor", () => {
+  it("REFUSES a malformed floor file instead of silently disarming the gate", () => {
+    for (const raw of ["twenty-eight", "", "   ", "0x1E", "28\n29", "-4"]) {
+      const parsed = checks.parseShippedBuildFloor(raw);
+      expect(parsed.ok).toBe(false);
+      expect(parsed.floor).toBeNull();
+      expect(parsed.problem).toEqual(expect.any(String));
+    }
+  });
+
+  it('treats an ABSENT floor file as "no floor known" — a stated no-op, not a pass', () => {
+    const parsed = checks.parseShippedBuildFloor(null);
+    // ok, because a repo that has never shipped has no floor to compare against.
+    // floor null is what makes the caller print "no floor" rather than "ok".
+    expect(parsed).toEqual({ ok: true, floor: null, problem: null });
+  });
+
+  it("REFUSES the live defect offline: floor says 28 and app.json still says 28", () => {
+    const parsed = checks.parseShippedBuildFloor("# highest build ASC has accepted\n28\n");
+    expect(parsed).toEqual({ ok: true, floor: "28", problem: null });
+
+    const verdict = checks.refusesDuplicateBuildNumber({
+      platform: "ios",
+      local: "28",
+      prior: [parsed.floor as string],
+    });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.reason).toContain("ALREADY CONSUMED");
+
+    // and the bump the owner approved clears it
+    expect(
+      checks.refusesDuplicateBuildNumber({
+        platform: "ios",
+        local: "29",
+        prior: [parsed.floor as string],
+      }).ok,
+    ).toBe(true);
   });
 });
 

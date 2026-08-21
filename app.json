@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "uk.vettrack.app",
-      "buildNumber": "28",
+      "buildNumber": "29",
       "appleTeamId": "87F5G378M6",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -56,7 +56,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "uk.vettrack.app",
-      "versionCode": 10300,
+      "versionCode": 10301,
       "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"],
       "intentFilters": [
         {

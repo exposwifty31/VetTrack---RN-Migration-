@@ -156,6 +156,75 @@ function refusesDuplicateBuildNumber({ platform, local, prior }) {
   };
 }
 
+/**
+ * Parse the hand-maintained shipped-build floor.
+ *
+ * WHY A FILE AT ALL. (B) asks EAS which build numbers are consumed, which needs
+ * network and credentials — so `--offline`, the mode that runs on every PR,
+ * skipped the collision check entirely and printed a note saying so. The gate
+ * was unenforced exactly where it runs most often. Nothing offline can ask App
+ * Store Connect what it has already accepted, so a human records it here and
+ * raises it after every upload, from either release lane (this app and the
+ * Capacitor shell share one bundle id, so they share one counter).
+ *
+ * WHY MALFORMED FAILS HARD. A hand-maintained file rots. The dangerous failure
+ * is not a stale number — it is a corrupted one that lets the gate pass while
+ * comparing against nothing. "Unreadable" and "no floor recorded" must never
+ * look alike: absent is a stated no-op, garbage is a refusal.
+ *
+ * Accepts `#` comments and blank lines; requires exactly one value line, in the
+ * dotted-numeric shape `compareBuildVersions` understands.
+ *
+ * @param {string|null} raw file contents, or null when the file is absent
+ * @returns {{ ok: boolean, floor: string|null, problem: string|null }}
+ */
+function parseShippedBuildFloor(raw) {
+  if (raw == null) {
+    // A lane that has never uploaded has no floor. Legitimate — but the caller
+    // must print "no floor", not "ok": a silent skip and a pass look identical
+    // from outside, and only one of them is honest.
+    return { ok: true, floor: null, problem: null };
+  }
+
+  const values = String(raw)
+    .split("\n")
+    // No `$`: without the `m` flag it anchors to end-of-INPUT, so on a string that
+    // still contains a newline after a `#` the engine backtracks through every
+    // position `.*` consumed — super-linear (sonar javascript:S8786). It also buys
+    // nothing, since `.` already excludes newline and `.*` therefore stops at the
+    // end of the line on its own. Dropping it is both linear and more correct: the
+    // comment is now stripped even if this is ever handed unsplit text.
+    .map((line) => line.replace(/#.*/, "").trim())
+    .filter((line) => line !== "");
+
+  if (values.length === 0) {
+    return {
+      ok: false,
+      floor: null,
+      problem: "shipped-build floor file holds no value (empty or comments only)",
+    };
+  }
+  if (values.length > 1) {
+    return {
+      ok: false,
+      floor: null,
+      problem:
+        `shipped-build floor file holds ${values.length} values ` +
+        `(${values.join(", ")}); it must hold exactly one`,
+    };
+  }
+
+  const floor = values[0];
+  if (Number.isNaN(compareBuildVersions(floor, "0"))) {
+    return {
+      ok: false,
+      floor: null,
+      problem: `shipped-build floor "${floor}" is not a dotted-numeric build number`,
+    };
+  }
+  return { ok: true, floor, problem: null };
+}
+
 /** Cheap offline sanity on the version fields themselves. */
 function validateVersionFields({ buildNumber, versionCode }) {
   const problems = [];
@@ -256,6 +325,7 @@ module.exports = {
   compareBuildVersions,
   compareEnvPresence,
   normalizeFingerprint,
+  parseShippedBuildFloor,
   refusesDuplicateBuildNumber,
   validateVersionFields,
 };

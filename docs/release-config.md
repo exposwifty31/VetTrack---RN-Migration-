@@ -77,19 +77,20 @@ remediation working, not drift, but it reads like noise.
 
 ## (B) Build-number collision
 
-Standing finding, live as of 2026-08-18:
+Finding as of 2026-08-18 — **closed 2026-08-21**, see (B1) below:
 
 ```text
 ios      local=28 priorBuilds=2 highestConsumed=28 -> REFUSED
 android  local=10300 priorBuilds=0 highestConsumed=none -> ok
 ```
 
-`app.json` carries `ios.buildNumber: "28"`, and EAS has already produced builds
-27 and 28 (both v1.3.0, `production`). Nothing bumps it, so the next production
-build would ship a duplicate `CFBundleVersion` and App Store Connect would reject
-it **at upload — after the build minutes are spent.** Android is the same defect
-with no collision yet: `versionCode` is static at `10300` and has simply never
-been challenged, because no AAB has ever been uploaded.
+`app.json` carried `ios.buildNumber` ~~`"28"`~~, and EAS had already produced
+builds 27 and 28 (both v1.3.0, `production`). Nothing bumps it, so the next
+production build would have shipped a duplicate `CFBundleVersion` and App Store
+Connect would have rejected it **at upload — after the build minutes are spent.**
+Android was the same defect with no collision yet: `versionCode` sat at
+~~`10300`~~ and had simply never been challenged, because no AAB has ever been
+uploaded.
 
 Two fixes, owner's call:
 
@@ -107,9 +108,46 @@ Two fixes, owner's call:
   and ours only overrides `android.googleServicesFile`, so a bump would survive.
   Persistence back to git is the obstacle.
 
-This gate was deliberately left refusing rather than "fixed" by bumping to 29:
-bumping is a release decision, and it would leave the gate with nothing to show
-it closing.
+The gate was deliberately left refusing rather than "fixed" by bumping, because
+bumping is a release decision and it would have left the gate with nothing to
+show it closing. **The owner took that decision on 2026-08-21**: `app.json` now
+carries `ios.buildNumber: "29"` and `android.versionCode: 10301`, and the gate
+keeps something to show — (B1) below, which is what the bump actually closed.
+
+The durable fix stays open and stays owner's call. `appVersionSource: "remote"`
+is deferred until after the first submission: changing who owns the counter in
+the middle of getting a build accepted swaps one known problem for an unknown
+one.
+
+---
+
+## (B1) Shipped-build floor — the offline oracle
+
+(B) needs `eas build:list`, which needs network and credentials. `--offline` is
+the mode CI runs **on every PR**, and it skipped (B) entirely and printed a note
+saying so. A gate that only runs in the mode nobody runs is not a gate — that,
+not EAS blindness, was the real defect here.
+
+`scripts/release-config/ios-shipped-build-floor` records the highest build number
+App Store Connect has **accepted**. Nothing offline can ask ASC, so a human
+maintains it. `parseShippedBuildFloor` (`scripts/release-config/checks.js`) reads
+it and `checkShippedBuildFloor()` (`scripts/release-preflight.mjs`) compares
+`app.json` against it, in **both** modes — it carries something EAS cannot,
+namely what was accepted rather than what was merely built.
+
+Three rules, each proved by a refusal in `src/__tests__/release-config-checks.test.ts`:
+
+- **Malformed fails hard.** A hand-maintained file rots, and the dangerous
+  failure is not a stale number — it is a corrupted one that lets the gate pass
+  while comparing against nothing.
+- **Absent is a stated no-op, not a pass.** The run prints `floor=none recorded`
+  and adds a note. A silent skip and a passing check look identical from
+  outside, and only one of them is honest.
+- **One counter, two lanes.** This app and the Capacitor shell share bundle id
+  `uk.vettrack.app`, so they share one `CFBundleVersion` counter. Raise the floor
+  after **every** upload from **either** lane, then raise the other lane's local
+  number above it. A safety net that trips on a number collision during an
+  incident is the worst failure mode this file has.
 
 ---
 
