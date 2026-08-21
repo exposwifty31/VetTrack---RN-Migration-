@@ -108,6 +108,9 @@ with an expiry and a re-verify recipe.
 
 **Every claim ends as** `verified` · `registered` · `attested` · `excluded by rule` · **FAIL**. There is no
 "skipped": a silent skip and a passing check look identical from outside, and only one of them is honest.
+One sixth label exists and is not an exception: on a tree where layer 2 cannot run at all (a shallow clone,
+no `main`), commit and pull-request claims are counted `unresolvable` so the dispositions still sum to the
+total. It appears only on a run that is **already failing** on `git-unavailable`, never on a passing one.
 
 **When the gate fails, pick one — never a fourth option:**
 1. The claim is **wrong** → fix the document. That is the common case and the point of the gate.
