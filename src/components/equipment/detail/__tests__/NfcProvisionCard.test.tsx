@@ -15,6 +15,7 @@
  */
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { StyleSheet } from "react-native";
 import type { ReactNode } from "react";
 
 import { ApiCodedError } from "@/lib/api/coded-error";
@@ -304,11 +305,32 @@ describe("unmount closes any open session", () => {
 });
 
 describe("bound-tag state", () => {
-  it("shows the currently bound UID when the row already carries one", async () => {
+  /**
+   * The UID goes through `ltrIsolate` (LRI…PDI) — the DetailBits idiom every
+   * sibling card already uses for a Latin value inside RTL copy (CustodyCard,
+   * HistoryCard, SweepItemRow). The card previously interpolated the UID raw and
+   * forced `writingDirection: "ltr"` on the WHOLE sentence instead, which set the
+   * bidi PARAGRAPH direction of Hebrew copy to LTR; the UID's leading digit run
+   * then resolved to the far side of the label and the operator saw the UID in
+   * two pieces (issue #94, iPhone 16 Plus, W3B step 2.1).
+   *
+   * These two assertions pin the MECHANISM, which is all jest can reach: a test
+   * renderer does not run the bidi algorithm, so the resulting glyph order stays
+   * a device-only observation.
+   */
+  it("isolates the bound UID so RTL copy cannot reorder it into two pieces", async () => {
     await renderCard({ ...DETAIL, nfcTagId: "04a2b3" } as EquipmentDetail);
     expect(screen.getByTestId("nfc-bound-state")).toHaveTextContent(
-      "equipmentDetail.nfc.bound 04a2b3",
+      "equipmentDetail.nfc.bound \u206604a2b3\u2069",
     );
+  });
+
+  it("leaves the sentence's paragraph direction alone (isolation replaces it)", async () => {
+    await renderCard({ ...DETAIL, nfcTagId: "04a2b3" } as EquipmentDetail);
+    const style = StyleSheet.flatten(screen.getByTestId("nfc-bound-state").props.style) as
+      | { writingDirection?: string }
+      | undefined;
+    expect(style?.writingDirection).toBeUndefined();
   });
 
   it("says no sticker is bound when the row has none", async () => {
