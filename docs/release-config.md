@@ -145,9 +145,67 @@ Three rules, each proved by a refusal in `src/__tests__/release-config-checks.te
   outside, and only one of them is honest.
 - **One counter, two lanes.** This app and the Capacitor shell share bundle id
   `uk.vettrack.app`, so they share one `CFBundleVersion` counter. Raise the floor
-  after **every** upload from **either** lane, then raise the other lane's local
-  number above it. A safety net that trips on a number collision during an
+  when App Store Connect **accepts** a build from **either** lane — not on upload,
+  and not on a rejection — then raise the other lane's local number above it. A safety net that trips on a number collision during an
   incident is the worst failure mode this file has.
+
+### Forward numbering — decided here, not at submission
+
+Where both lanes actually stand, read from their own files rather than recalled:
+
+| Lane | Local number | Recorded as shipped |
+|---|---|---|
+| this repo (Expo) | `app.json` — `ios.buildNumber "29"`, `android.versionCode 10301` | `scripts/release-config/ios-shipped-build-floor` = 28 |
+| Capacitor shell | `CURRENT_PROJECT_VERSION = 29` in `vettrack/ios/App/App.xcodeproj/project.pbxproj` | `vettrack/ios/.last-shipped-build` = 28 |
+
+**29 is already claimed by the Capacitor lane.** So the acceptance run in
+`docs/ota-acceptance.md` — `preview` profile, internal distribution — spends
+29 / 10301 and never reaches App Store Connect. `eas build:list` is **not**
+filtered by profile, so an internal build consumes the number in the EAS oracle
+exactly as a production one does, and permanently.
+
+**The submission build is therefore 30 / 10302.** Nothing has to remember that:
+once 29 is consumed, the full run's `checkBuildNumbers()` refuses it unaided.
+It is written down so the number is settled before the build minutes are spent
+rather than discovered at upload.
+
+**29 / 30 holds only while App Store Connect has not accepted the Capacitor
+lane's 29.** It is claimed locally there, not shipped —
+`vettrack/ios/.last-shipped-build` is still 28. The moment ASC accepts it, the
+floor in this repo becomes 29 and
+`checkShippedBuildFloor()` REFUSES `app.json`'s `"29"`, because it requires the
+local number to be strictly above the floor. So the two lanes are ordered, not
+independent:
+
+| Order | Acceptance (preview) | Submission |
+|---|---|---|
+| Expo preview first *(the plan)* | 29 / 10301 | 30 / 10302 |
+| ASC accepts Capacitor's 29 first | 30 / 10302 | 31 / 10303 |
+
+Either order is safe; only the first is written down elsewhere. If ASC accepts the
+Capacitor lane's 29 before the acceptance run, raise the floor here to 29 **and** move
+`app.json` to 30 before building, and read every 29/30 in
+`docs/ota-acceptance.md` as 30/31. The gate will catch it either way — this note
+exists so it is caught before the build minutes, not after.
+
+**The floor mirrors App Store truth, and that truth is recorded twice** — as
+`scripts/release-config/ios-shipped-build-floor` here and
+`vettrack/ios/.last-shipped-build` in the Capacitor lane. Each lane's gate reads
+its own copy (`checkShippedBuildFloor()` here;
+`vettrack/scripts/verify-resubmission-static.sh` there), so the two must never hold different numbers.
+
+**The trigger is App Store Connect ACCEPTING a build, not an upload.** The
+acceptance run in `docs/ota-acceptance.md` is an internal `preview` build: it
+uploads to EAS and permanently consumes the number there, but never reaches App
+Store Connect. It must move **neither** shipped-build record. Raising a floor for
+a build App Store Connect never saw burns the next number for nothing.
+
+When App Store Connect does accept a build from either lane, three things move
+together: set **both** records to the accepted number, then raise the *other*
+lane's local number above it. Once this repo ships 30, both records read 30 and
+the Capacitor lane goes from 29 to 31. Doing only part of it is what turns a
+shared counter into a collision — and updating one record but not the other
+re-creates that collision one gate later, because each lane checks its own copy.
 
 ---
 

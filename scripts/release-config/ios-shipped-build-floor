@@ -1,5 +1,10 @@
 # The highest iOS build number App Store Connect has ACCEPTED.
 # Offline oracle for the build-number collision gate — nothing offline can ask ASC.
-# Raise this after EVERY upload, from EITHER lane: this app and the Capacitor
-# shell share bundle id uk.vettrack.app, so they share one CFBundleVersion counter.
+# Raise this when App Store Connect ACCEPTS a build, from EITHER lane: this app
+# and the Capacitor shell share bundle id uk.vettrack.app, so they share one
+# CFBundleVersion counter. NOT on upload — an internal EAS `preview` build
+# consumes the number in EAS but never reaches ASC, and must not move this file.
+# Update vettrack/ios/.last-shipped-build to the same number: each lane's gate
+# reads its own copy, so divergence between the two records re-creates the collision
+# this file exists to prevent.
 28
