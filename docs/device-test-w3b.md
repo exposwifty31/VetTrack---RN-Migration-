@@ -20,10 +20,15 @@
 > `d05597b` on `feat/w3b-device-features`) is covered by unit tests that cannot
 > reach the thing that matters: a simulator has no NFC radio and no torch LED,
 > and an NTAG215 lock is one-way. Three native entry points —
-> `writeNdefMessage`, `makeReadOnly`, `queryNDEFStatus` — have **never been
-> invoked from this codebase**, and they are reached through New-Architecture
-> bridgeless interop with different completion-handler shapes than the read
-> path. The read path working is not evidence for them.
+> `writeNdefMessage`, `makeReadOnly`, `queryNDEFStatus` — had **never been
+> invoked from this codebase** when this script was written, and they are reached
+> through New-Architecture bridgeless interop with different completion-handler
+> shapes than the read path. The read path working is not evidence for them.
+>
+> **This run closed one of the three.** `writeNdefMessage` executed on both
+> platforms (2.1 iOS, 2.3 Android) and read back correctly. `makeReadOnly` and
+> `queryNDEFStatus` remain uninvoked: every Stage 3 step is recorded NOT RUN and
+> 2.7 is deferred. Those two are what a future session still has to prove.
 
 **Order is load-bearing.** Stage 1 writes nothing. Stage 2 writes tags that can
 still be rewritten. Stage 3 destroys tags. Do not run them out of order, and do
@@ -507,7 +512,10 @@ carry a half-written tag across the boundary.
 on.** Step 3.2 depends on you presenting the *same* tag twice, and once locked
 they are visually identical.
 
-Result: ☐ pass ☐ fail — DEFERRED to the Stage 3 session, per the owner's planning decision.
+Result: ☐ pass ☐ fail — DEFERRED, per the owner's planning decision. **It runs at the
+START of the Stage 3 session, before any Stage 3 step** — 3.2 requires the tag this
+step prepares, and Stage 3 itself writes nothing. Deferring it does not move it after
+Stage 3; Stage 2 is therefore not complete until it has run.
 
 ---
 
@@ -617,7 +625,7 @@ Result: ☐ pass ☐ fail — NOT RUN.
 |---|---|---|
 | 0 — Gate | 0.1–0.5 | ☑ pass ☐ fail — 0.5 reached detail by deep link; the step's instruction has since been corrected to match |
 | 1 — Diagnostic (nothing written) | 1.1–1.7 | ☐ pass ☑ **fail** — 1.5 split: preview recovers, iOS torch does not re-arm (D1). 1.1–1.4, 1.6, 1.7 pass |
-| 2 — Reversible writes | 2.1–2.7 | ☑ pass ☐ fail — 2.1–2.4 pass — 2.5 and 2.6 not run (optional), 2.7 deferred to the Stage 3 session |
+| 2 — Reversible writes | 2.1–2.7 | ☐ pass ☐ fail ☑ **partial** — 2.1–2.4 pass; 2.5/2.6 not run (optional); **2.7 not run**, and it gates Stage 3. Stage 2 is not complete, so the "Stages 1 and 2 have passed" precondition for Stage 3 is NOT met |
 | 3 — Irreversible | 3.1–3.3 | ☐ pass ☐ fail ☑ not reached — deferred; `makeReadOnly` has still never been invoked from this codebase |
 
 **Tags consumed:** 2 (`S2-iOS`, `S2-AND` — both rewritable).  **Tags permanently locked:** 0.
@@ -645,8 +653,11 @@ Mechanism, read in source and NOT instrumented: `src/components/scan/QrScanner.t
 renders the camera conditionally on `active && appActive`, so backgrounding UNMOUNTS the
 view; expo-camera's own `onAppForegrounded` re-apply therefore never runs, and on the
 fresh view the torch prop is assigned before the capture device is configured, so the
-enable call early-returns and nothing retries. Android is immune because it re-applies
-torch during camera bind — same prop, different mechanism, only one platform affected.
+enable call early-returns and nothing retries. Android **is expected to be unaffected**
+because it re-applies torch during camera bind — same prop, different mechanism. That
+expectation is read from source only: **no Android background/resume cycle was run**, so
+"only one platform affected" is the hypothesis, not a result. Running 1.5 on Android is
+the missing half.
 **Treat as a strong hypothesis with a complete mechanism, not a measurement.** A cheap
 discriminator was NOT run: toggle the torch off and on after resume; if it lights, only
 the mount-window application is lost.
