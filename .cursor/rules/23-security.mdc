@@ -15,7 +15,7 @@ Broken access control outranks everything else in practice, and it looks like or
 - **Never trust a client-supplied identifier.** `GET /invoices/:id` must verify that the *authenticated* user owns that invoice — the fact that the UI only ever links to their own is not a control.
 - Authorize on the **server**, per request, per object. A hidden button is not a permission.
 - Deny by default. New endpoints are protected unless explicitly opened, not the reverse.
-- Check authorization **before** validation and before any side effect, so a 403 never leaks whether a record exists.
+- Order matters: **validate the request's shape first, then authorize, then act.** Schema validation rejects a malformed id before it reaches authorization logic; authorization then runs before any side effect and before any response that would reveal whether the record exists. Returning 404-vs-403 based on existence, ahead of the ownership check, is an enumeration oracle.
 
 ## Multi-Tenancy
 

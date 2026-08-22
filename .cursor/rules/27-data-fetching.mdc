@@ -1,5 +1,5 @@
 ---
-description: Client data fetching and server state — TanStack Query / SWR patterns, cache keys, mutations, and error/retry behavior.
+description: Client data fetching and server state — TanStack Query patterns, cache keys, mutations, and error/retry behavior.
 globs: **/hooks/**,**/queries/**,**/api/**,**/*.query.ts,**/*.api.ts
 alwaysApply: false
 ---
@@ -7,6 +7,8 @@ alwaysApply: false
 # Data Fetching & Server State
 
 Server data is a **cache of someone else's state**, not application state. Copying it into `useState` guarantees it goes stale and you never find out.
+
+The APIs named below (`staleTime`, `gcTime`, `useMutation`, `invalidateQueries`) are TanStack Query's. The reasoning — key completeness, cancel-before-optimistic-write, narrow invalidation, retry policy — carries to any server-cache library, but SWR spells its options differently; do not transliterate the names.
 
 ## Query Keys Are the Cache
 

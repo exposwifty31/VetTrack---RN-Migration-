@@ -1,10 +1,12 @@
 ---
-description: React 19 component architecture, hook correctness, render performance, and state placement. Framework-agnostic React rules.
+description: React 19 component architecture, hook correctness, render performance, and state placement. Platform-neutral React core, with DOM-specific items marked.
 globs: **/*.tsx,**/*.jsx
 alwaysApply: false
 ---
 
 # React
+
+> **Scope.** Everything above the *Web (DOM) only* heading applies on any React renderer — web, React Native, or otherwise. The DOM section does not: in React Native there is no `<label>`, no `FormData`, no `dangerouslySetInnerHTML`, and lists virtualize through FlashList rather than a DOM windowing library. See `04-react-native-expo.mdc` for the native equivalents.
 
 ## Component Shape
 
@@ -16,7 +18,7 @@ interface UserCardProps {
 
 export function UserCard({ user, onSelect }: UserCardProps) {
   if (!user.isActive) return <InactiveBadge />   // early return, no nesting
-  return <article onClick={() => onSelect?.(user.id)}>{user.name}</article>
+  return <CardShell onSelect={() => onSelect?.(user.id)}>{user.name}</CardShell>
 }
 ```
 
@@ -57,22 +59,29 @@ Every effect that subscribes returns a cleanup. No exceptions.
 - Never define a component inside another component — it remounts the whole subtree every render.
 - `key` is a stable identity, never an array index — with reordering, index keys corrupt state.
 
-## Lists and Forms
+## Lists
 
-- Long lists get virtualized. 500 DOM rows is a jank guarantee.
-- Uncontrolled inputs (`defaultValue` + `FormData`) by default; controlled only when you need to react per keystroke.
-- Every input has an associated `<label>`. Not a placeholder pretending to be one.
+- Long lists get virtualized, on every platform. Rendering 500 rows at once is a jank guarantee.
 
 ## Errors and Loading
 
 - `<ErrorBoundary>` around each independently-failing region — not one at the app root.
-- `<Suspense>` boundaries scoped tightly so one slow query does not blank the page.
+- `<Suspense>` boundaries scoped tightly so one slow query does not blank the screen.
 - Skeletons matching final layout dimensions, to avoid layout shift.
 
 ## NEVER
 
 - Conditional hooks, or hooks in loops.
 - Mutating state directly — `state.x = 1` then `setState(state)` will not re-render.
-- `dangerouslySetInnerHTML` without sanitizing.
 - Index as key on a reorderable list.
 - Business logic inside JSX — extract to a named function.
+- Defining a component inside another component.
+
+## Web (DOM) only
+
+Skip this section entirely in a React Native codebase.
+
+- Uncontrolled inputs (`defaultValue` + `FormData`) by default; controlled only when you need to react per keystroke.
+- Every input has an associated `<label>`. Not a placeholder pretending to be one.
+- `dangerouslySetInnerHTML` without sanitizing is prohibited.
+- Semantic elements (`<button>`, `<a href>`, `<article>`) over `<div onClick>` — see `21-accessibility.mdc`.

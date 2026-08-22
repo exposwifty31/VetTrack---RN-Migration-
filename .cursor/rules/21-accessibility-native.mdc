@@ -14,10 +14,11 @@ This codebase already uses them heavily — `accessibilityRole`, `accessibilityL
 
 ```tsx
 <Pressable
+  disabled={isSaving}                                            // actually blocks the press
   accessibilityRole="button"
   accessibilityLabel="Mark patient as discharged"
   accessibilityHint="Moves the case out of the active ward list"
-  accessibilityState={{ disabled: isSaving, busy: isSaving }}
+  accessibilityState={{ disabled: isSaving, busy: isSaving }}    // announces it
   onPress={onDischarge}
 />
 ```
@@ -26,6 +27,7 @@ This codebase already uses them heavily — `accessibilityRole`, `accessibilityL
 - **`accessibilityLabel`** — what it is, not what it looks like. `"Delete case 4821"`, never `"trash icon"`.
 - **`accessibilityHint`** — what happens on activation. Optional, and only when non-obvious; a hint on every button is noise.
 - **`accessibilityState`** — `{ disabled, selected, checked, busy, expanded }`. A visually greyed-out button that omits `disabled` here still announces as tappable.
+- **`accessibilityState.disabled` reports; the `disabled` prop enforces.** They are separate, and a real control needs both. Set only the accessibility state and `onPress` stays live — a screen-reader user hears "dimmed" and the handler fires anyway. Set only the prop and the press is blocked but nothing is announced. A double-submit during a save is the usual result of getting this wrong.
 - **`accessibilityValue`** — `{ min, max, now, text }` for sliders and progress.
 - **`accessible={true}`** groups children into one focusable unit. Use it on a card so the reader announces it once instead of walking six `Text` nodes.
 - **`importantForAccessibility="no-hide-descendants"`** (Android) / **`accessibilityElementsHidden`** (iOS) to hide decoration.
