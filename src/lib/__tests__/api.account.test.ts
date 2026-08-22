@@ -82,12 +82,21 @@ describe("accountApi.updateDisplayName", () => {
 /**
  * Account deletion (A8) is the in-app store-compliance path — Apple Guideline
  * 5.1.1(v) and Google Play both require it, and it is irreversible. Two things
- * therefore have to hold and neither was pinned before: the request must stay
- * self-scoped (no id, no body — the server reads `req.authUser`), and the coded
- * `reason` the screen branches on must keep matching the server's. A drift in
- * either is silent: the first would let the app ask to delete somebody else,
- * the second would show a generic "try again" on a failure the user can
- * actually act on (transfer the clinic).
+ * therefore have to hold and neither was pinned before: the request shape stays
+ * as the route documents it (no id, no body), and the coded `reason` the screen
+ * branches on keeps matching the server's.
+ *
+ * The first is a contract assertion, NOT an authorization control — deletion is
+ * scoped server-side by `req.authUser`, so a client that invented an id would
+ * simply be ignored, not obeyed. What it protects is the pair staying in step:
+ * the day the route starts reading an id, this fails instead of the app quietly
+ * sending one the server drops.
+ *
+ * The second is the user-visible half. A drift there is silent — a renamed
+ * reason shows a generic "try again" on a failure the user can actually act on
+ * (transfer the clinic), so the assertions below match on the exported
+ * constants and on `ApiCodedError`, which is the `instanceof` the screen gates
+ * every mapped message behind.
  */
 describe("accountApi.deleteAccount", () => {
   it("DELETEs the self-scoped route with no id, no body, and a trace id", async () => {
@@ -126,6 +135,10 @@ describe("accountApi.deleteAccount", () => {
 
     const err = await accountApi.deleteAccount().catch((e: unknown) => e);
 
+    // The screen gates the protected-account message on `instanceof
+    // ApiCodedError` before it reads `reason`, so a bare object with the right
+    // fields would pass this test and still render the generic copy.
+    expect(err).toBeInstanceOf(ApiCodedError);
     expect(err).toMatchObject({
       status: 403,
       code: "FORBIDDEN",
