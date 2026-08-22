@@ -247,7 +247,7 @@ It is not a review rejection and not a launch failure.
 
 ### Owner actions, in order
 
-1. Upload the first AAB (internal track is enough).
+1. Upload the first AAB. ~~(internal track is enough)~~ *Corrected 2026-08-22:* internal is enough **for this step** — any upload generates the Play App Signing key. It is **not** enough for the closed-testing requirement in `docs/G3-PLAN.md` §7 P5, which the owner confirmed applies to this account on 2026-08-22, and which only a **closed** track satisfies. Upload to the closed track (`alpha`) and both are served by one upload; upload to `internal` and the 14-day clock silently never starts.
 2. Play Console → your app → **Test and release → Setup → App integrity → App
    signing** → copy the *App signing key certificate* SHA-256 (upper-case,
    colon-separated). The same page emits a ready-made Digital Asset Links JSON
