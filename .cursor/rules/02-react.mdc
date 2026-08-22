@@ -84,4 +84,4 @@ Skip this section entirely in a React Native codebase.
 - Uncontrolled inputs (`defaultValue` + `FormData`) by default; controlled only when you need to react per keystroke.
 - Every input has an associated `<label>`. Not a placeholder pretending to be one.
 - `dangerouslySetInnerHTML` without sanitizing is prohibited.
-- Semantic elements (`<button>`, `<a href>`, `<article>`) over `<div onClick>` — see the accessibility rule for the platform: `21-accessibility.mdc` on web, `21-accessibility-native.mdc` in React Native.
+- Semantic elements (`<button>`, `<a href>`, `<article>`) over `<div onClick>` — the accessibility rule in this collection covers why.
