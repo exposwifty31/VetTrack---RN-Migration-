@@ -118,7 +118,18 @@ describe("root navigator mounts exactly one stack", () => {
     expect(routes).toEqual(["AuthLoading"]);
   });
 
-  it("signed IN: registers the tab shell", async () => {
+  /**
+   * Both signed-in facts in ONE mount. They were two tests that each mounted the
+   * navigator and re-asserted "Main is registered"; the second fact is the
+   * regression, not a separate scenario (SonarCloud S5976).
+   *
+   * THE REGRESSION, observed on the iPad sim: BOTH branches used to register a
+   * route named "SignIn". React Navigation keeps the CURRENT route across a
+   * config change when the new config still declares it, so signing in swapped
+   * the branch but left the user parked on SignIn's post-sign-in interstitial
+   * ("מחובר" + a manual "go home" button) instead of landing on Main.
+   */
+  it("signed IN: registers the tab shell and does NOT re-register SignIn", async () => {
     setClerkKey("pk_test_x");
     setClerkAuthState({ isLoaded: true, isSignedIn: true });
 
@@ -126,44 +137,21 @@ describe("root navigator mounts exactly one stack", () => {
 
     expect(routes).toContain("Main");
     expect(routes).not.toContain("AuthLoading");
-  });
-
-  /**
-   * The regression this pins, observed on the iPad sim: BOTH branches used to
-   * register a route named "SignIn". React Navigation keeps the CURRENT route
-   * across a config change when the new config still declares it, so signing in
-   * swapped the branch but left the user parked on SignIn's post-sign-in
-   * interstitial ("מחובר" + a manual "go home" button) instead of landing on
-   * Main. Route names must not overlap between the two branches.
-   */
-  it("signed IN: does NOT re-register SignIn, so the swap cannot strand the user on it", async () => {
-    setClerkKey("pk_test_x");
-    setClerkAuthState({ isLoaded: true, isSignedIn: true });
-
-    const routes = await mountRoutes();
-
-    expect(routes).toContain("Main");
+    // Fails if the app branch re-registers SignIn — the iPad-sim regression.
     expect(routes).not.toContain("SignIn");
   });
 
-  it("no Clerk key (dev-bypass): keeps SignIn reachable for the bootstrap affordance", async () => {
+  it("no Clerk key (dev-bypass): registers the tab shell AND keeps SignIn reachable", async () => {
     setClerkKey("");
     setClerkAuthState({ isLoaded: false, isSignedIn: false });
 
     const routes = await mountRoutes();
 
+    // Never stranded on an auth branch that this build cannot complete.
     expect(routes).toContain("Main");
-    // No auth branch exists on this build, so there is no name collision and
+    // No auth branch exists here, so there is no name collision and
     // BootstrapGate's navigate("SignIn") must still resolve.
     expect(routes).toContain("SignIn");
   });
-
-  it("no Clerk key (dev-bypass): registers the tab shell rather than stranding on SignIn", async () => {
-    setClerkKey("");
-    setClerkAuthState({ isLoaded: false, isSignedIn: false });
-
-    const routes = await mountRoutes();
-
-    expect(routes).toContain("Main");
-  });
 });
+
