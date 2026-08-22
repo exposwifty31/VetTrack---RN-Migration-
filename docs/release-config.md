@@ -56,10 +56,24 @@ three names, `preview` and `development` hold zero.
 `app.config.js` sets `android.googleServicesFile` from it and falls back to
 `./google-services.json`, which is gitignored and absent from a clean checkout.
 
-*Mechanism, not an observation* — zero Android builds have ever run on this EAS
-project, so there is no empirical data point. An Android build on `preview` or
+~~*Mechanism, not an observation* — zero Android builds have ever run on this EAS
+project, so there is no empirical data point.~~ An Android build on `preview` or
 `development` resolves an environment with no variables and should fail at
 **config resolution (build time)**, not at launch.
+
+*Corrected 2026-08-22 — there is an empirical data point now, and the mechanism was
+right.* `npx expo prebuild -p android --no-install` on a clean checkout with no
+`GOOGLE_SERVICES_JSON` in the environment fails exactly where predicted, in the
+config-plugin phase rather than at launch:
+
+```text
+[android.dangerous]: withAndroidDangerousBaseMod: Cannot copy google-services.json
+```
+
+It fails **late** — the Android project is written first, and only the dangerous mod
+throws — so the tree is left holding a half-configured `android/` that a subsequent
+command will happily build against. That is the part worth knowing before the first
+AAB: the failure is loud, but what it leaves behind is not.
 
 It is registered as a reported gap rather than a requirement: failing every build
 for an unexercised path is the false alarm that teaches people to ignore red.
