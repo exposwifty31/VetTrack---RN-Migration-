@@ -5,6 +5,7 @@
  * stale id; success returns the full updated row (we model {id, displayName}).
  */
 import {
+  ACCOUNT_DELETION_REASON,
   accountApi,
   DISPLAY_NAME_MAX_LENGTH,
   isValidDisplayName,
@@ -75,5 +76,82 @@ describe("accountApi.updateDisplayName", () => {
     const err = await accountApi.updateDisplayName("gone", "Name").catch((e: unknown) => e);
 
     expect(err).toMatchObject({ status: 404, code: "NOT_FOUND" });
+  });
+});
+
+/**
+ * Account deletion (A8) is the in-app store-compliance path — Apple Guideline
+ * 5.1.1(v) and Google Play both require it, and it is irreversible. Two things
+ * therefore have to hold and neither was pinned before: the request must stay
+ * self-scoped (no id, no body — the server reads `req.authUser`), and the coded
+ * `reason` the screen branches on must keep matching the server's. A drift in
+ * either is silent: the first would let the app ask to delete somebody else,
+ * the second would show a generic "try again" on a failure the user can
+ * actually act on (transfer the clinic).
+ */
+describe("accountApi.deleteAccount", () => {
+  it("DELETEs the self-scoped route with no id, no body, and a trace id", async () => {
+    mockAuthFetch.mockResolvedValue(makeResponse(200, { success: true }));
+
+    const result = await accountApi.deleteAccount();
+
+    expect(mockAuthFetch).toHaveBeenCalledTimes(1);
+    const [path, init] = mockAuthFetch.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe("/api/users/delete-account");
+    expect(init.method).toBe("DELETE");
+    expect(init.body).toBeUndefined();
+    expect((init.headers as Record<string, string>)["x-request-id"]).toBe("test-request-uuid");
+    expect(result).toEqual({ success: true });
+  });
+
+  it("surfaces the 409 sole-clinic-admin reason the screen branches on", async () => {
+    mockAuthFetch.mockResolvedValue(
+      makeResponse(409, { code: "CONFLICT", reason: "SOLE_CLINIC_ADMIN" }),
+    );
+
+    const err = await accountApi.deleteAccount().catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiCodedError);
+    expect(err).toMatchObject({
+      status: 409,
+      code: "CONFLICT",
+      reason: ACCOUNT_DELETION_REASON.SOLE_CLINIC_ADMIN,
+    });
+  });
+
+  it("surfaces the 403 protected-account reason the screen branches on", async () => {
+    mockAuthFetch.mockResolvedValue(
+      makeResponse(403, { code: "FORBIDDEN", reason: "ACCOUNT_DELETION_PROTECTED" }),
+    );
+
+    const err = await accountApi.deleteAccount().catch((e: unknown) => e);
+
+    expect(err).toMatchObject({
+      status: 403,
+      code: "FORBIDDEN",
+      reason: ACCOUNT_DELETION_REASON.PROTECTED,
+    });
+  });
+
+  it("leaves an unmapped server failure on the generic branch", async () => {
+    mockAuthFetch.mockResolvedValue(
+      makeResponse(500, { code: "INTERNAL_ERROR", reason: "ACCOUNT_DELETION_FAILED" }),
+    );
+
+    const err = await accountApi.deleteAccount().catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiCodedError);
+    // Neither mapped reason — the screen must fall through to the generic copy.
+    expect((err as ApiCodedError).reason).not.toBe(ACCOUNT_DELETION_REASON.SOLE_CLINIC_ADMIN);
+    expect((err as ApiCodedError).reason).not.toBe(ACCOUNT_DELETION_REASON.PROTECTED);
+  });
+
+  it("still raises a coded error when the failure body is not an object", async () => {
+    mockAuthFetch.mockResolvedValue(makeResponse(502, null));
+
+    const err = await accountApi.deleteAccount().catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ApiCodedError);
+    expect(err).toMatchObject({ status: 502, code: "HTTP_502", reason: null });
   });
 });
