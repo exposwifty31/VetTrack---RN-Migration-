@@ -32,10 +32,17 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
  * stack (it is ALSO still registered there for the NFC advisory fallback).
  * The runtime navigation object of a nested tab reaches the same root stack
  * routes, so the cast is behavior-preserving.
+ *
+ * Tab mode has no native header, so this wrapper owns the top safe-area inset
+ * — the MineTabScreen precedent directly below. Without it the screen's search
+ * header painted under the status bar, and under the clock on iPad (issue #95).
  */
-function EquipmentTabScreen(props: MainTabScreenProps<"EquipmentTab">) {
+export function EquipmentTabScreen(props: MainTabScreenProps<"EquipmentTab">) {
+  const insets = useSafeAreaInsets();
   return (
-    <EquipmentListScreen {...(props as unknown as RootStackScreenProps<"EquipmentList">)} />
+    <View testID="equipment-tab-root" className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+      <EquipmentListScreen {...(props as unknown as RootStackScreenProps<"EquipmentList">)} />
+    </View>
   );
 }
 
@@ -46,10 +53,10 @@ function EquipmentTabScreen(props: MainTabScreenProps<"EquipmentTab">) {
  * Tab mode has no native header, so this wrapper owns the top safe-area inset;
  * the screen self-gates via BootstrapGate.
  */
-function MineTabScreen(props: MainTabScreenProps<"Mine">) {
+export function MineTabScreen(props: MainTabScreenProps<"Mine">) {
   const insets = useSafeAreaInsets();
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <View testID="mine-tab-root" className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <MyEquipmentScreen {...(props as unknown as RootStackScreenProps<"MyEquipment">)} />
     </View>
   );
