@@ -145,8 +145,8 @@ Three rules, each proved by a refusal in `src/__tests__/release-config-checks.te
   outside, and only one of them is honest.
 - **One counter, two lanes.** This app and the Capacitor shell share bundle id
   `uk.vettrack.app`, so they share one `CFBundleVersion` counter. Raise the floor
-  after **every** upload from **either** lane, then raise the other lane's local
-  number above it. A safety net that trips on a number collision during an
+  when App Store Connect **accepts** a build from **either** lane — not on upload,
+  and not on a rejection — then raise the other lane's local number above it. A safety net that trips on a number collision during an
   incident is the worst failure mode this file has.
 
 ### Forward numbering — decided here, not at submission
@@ -169,9 +169,10 @@ once 29 is consumed, the full run's `checkBuildNumbers()` refuses it unaided.
 It is written down so the number is settled before the build minutes are spent
 rather than discovered at upload.
 
-**29 / 30 holds only while the Capacitor lane has not uploaded 29.** It is
-claimed locally there, not shipped — `vettrack/ios/.last-shipped-build` is still
-28. The moment that lane uploads, the floor in this repo becomes 29 and
+**29 / 30 holds only while App Store Connect has not accepted the Capacitor
+lane's 29.** It is claimed locally there, not shipped —
+`vettrack/ios/.last-shipped-build` is still 28. The moment ASC accepts it, the
+floor in this repo becomes 29 and
 `checkShippedBuildFloor()` REFUSES `app.json`'s `"29"`, because it requires the
 local number to be strictly above the floor. So the two lanes are ordered, not
 independent:
@@ -179,10 +180,10 @@ independent:
 | Order | Acceptance (preview) | Submission |
 |---|---|---|
 | Expo preview first *(the plan)* | 29 / 10301 | 30 / 10302 |
-| Capacitor uploads 29 first | 30 / 10302 | 31 / 10303 |
+| ASC accepts Capacitor's 29 first | 30 / 10302 | 31 / 10303 |
 
-Either order is safe; only the first is written down elsewhere. If the Capacitor
-lane ships 29 before the acceptance run, raise the floor here to 29 **and** move
+Either order is safe; only the first is written down elsewhere. If ASC accepts the
+Capacitor lane's 29 before the acceptance run, raise the floor here to 29 **and** move
 `app.json` to 30 before building, and read every 29/30 in
 `docs/ota-acceptance.md` as 30/31. The gate will catch it either way — this note
 exists so it is caught before the build minutes, not after.
