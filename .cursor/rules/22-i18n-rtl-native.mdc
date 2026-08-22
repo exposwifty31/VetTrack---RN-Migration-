@@ -1,0 +1,87 @@
+---
+description: RTL and bidirectional text in React Native + Expo (Hebrew). I18nManager semantics, logical style props, what does not auto-flip, and testing.
+globs: src/**/*.tsx,src/**/*.ts,locales/**,android/app/src/main/AndroidManifest.xml
+alwaysApply: false
+---
+
+# RTL in React Native (Hebrew)
+
+**None of the web RTL toolkit exists here.** There is no CSS, no `:dir()`, no `margin-inline-start`, no `<bdi>`. React Native has its own, smaller mechanism, and the failure modes are different.
+
+## I18nManager and the Restart Trap
+
+```ts
+import { I18nManager } from 'react-native'
+import * as Updates from 'expo-updates'
+
+if (I18nManager.isRTL !== shouldBeRTL) {
+  I18nManager.allowRTL(shouldBeRTL)
+  I18nManager.forceRTL(shouldBeRTL)
+  await Updates.reloadAsync()      // required — the change is inert until reload
+}
+```
+
+`forceRTL` does **not** take effect on the current render, or the current session, without a reload. The classic bug: a language toggle appears to do nothing, someone "fixes" it by re-rendering harder, and it still does nothing.
+
+Consequences to design around:
+
+- Switching language is a **restart-level event**. Warn the user, or reload immediately — do not leave the app in a half-flipped state.
+- `I18nManager.isRTL` is a module-level boolean read at startup. A style computed from it at module scope is frozen for the session; that is usually what you want, but be deliberate about it.
+- Android needs `android:supportsRtl="true"` in `AndroidManifest.xml`. Without it, the native side never mirrors regardless of what JS says.
+
+## Logical Style Props
+
+RN's equivalents of logical CSS properties. Use these, not `marginLeft`/`marginRight`:
+
+| Physical | Logical |
+|---|---|
+| `marginLeft` / `marginRight` | `marginStart` / `marginEnd` |
+| `paddingLeft` / `paddingRight` | `paddingStart` / `paddingEnd` |
+| `borderLeftWidth` | `borderStartWidth` |
+| `left` / `right` (absolute) | `start` / `end` |
+| `borderTopLeftRadius` | `borderTopStartRadius` |
+
+`flexDirection: 'row'` **already flips** when RTL is active. Adding `'row-reverse'` double-flips it back to LTR order — the single most common accidental RTL bug in an RN codebase.
+
+## Text
+
+- `textAlign: 'auto'` (the default) follows the text's own direction. **Never hardcode `'left'`** — it will not flip.
+- `writingDirection: 'ltr'` on a `<Text>` to pin a value that must not reorder: phone numbers, IDs, IBANs, codes, version strings.
+- User-generated content of unknown direction gets `textAlign: 'auto'` and no forced `writingDirection`.
+- `<TextInput>` inherits direction from the value in most cases, but set `textAlign="auto"` explicitly on fields that may receive Latin input inside a Hebrew UI — an email field is the canonical case.
+
+## What Does Not Auto-Flip
+
+Everything below is physical and stays put when the layout mirrors. Each needs an explicit `I18nManager.isRTL` branch:
+
+- **Icons and images** — `transform: [{ scaleX: I18nManager.isRTL ? -1 : 1 }]`. Mirror directional arrows, chevrons, send, reply, back. Do **not** mirror logos, checkmarks, close, play buttons, or clocks.
+- **`shadowOffset.width`** (iOS) — a `+2` offset points the wrong way relative to an RTL layout.
+- **Animated `translateX`** — every slide-in, drawer, carousel, and swipe-to-dismiss needs its sign inverted. Reanimated worklets read `I18nManager.isRTL` fine; capture it outside the worklet as a constant.
+- **Gesture direction** — swipe-to-delete and pager gestures reverse.
+- **Horizontal `ScrollView`/`FlatList`** — initial content offset and `scrollToIndex` behave inconsistently across platforms under RTL. Test both, do not assume.
+- **`transformOrigin`, `LinearGradient` angles, and SVG paths.**
+
+## Formatting Numbers and Dates
+
+Format with `Intl`, then let the layout be. Formatting and bidi isolation are separate problems and people conflate them constantly.
+
+```ts
+new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS' }).format(1234)
+```
+
+**Verify `Intl` behavior under Hermes on Android** for this project's RN version before relying on a specific locale output — Hermes' ICU support has historically lagged, and a format that works in the iOS simulator can silently degrade on an Android device. Polyfill with `@formatjs/intl-*` if a needed format is missing. This is a device-only bug class: it will not show up on your Mac.
+
+## Testing
+
+- Mock both directions in Jest: `jest.spyOn(I18nManager, 'isRTL', 'get').mockReturnValue(true)`. A component with a direction branch needs both cases covered.
+- Snapshot tests taken only in LTR prove nothing about the Hebrew build.
+- Verify on a **real device** in Hebrew: every screen, every modal, every horizontal list, and one long Hebrew string with an embedded English word and a phone number.
+
+## NEVER
+
+- A hardcoded user-facing string in a component — it goes in `locales/`.
+- `marginLeft` / `paddingRight` / `left` in a style that participates in layout.
+- `flexDirection: 'row-reverse'` used as a way to "make it RTL".
+- `textAlign: 'left'`.
+- Assuming a Hebrew string occupies the same width as its English source — no fixed-width or fixed-height text containers.
+- Calling `forceRTL` without a reload.
