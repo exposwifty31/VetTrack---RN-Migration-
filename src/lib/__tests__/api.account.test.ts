@@ -88,9 +88,10 @@ describe("accountApi.updateDisplayName", () => {
  *
  * The first is a contract assertion, NOT an authorization control — deletion is
  * scoped server-side by `req.authUser`, so a client that invented an id would
- * simply be ignored, not obeyed. What it protects is the pair staying in step:
- * the day the route starts reading an id, this fails instead of the app quietly
- * sending one the server drops.
+ * simply be ignored, not obeyed. What it protects is this side of the wire, and
+ * only this side: `authFetch` is mocked here, so the day the CLIENT starts
+ * sending an id or a body, this fails. A server that started reading one would
+ * not trip it — that direction needs the route's own test, in the other repo.
  *
  * The second is the user-visible half. A drift there is silent — a renamed
  * reason shows a generic "try again" on a failure the user can actually act on
