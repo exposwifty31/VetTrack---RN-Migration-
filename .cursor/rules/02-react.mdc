@@ -35,7 +35,7 @@ The order to reach for, cheapest first:
 2. **Local** — `useState` in the component that owns it.
 3. **URL** — filters, sort, pagination, active tab. Survives refresh and is shareable.
 4. **Lifted** — the nearest common ancestor, only once two siblings genuinely need it.
-5. **Server cache** — TanStack Query / SWR / RSC. Server data is not client state.
+5. **Server cache** — a query library, or React Server Components where the platform has them (web/SSR only; there is no RSC in React Native). Server data is not client state.
 6. **Global store** — last resort, for genuinely cross-cutting concerns only.
 
 Most `useState` + `useEffect` pairs are a derived value wearing a costume.
@@ -46,7 +46,7 @@ An effect synchronizes with something **outside React**: a subscription, a timer
 
 Do not use it for:
 - Deriving state from props → compute during render.
-- Fetching on mount → use the framework's loader, RSC, or a query library.
+- Fetching on mount → use a query library, or the framework's loader / RSC on web. In React Native the query library *is* the loader — there is no route-level server loader.
 - Reacting to a user event → put the logic in the event handler.
 - Resetting state when a prop changes → change the `key` instead. Note what this costs: a new `key` unmounts the component and **destroys the entire subtree's state**, including focus, scroll position, and uncontrolled input values, then remounts from scratch. That is the intended tool for "reset this form when the selected record changes", but it is deliberate and expensive — not a targeted field reset.
 
@@ -84,4 +84,4 @@ Skip this section entirely in a React Native codebase.
 - Uncontrolled inputs (`defaultValue` + `FormData`) by default; controlled only when you need to react per keystroke.
 - Every input has an associated `<label>`. Not a placeholder pretending to be one.
 - `dangerouslySetInnerHTML` without sanitizing is prohibited.
-- Semantic elements (`<button>`, `<a href>`, `<article>`) over `<div onClick>` — see `21-accessibility.mdc`.
+- Semantic elements (`<button>`, `<a href>`, `<article>`) over `<div onClick>` — see the accessibility rule for the platform: `21-accessibility.mdc` on web, `21-accessibility-native.mdc` in React Native.
