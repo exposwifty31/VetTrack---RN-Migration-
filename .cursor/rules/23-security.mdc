@@ -28,7 +28,11 @@ Every query filters by tenant id — enforced structurally via Row Level Securit
 - Parameterized queries, always. String-interpolated SQL is the vulnerability regardless of how internal the input feels.
 - Never pass user input to a shell. If you must invoke a process, use an argument array — never a concatenated command string.
 - Path traversal: resolve and confirm the result is inside the intended directory. `../` in a filename is a classic.
-- SSRF: user-supplied URLs are fetched only against an allowlist, with redirects disabled and internal ranges (169.254.169.254, 10.x, 127.x) blocked. Cloud metadata endpoints are the standard target.
+- SSRF: a hostname allowlist is not sufficient on its own, because a permitted name can resolve to an internal address (DNS rebinding). Require all four:
+  1. Scheme allowlist — `http`/`https` only. Reject `file:`, `gopher:`, `ftp:`, `data:`.
+  2. Resolve **every** `A`/`AAAA` record and validate each resolved address before connecting — then connect to the validated address, not by re-resolving the name.
+  3. Disable redirects, or re-run the full validation on every hop.
+  4. Block the private and special ranges, not a sample of them: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `169.254.0.0/16` (cloud metadata — the standard target), `0.0.0.0/8`, plus IPv6 `::1`, `fe80::/10`, `fc00::/7`, `::ffff:0:0/96` (IPv4-mapped), and multicast.
 - XSS: framework escaping by default. `dangerouslySetInnerHTML` / `v-html` / `set:html` require sanitization with a real library, not a regex.
 
 ## Secrets

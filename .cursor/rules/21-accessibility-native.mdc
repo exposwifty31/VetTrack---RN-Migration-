@@ -1,0 +1,67 @@
+---
+description: Accessibility in React Native — accessibility props, roles, focus and announcements, touch targets, and Dynamic Type. Native APIs, not DOM.
+globs: src/**/*.tsx,src/**/*.ts
+alwaysApply: false
+---
+
+# Accessibility (React Native)
+
+**There is no DOM here.** No `<button>`, no `tabindex`, no `:focus-visible`, no `aria-*`, no `<label>`, no live-region markup. React Native exposes the platform accessibility trees (VoiceOver on iOS, TalkBack on Android) through props, and those props are the whole API.
+
+This codebase already uses them heavily — `accessibilityRole`, `accessibilityLabel`, `accessibilityState`. Do not replace working native props with web attributes.
+
+## The Core Props
+
+```tsx
+<Pressable
+  accessibilityRole="button"
+  accessibilityLabel="Mark patient as discharged"
+  accessibilityHint="Moves the case out of the active ward list"
+  accessibilityState={{ disabled: isSaving, busy: isSaving }}
+  onPress={onDischarge}
+/>
+```
+
+- **`accessibilityRole`** — `button`, `link`, `header`, `image`, `search`, `switch`, `checkbox`, `radio`, `adjustable`, `alert`, `summary`, `none`. It tells the screen reader what the element *is*; without it, a `Pressable` announces as plain text.
+- **`accessibilityLabel`** — what it is, not what it looks like. `"Delete case 4821"`, never `"trash icon"`.
+- **`accessibilityHint`** — what happens on activation. Optional, and only when non-obvious; a hint on every button is noise.
+- **`accessibilityState`** — `{ disabled, selected, checked, busy, expanded }`. A visually greyed-out button that omits `disabled` here still announces as tappable.
+- **`accessibilityValue`** — `{ min, max, now, text }` for sliders and progress.
+- **`accessible={true}`** groups children into one focusable unit. Use it on a card so the reader announces it once instead of walking six `Text` nodes.
+- **`importantForAccessibility="no-hide-descendants"`** (Android) / **`accessibilityElementsHidden`** (iOS) to hide decoration.
+
+## Touch and Layout
+
+- Minimum target **44×44pt** (iOS HIG) / **48×48dp** (Android). Use `hitSlop` when the visual element must stay smaller than the target.
+- **Dynamic Type / font scale.** Never a fixed `fontSize` on body text without allowing scaling. Test at the largest accessibility text size — this is the most common real-world break, and it shows up as clipped or overlapping text, not as a crash.
+- Do not set `allowFontScaling={false}` to fix a layout that broke under large text. Fix the layout.
+- No fixed-height text containers. Hebrew, long translations, and large font scales all overflow them.
+
+## Announcements and Focus
+
+- `AccessibilityInfo.announceForAccessibility(msg)` for transient status — saved, sync failed, results updated. There is no `aria-live`; this is the equivalent.
+- On screen change, set focus deliberately with `AccessibilityInfo.setAccessibilityFocus(reactTag)`. Otherwise focus can stay on the previous screen's element.
+- Modals and sheets must trap the reader inside them. Verify with the actual screen reader — the visual result and the accessibility tree diverge more often than you would expect.
+- Query user settings and respect them: `AccessibilityInfo.isScreenReaderEnabled()`, `isReduceMotionEnabled()`, `isBoldTextEnabled()`.
+
+## Visual
+
+- Contrast 4.5:1 for body text, 3:1 for large text and control boundaries — the WCAG ratios apply unchanged on mobile.
+- Never color alone for state. In a clinical UI a red border is not a status; pair it with an icon and text.
+- Honor `isReduceMotionEnabled` — skip or shorten Reanimated transitions rather than running them anyway.
+
+## Verify
+
+Automated checks catch very little on native. The real pass is manual:
+
+1. **VoiceOver** (iOS) and **TalkBack** (Android) through one complete flow, on a device.
+2. Largest Dynamic Type setting, every screen.
+3. Screen reader plus RTL together — that combination surfaces bugs neither finds alone.
+
+## NEVER
+
+- Web a11y attributes: `aria-*`, `role=`, `tabIndex`, `htmlFor`. They are silently ignored by RN.
+- A `Pressable`/`TouchableOpacity` with no `accessibilityRole` and no `accessibilityLabel`.
+- An icon-only control whose label is the icon's name rather than its action.
+- `accessible={false}` on an interactive element.
+- Shipping a screen never opened with a screen reader running.

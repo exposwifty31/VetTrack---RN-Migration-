@@ -7,11 +7,11 @@ alwaysApply: true
 
 ## Response Format
 
-- Show **only the changed code**, with enough surrounding context to place it. Do not reprint an unchanged 200-line file.
+- Show **only the changed code**, with enough surrounding context to place it. Do not reprint an unchanged 200-line file. Prose that states what changed, why, or what a trade-off costs is wanted — this rule is about not re-dumping code, not about suppressing explanation.
 - Lead with what changed and why, in one or two sentences. Detail after, for whoever wants it.
 - When several approaches exist, **recommend one and say why** — do not present a menu and make me choose.
 - Reference code as `path/to/file.ts:42` so it is clickable.
-- No preamble ("Great question!"), no summary of what you are about to do, no closing recap of what you just did.
+- No filler preamble ("Great question!", "Let me help you with that"), no announcement of what you are about to do, no closing recap of what you just said. Opening directly with the substance is not a preamble.
 
 ## Explaining
 

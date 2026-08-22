@@ -5,7 +5,9 @@ alwaysApply: true
 
 # Core Engineering Standards
 
-These override framework conventions when they conflict. Everything else is negotiable; this is not.
+These take precedence over *stylistic* conventions when they conflict. Everything else is negotiable; this is not.
+
+**They do not override framework correctness.** Where a framework or platform requires something for the code to work, be secure, or respect a lifecycle — a Next.js route file's default export, React's rules of hooks, `I18nManager` needing a reload, a SwiftUI view's identity, a required `Sendable` conformance — the framework requirement wins. A rule that produces invalid code is not a standard; it is a bug.
 
 ## 1. Evidence Over Assertions
 
@@ -54,8 +56,8 @@ Write code that reads like the code around it. Match the surrounding file's nami
 
 ## NEVER
 
-- Commit, push, or open a PR unless explicitly asked.
-- Add a dependency when a ~20-line local implementation would do.
-- Leave commented-out code. Delete it; version control remembers.
-- Write a comment that restates the code. Comment the *why*, never the *what*.
-- Use placeholder text like `// TODO: implement` in delivered work.
+- Committing, pushing, or opening a PR unless explicitly asked.
+- Adding a dependency when a ~20-line local implementation would do — **except** for anything security-sensitive. Cryptography, password hashing, session handling, token signing, sanitization, and protocol parsing use a vetted, maintained library, however short the hand-rolled version looks. See `23-security.mdc`.
+- Leaving commented-out code — delete it; version control remembers.
+- Writing a comment that restates the code — comment the *why*, never the *what*.
+- Leaving placeholder text like `// TODO: implement` in delivered work.

@@ -46,7 +46,7 @@ Do not use it for:
 - Deriving state from props → compute during render.
 - Fetching on mount → use the framework's loader, RSC, or a query library.
 - Reacting to a user event → put the logic in the event handler.
-- Resetting state when a prop changes → change the `key` instead.
+- Resetting state when a prop changes → change the `key` instead. Note what this costs: a new `key` unmounts the component and **destroys the entire subtree's state**, including focus, scroll position, and uncontrolled input values, then remounts from scratch. That is the intended tool for "reset this form when the selected record changes", but it is deliberate and expensive — not a targeted field reset.
 
 Every effect that subscribes returns a cleanup. No exceptions.
 
