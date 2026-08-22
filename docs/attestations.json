@@ -30,6 +30,26 @@
       "attestedAt": "2026-08-15",
       "staleAfterDays": 90,
       "reverifyWith": "npm run release:preflight"
+    },
+    {
+      "id": "nfc-write-readback-verified",
+      "claim": "NTAG215 read, WRITE and read-back all work on physical hardware - iPhone 16 Plus (iOS 26.6) and Pixel 7 (Android 16). A blank tag yields the correct no-id diagnostic on both, with device syslog and logcat corroboration rather than screenshots alone; a written tag reads back to the correct unit through the app's own parser; the bound UID renders lowercase, so normalizeTagUid holds. The iOS write succeeded under a TAG-only reader session (includeNdefEntitlement false), so the NDEF format entitlement is NOT required to write. LOCKING IS NOT COVERED: makeReadOnly and queryNDEFStatus have never been invoked from this codebase. Re-verify by re-running stages 1 and 2 of the script (the reverifyWith field resolves as a path, so that scoping lives here).",
+      "target": "physical-device",
+      "evidence": "docs/device-test-w3b.md",
+      "attestedBy": "repo owner, W3B stages 0-2 run of 2026-08-21 (results recorded inline in that document, with syslog/logcat corroboration)",
+      "attestedAt": "2026-08-21",
+      "staleAfterDays": 120,
+      "reverifyWith": "docs/device-test-w3b.md"
+    },
+    {
+      "id": "text-size-cap-selectable",
+      "claim": "At iOS AX5 the 200% text ceiling reaches RN's NativeSelectableText branch: the Settings version line (<AppText selectable>) stayed the smallest text on the screen and proportional to its base size, and Menu/AccountSection capped alongside it, while Home - which carries no cap (step 1.7) - kept growing and clipped at the same setting. That contrast is what makes 1.6 a measurement rather than a false pass. The selectable version line is the element with no automated coverage asserting the ceiling reaches it, because jest renders RN's Text while the app renders Uniwind's. Re-verify by re-running steps 1.6 and 1.7 at iOS AX5 (the reverifyWith field resolves as a path, so that scoping lives here).",
+      "target": "physical-device",
+      "evidence": "docs/device-test-w3b.md",
+      "attestedBy": "repo owner, screenshot comparison at the same AX5 setting across three screens (Settings, Menu, Home)",
+      "attestedAt": "2026-08-21",
+      "staleAfterDays": 120,
+      "reverifyWith": "docs/device-test-w3b.md"
     }
   ]
 }

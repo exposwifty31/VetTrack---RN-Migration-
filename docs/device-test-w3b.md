@@ -1,28 +1,42 @@
 # W3B device test script — NFC write/lock, torch, app-resume, text size
 
-> **Nothing in this document has been executed.** This is the procedure, not a
-> result. Every step ships with a blank result line. A step with no recorded
-> result is untested — not passed.
+> **Stages 0-2 were executed on 2026-08-21; Stage 3 was not.** Results are recorded inline
+> below and the findings are collected at the end. A step with no recorded result is still
+> untested — not passed — and Stage 3's lines say so explicitly.
+> <!-- vt-claim: attested nfc-write-readback-verified -->
+> <!-- vt-claim: attested text-size-cap-selectable -->
+>
+> Both devices ran an installed build one number behind `app.json` (28 / 10300 against
+> 29 / 10301), because each native prebuild predates the version bump. Nothing tested here
+> is version-gated, so no result is weakened by it — but it is why the on-device build
+> string does not match the repo, and reading that as a wrong build would be a false alarm.
+>
+> **Two tags of ten consumed, both still rewritable. Zero tags locked.**
 >
 > It exists because the W3B work (commits `e09decd`, `5915f37`, `ab9d533`,
 > `d05597b` on `feat/w3b-device-features`) is covered by unit tests that cannot
 > reach the thing that matters: a simulator has no NFC radio and no torch LED,
 > and an NTAG215 lock is one-way. Three native entry points —
-> `writeNdefMessage`, `makeReadOnly`, `queryNDEFStatus` — have **never been
+> `writeNdefMessage`, `makeReadOnly`, `queryNDEFStatus` — had **never been
 > invoked from this codebase**, and they are reached through New-Architecture
 > bridgeless interop with different completion-handler shapes than the read
 > path. The read path working is not evidence for them.
+> 
+> **Status after the 2026-08-21 run:** `writeNdefMessage` has now been invoked
+> successfully on both platforms (steps 2.1 and 2.3). `makeReadOnly` and
+> `queryNDEFStatus` are reached only through the lock path, which Stage 3 owns —
+> so both remain **never invoked**, and that is exactly what Stage 3 still has to prove.
 
 **Order is load-bearing.** Stage 1 writes nothing. Stage 2 writes tags that can
 still be rewritten. Stage 3 destroys tags. Do not run them out of order, and do
 not start Stage 3 until Stages 1 and 2 have passed on both platforms.
 
-**Tester:** ............................  **Date:** ....................
+**Tester:** repo owner (with Claude Code driving logs/screenshots)  **Date:** 2026-08-21
 
 | Hardware | Model | OS version | Build / commit |
 |---|---|---|---|
-| iPhone | | | |
-| Android | | | |
+| iPhone | iPhone 16 Plus | iOS 26.6 | 1.3.0 (28), branch `feat/w3b-device-run` @ `8861c16` |
+| Android | Pixel 7 (`panther`) | Android 16 | 1.3.0 (10300), same branch |
 
 ---
 
@@ -73,7 +87,9 @@ adb shell pm list packages | grep vettrack
 you are driving a different build than this script describes — stop, and record
 which id you actually have. Step 2.5 (AAR dispatch) is meaningless otherwise.
 
-Result: ☐ pass ☐ fail — ....................................................
+Result: ☑ pass — `uk.vettrack.app` only. Owner confirmed the live Capacitor app is not in
+real use; the iPhone container already showed RN writes (MMKV) with the WebKit/Dexie data
+frozen days earlier, i.e. the replacement had already happened.
 
 ### 0.2 — Tag stock
 
@@ -100,7 +116,10 @@ Result: ☐ pass ☐ fail — ..................................................
   `SACRIFICIAL-1`, `SACRIFICIAL-2`. Stage 3 depends on you knowing which is
   which, and a locked tag is indistinguishable by eye.
 
-Result: ☐ ready — tags labelled, count: ......
+Result: ☑ ready — tags labelled, count: 10 (NTAG215 wet inlay, one sealed pack; supplier
+invoice 02/000340, Maker Depot). Budget of ≥5 satisfied. Chip model confirmed three
+independent ways: the supplier invoice, the Android tech list (`MifareUltralight` + NDEF
+type 2), and the 7-byte UID shape with the `04` NXP prefix.
 
 ### 0.3 — Account and backend
 
@@ -120,7 +139,10 @@ equipment rows with **no sticker bound**.
 **Fail looks like:** empty lists (no session — sign in again, do not read it as
 a data bug), or the card absent (see 0.5).
 
-Result: ☐ pass ☐ fail — account used: ......................................
+Result: ☑ pass — account used: the owner's admin account, signed in via Apple SSO against
+production, after the owner added `vettrack://sso-callback` to the PRODUCTION Clerk
+allowlist mid-session (see F-SSO in the findings). Equipment list populated (65 ready);
+`W3B-TEST-1/2/3` created for this run.
 
 ### 0.4 — Build integrity
 
@@ -138,11 +160,17 @@ applied.
 read path will SIGABRT on the first tag and every NFC step below is invalid.
 Re-run `npx patch-package` before continuing.
 
-Result: ☐ pass ☐ fail — ....................................................
+Result: ☑ pass — `npm ci` printed `react-native-nfc-manager@3.17.2 ✔`. The signed binary
+carries `com.apple.developer.nfc.readersession.formats = [TAG]` and an explicit
+`application-identifier` (not the wildcard profile).
 
 ### 0.5 — The card is actually on screen
 
-Open any equipment detail (Equipment tab → tap a unit).
+Open any equipment detail. **On a phone the Equipment tab does not reach detail** — a
+row press pushes ScanConfirm by deliberate Slice-1 design, and only a tablet's row
+press selects into the detail pane (`src/screens/EquipmentListScreen.tsx:52-56`; filed
+under *Not defects* below). On a phone, use the deep link `vettrack://equipment/<id>`
+(`src/navigation/linking.ts:35`), taking the id from the equipment list.
 
 **Expect:** a card titled **"NFC sticker"** with the line **"No sticker bound to
 this equipment"**, a **"Program sticker"** button and a **"Lock sticker
@@ -158,7 +186,11 @@ The card rendering nothing is a **deliberate** design (a wrong flash is worse
 than a delay). Do not report its absence as "the feature is missing" without
 ruling out both causes above.
 
-Result: ☐ pass ☐ fail — ....................................................
+Result: ☑ pass — card present with both buttons, reached by the deep link on the phone.
+The run found this step's instruction wrong: it said "Equipment tab → tap a unit", which
+on a phone lands on ScanConfirm and never reaches the card. The instruction above has
+since been corrected to name the deep link, so a re-run does not fail at the gate on a
+route that was never a defect. See F-DETAIL in the findings.
 
 ---
 
@@ -187,7 +219,10 @@ end to end (`useNfcAdvisoryScan` → `decodeRecord0` returns
   is broken and Stage 2 will not work.
 - **The app crashes / disappears.** → almost certainly the missing patch (0.4).
 
-Result: ☐ pass ☐ fail — ....................................................
+Result: ☑ pass — showed "אין מזהה ציוד בתווית זו." Device log corroborates: a real tag
+connected and the app closed its own session (3s), versus a prior attempt that polled 16s
+with no tag and ended on user cancel. **Proves radio + CoreNFC session + record-0 parser
+end to end on iOS with a TAG-only entitlement.**
 
 ### 1.2 — Android: same blank-tag diagnostic
 
@@ -199,7 +234,10 @@ sheet** — reader mode has no UI of its own, so the only feedback is in-app.
 screen never updates, check NFC is enabled in Android settings — a disabled
 radio can surface as a silent non-event rather than an error.
 
-Result: ☐ pass ☐ fail — ....................................................
+Result: ☑ pass — same copy as 1.1. Logcat is independent hardware proof:
+`NfcDispatcher: dispatchTag TAG Tech [NfcA, MifareUltralight, Ndef] message: null` — the
+copy is driven by a real null NDEF message, not an app-side guess — then `connect to Ndef`
+and a clean `unregisterTagEvent`. The tech list also confirms NTAG21x.
 
 ### 1.3 — iPhone: torch on and off
 
@@ -218,7 +256,8 @@ expo-camera 57 exposes none.
 **Also record:** if the pill is not visible at all, the camera session is not
 held (the toggle only renders while `cameraActive`).
 
-Result: ☐ pass ☐ fail — ....................................................
+Result: ☑ pass — the physical rear LED lit and went out. Pill visible, so the camera session
+was held.
 
 ### 1.4 — Android: torch on and off
 
@@ -232,7 +271,8 @@ moment after the camera appears may be silently dropped.** If the first tap does
 nothing but a second tap works, record it exactly that way; that is a different
 defect from "never works."
 
-Result: ☐ pass ☐ fail — ....................................................
+Result: ☑ pass — LED on and off. The Android first-tap-after-bind hazard described above was
+NOT reproduced and was not separately probed.
 
 ### 1.5 — Background mid-scan, then resume
 
@@ -257,7 +297,10 @@ the app.
 recovers — that is the original hang, and it means the gate did not do its job.
 Record whether a second background/resume cycle clears it.
 
-Result: ☐ pass ☐ fail — ....................................................
+Result: ☐ pass ☑ **fail (torch half only)** — the camera preview DID return live, so the
+app-state gate did its job and the original hang did not occur. But the torch did NOT come
+back on while the pill STAYED WHITE: the UI claimed on, the hardware was off. Root cause is
+recorded in the findings section; it is iOS-only (1.4 passes on Android).
 
 ### 1.6 — Text size AT the cap (a screen that has one)
 
@@ -302,14 +345,21 @@ stop growing at ~2x, same as Settings.
 the `AppText` migration did not take on that file, despite the grep. Record it
 as a separate finding from 1.6's Settings result.
 
-Result (Menu / Account): ☐ pass ☐ fail — ...................................
+Result (Menu / Account): ☑ pass — at iOS AX5, on ONE screen: the menu rows and section labels
+grew without bound while the display-name, locale toggle and sign-out rows held ~2x. The
+least-evidenced of the three cap carriers now has device evidence.
 **Fail looks like:** text that keeps growing past ~2x on this screen (the cap is
 not applying through Uniwind's `Text` wrapper — this is the single thing the
 jest coverage cannot prove, because jest renders RN's `Text` while the app
 renders Uniwind's), **or** text capped at 2x that still overflows the viewport
 (the cap applies but 2x is too generous for this layout).
 
-Result: ☐ pass ☐ fail — ....................................................
+Result: ☑ pass — including the version line (`<AppText selectable>`, the
+NativeSelectableText branch with no automated ceiling coverage), which stayed the smallest
+text on the screen and did NOT outgrow its neighbours. The ceiling therefore DOES reach RN's
+selectable-text branch. Nothing overflowed the viewport. **A mid-range capture was
+inconclusive and is deliberately not recorded as a result** — below 2× capped and uncapped
+are indistinguishable, so AX5 was required to measure anything at all.
 
 ### 1.7 — Text size ABOVE the cap (contrast — a screen that has none)
 
@@ -327,7 +377,8 @@ you were on the wrong screen in one of them. Record which.
 
 **Restore the OS text size to normal before continuing.**
 
-Result: ☐ 1.6 and 1.7 visibly differ ☐ identical (investigate) — ...........
+Result: ☑ 1.6 and 1.7 visibly differ — at the same AX5 setting the uncapped Home screen
+clipped badly while the capped surfaces held. 1.6 measured something real.
 
 ---
 
@@ -377,7 +428,12 @@ write for want of the NDEF format.
   reopens the duplicate-row hazard against a global unique index. Record the
   exact string.
 
-Result: ☐ pass ☐ fail — UID recorded (must be lowercase): ..................
+Result: ☑ pass — UID recorded (must be lowercase): **lowercase**, 14 hex chars, `04` NXP
+prefix (full value in the uncommitted run log; redacted here per the NFC UID rule).
+**The entitlement question is ANSWERED: the write SUCCEEDED with `includeNdefEntitlement`
+false, i.e. a TAG-only session. No format or session-invalidation error.**
+One defect found here: the bound line renders the UID SPLIT around the RTL label instead of
+pinned left-to-right. See findings.
 
 ### 2.2 — iPhone: read it back through the app's own parser
 
@@ -397,7 +453,8 @@ equipment you wrote in 2.1** — same name, same unit.
   decoded to a URL the extractor rejected (wrong origin or non-canonical path).
 - **It pre-fills a DIFFERENT unit** → the worst outcome; record the two ids.
 
-Result: ☐ pass ☐ fail — ....................................................
+Result: ☑ pass — the confirm sheet opened pre-filled with the SAME unit written in 2.1.
+None of the three documented failure modes occurred.
 
 ### 2.3 — Pixel: write a sticker
 
@@ -412,7 +469,10 @@ deliberate timeout (`NFC_SESSION_TIMEOUT_MS`), the backstop for Android's
 UI-less reader mode. **It is the bound, not a hang.** Do not report it as a
 freeze; do report if it *never* times out.
 
-Result: ☐ pass ☐ fail — UID recorded: ......................................
+Result: ☑ pass — UID recorded: **lowercase**, same shape as 2.1 (redacted as above).
+**The 2.1 bidi split does NOT occur here** — Android renders the UID as one contiguous run,
+which narrows that defect to iOS. Caveat: two different tags, so this is a strong indication
+rather than a controlled comparison.
 
 ### 2.4 — Pixel: read it back
 
@@ -420,7 +480,8 @@ Result: ☐ pass ☐ fail — UID recorded: ....................................
 **Expect:** as 2.2.
 **Fail looks like:** as 2.2.
 
-Result: ☐ pass ☐ fail — ....................................................
+Result: ☑ pass — opened pre-filled with `W3B-TEST-2`, the unit written in 2.3 and
+deliberately NOT the one used on iOS, so a stale prior binding could not have produced it.
 
 ### 2.5 — Pixel: AAR cold-tap dispatch (Android only, non-destructive)
 
@@ -445,7 +506,7 @@ time.**
 - **The app opens but lands on Home, not the equipment** → dispatch worked, deep
   link routing did not. A separate, lesser finding — record it as such.
 
-Result: ☐ pass ☐ fail — which of the above: ................................
+Result: ☐ pass ☐ fail — **NOT RUN.** Optional step, out of scope for this session.
 
 ### 2.6 — Bind conflict (optional, reversible)
 
@@ -464,7 +525,8 @@ high severity.
 the *first*. Re-write it for its original unit (repeat 2.3) to leave it
 consistent, or discard it.
 
-Result: ☐ pass ☐ fail ☐ skipped — ..........................................
+Result: ☐ pass ☐ fail ☑ skipped — **NOT RUN.** Optional step, out of scope for this session.
+Not executed, therefore not passed: the bind-conflict path remains unexercised on hardware.
 
 ### 2.7 — Program the sacrificial tags (do NOT lock them)
 
@@ -488,7 +550,10 @@ carry a half-written tag across the boundary.
 on.** Step 3.2 depends on you presenting the *same* tag twice, and once locked
 they are visually identical.
 
-Result: ☐ pass ☐ fail — tag programmed and set aside: ☐
+Result: **DELIBERATELY DEFERRED to the Stage 3 session.** The reason this step sits before
+Stage 3 — that a failed write should happen while still reversible — is preserved by running
+it at the START of that session. Deferring avoids a labelled sacrificial tag sitting for days
+waiting to be confused with its twin, which is the exact hazard 3.2 warns about.
 
 ---
 
@@ -538,7 +603,8 @@ confirm block **disarms itself** (it disarms on every outcome, pass or fail).
   outcome guarantee is broken. High severity: it leaves a hot confirm one tap
   from destroying the next tag.
 
-Result: ☐ pass ☐ fail — ....................................................
+Result: **NOT REACHED — by design.** Owner decision at planning time: stages 1+2 in this
+session, stage 3 in its own. `makeReadOnly` has still never been invoked from this codebase.
 
 ### 3.2 — Re-lock the now-locked tag (the step a mock cannot stand in for)
 
@@ -571,8 +637,8 @@ styling, not red. Success haptic.
 > second one appears in the fail list above, so a wrong-tag slip would be
 > recorded as a code defect **and would destroy a second tag**.
 
-Result: ☐ pass ☐ fail — exact string shown: ................................
-Tag identity confirmed physically (not from memory): ☐
+Result: **NOT REACHED — by design.**
+Tag identity confirmed physically (not from memory): n/a
 
 ### 3.3 — Write to the locked tag (optional confirmation)
 
@@ -588,7 +654,7 @@ being locked, meaning 3.1 reported a lock that did not happen. **This is the
 highest-severity outcome in the whole script**: it means the app can tell an
 operator a sticker is locked when it is not.
 
-Result: ☐ pass ☐ fail — ....................................................
+Result: **NOT REACHED — by design.**
 
 ---
 
@@ -596,13 +662,114 @@ Result: ☐ pass ☐ fail — ..................................................
 
 | Stage | Steps | Result |
 |---|---|---|
-| 0 — Gate | 0.1–0.5 | ☐ pass ☐ fail |
-| 1 — Diagnostic (nothing written) | 1.1–1.7 | ☐ pass ☐ fail |
-| 2 — Reversible writes | 2.1–2.7 | ☐ pass ☐ fail |
-| 3 — Irreversible | 3.1–3.3 | ☐ pass ☐ fail ☐ not reached |
+| 0 — Gate | 0.1–0.5 | ☑ pass ☐ fail — 0.5 reached detail by deep link; the step's instruction has since been corrected to match |
+| 1 — Diagnostic (nothing written) | 1.1–1.7 | ☐ pass ☑ **fail** — 1.5 splits: preview recovers, iOS torch does not re-arm (F-TORCH / #93). 1.1–1.4, 1.6, 1.7 pass |
+| 2 — Reversible writes | 2.1–2.7 | ☑ pass ☐ fail — 2.1–2.4 pass; 2.5 and 2.6 not run (optional), 2.7 deferred to the Stage 3 session |
+| 3 — Irreversible | 3.1–3.3 | ☐ pass ☐ fail ☑ not reached — deferred; `makeReadOnly` has still never been invoked from this codebase |
 
-**Tags consumed:** ......  **Tags permanently locked:** ......
+**Tags consumed:** 2 of 10 (both still rewritable)  **Tags permanently locked:** 0
 
 Anything recorded as a failure above is a finding, not a retry instruction —
 carry it back before the branch goes to PR. In particular, an unrecorded step is
 untested; a blank result line is not a pass.
+
+---
+
+## Findings from the 2026-08-21 run
+
+Ten findings. None is a Stage-1/2 step failure except F-TORCH; the rest surfaced *while*
+running the script and are recorded because a device run is the only place they appear.
+
+Six were filed as GitHub issues; the other four are resolved, a product question, or inside
+an already-known set, and are recorded here so they are not re-found and re-filed:
+
+| Finding | Filed as | Disposition |
+|---|---|---|
+| F-TORCH | #93 | open — mechanism read in source, not instrumented |
+| F-BIDI | #94 | open — iOS bidi layout |
+| F-NOFEEDBACK | #97 | open — Android in-flight state |
+| F-NOEXIT | #96 | open — three problems on one surface |
+| F-SAFEAREA | #95 | open — blocks the Lane 1a screenshot milestone |
+| F-PUSH | #98 | open — cross-repo, server-side cause not diagnosed |
+| F-DETAIL | not filed | product decision, not a code defect |
+| F-SSO | not filed | resolved during the run |
+| F-TABBAR | not filed | inside the known uncapped-`Text` set |
+| F-DEVERROR | not filed | closed against the operator |
+
+### F-TORCH — the torch does not re-arm after background/resume (iOS only) · step 1.5
+`src/components/scan/QrScanner.tsx` keeps `torchOn` across the background→foreground remount
+**deliberately** (its own comment says a dark ward is still dark). The pill therefore renders
+white while the LED is off — the UI asserts a hardware state that is not true.
+Mechanism, read from source rather than measured: our gate unmounts `<CameraView>` on
+background, so expo-camera's own `onAppForegrounded` re-apply path never runs (it is guarded on
+a session it paused itself). On the fresh mount the `enableTorch` prop assignment fires
+`enableTorch()`, which early-returns while the capture device is still being configured on the
+session queue — and nothing retries, because the prop never changes again.
+Android is immune: it re-applies torch during camera bind, which is why 1.4 passes.
+Cheap discriminator NOT run: toggle the torch off/on after resume — if it lights, only the
+mount-window application is lost.
+
+### F-BIDI — the bound UID renders split around its label (iOS only) · step 2.1
+The hex UID is broken into two pieces on opposite sides of the Hebrew label instead of being
+pinned left-to-right: a digit run and a letter run are reordered as separate bidi runs inside an
+RTL paragraph. An operator cannot read or transcribe a tag's UID. Android renders the same shape
+correctly (2.3), which narrows it to iOS text layout. A jest snapshot cannot catch this — jest
+does not run bidi layout.
+
+### F-NOFEEDBACK — no "present the tag now" state on Android · step 2.3
+`src/components/equipment/detail/NfcProvisionCard.tsx` derives a `busy` flag from the mutation
+and its only visual consequence is dimming the buttons to 40% opacity. iOS never exposes the gap
+because the OS supplies its own "hold the sticker" sheet; Android reader mode has no system UI,
+so nothing tells the user the session is open. Observed cost: the owner reported the button as
+"not working" while the log showed the session had opened correctly and was waiting. The same
+gap cost time twice in one evening (also at 1.2, reported as a "never ending spinner").
+
+### F-NOEXIT — the confirm sheet has no visible exit on success · step 2.2
+`src/screens/CheckoutConfirm.tsx`: on success the confirm button renders null and the cancel
+button — the only control that navigates back — is REPLACED by undo. The backdrop is
+`pointerEvents="none"`. The remaining exit is a pan-down gesture whose touch target is almost
+entirely covered by the full-width button, which swallows the drag; it only worked once started
+from the grab handle. And the dismiss itself calls `goBack()` with no exit animation, so the
+drag's position and the backdrop fade are discarded and the navigator's pop reads as a jump.
+Entry IS animated; only the exit is a hard cut. Three separate problems, all on the success path.
+
+### F-SAFEAREA — the equipment tab ignores the top safe-area inset
+`src/navigation/MainTabs.tsx`: the equipment tab wrapper renders the list screen with no
+inset wrapper, while its sibling tab wrapper applies `paddingTop: insets.top` and the comment
+directly above states that tab wrappers own the top inset. The search header therefore renders
+under the status bar. Single omission, single location; the same list reached via a stack push
+(which has a native header) renders correctly.
+
+### F-DETAIL — no list on a phone reaches equipment detail
+`src/screens/EquipmentListScreen.tsx` documents the phone row press → ScanConfirm behaviour as
+deliberate. The consequence is broader than it reads: the equipment tab AND the exceptions card
+both land on that same list, so every route that *shows* equipment leads to checkout. Detail is
+reachable only from quick search, the activity feed, and alerts. The owner hit this three times
+in one evening on two devices, each time expecting the device's details — discoverability data,
+not a code defect. Worth a product decision.
+
+### F-SSO — production SSO redirect was not allowlisted (RESOLVED during the run)
+Apple/Google sign-in failed against the production Clerk instance with an unauthorized-redirect
+error for every user, store build included. The app derives its redirect implicitly from the
+scheme rather than passing one explicitly, which is why nothing caught it before a device run.
+The owner added the redirect to the dashboard mid-session and Apple sign-in was then verified
+working on device; Android was later shown to use the SAME redirect, so one entry covers both.
+Residual work (pin the redirect in code, surface config faults distinguishably) is tracked
+separately.
+
+### F-PUSH — push registration fails against production
+The client's initial push registration is rejected server-side and logged as non-fatal, so
+nothing crashes. It sits on the Critical Alerts path, which is an open gate. Not investigated
+further during this run.
+
+### F-TABBAR — tab labels vanish at maximum accessibility text size
+At iOS AX5 the tab bar's labels disappear entirely, leaving bare glyphs. This falls inside the
+known set of uncapped `Text` imports, but it is navigation rather than content, and that set
+also still includes the Code Blue path. Step 1.7 says explicitly not to file uncapped text at
+AX5, which is why this is recorded rather than filed — the exception worth a second look is
+that three of the four tab labels vanish, and that is navigation.
+
+### F-DEVERROR — a dev-only render error, closed against the operator
+A render error seen mid-run did NOT recur across the background/resume cycle, which isolates
+the trigger to a Metro swap performed by the operator rather than to the app. Recorded so the
+next reader does not chase it as an app defect; no issue filed, deliberately.

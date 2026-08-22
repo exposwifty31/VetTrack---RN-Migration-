@@ -46,7 +46,7 @@ import {
 import { hasRoleAtLeast } from "@/lib/roles";
 import type { EquipmentDetail } from "@/types/api";
 
-import { PrimaryButton, QuietButton, SectionTitle } from "./DetailBits";
+import { ltrIsolate, PrimaryButton, QuietButton, SectionTitle } from "./DetailBits";
 
 /**
  * Every string this card can render as feedback, as a LITERAL union rather than
@@ -205,13 +205,17 @@ export function NfcProvisionCard({ detail }: Readonly<{ detail: EquipmentDetail 
         <Text
           testID="nfc-bound-state"
           className="font-rubik text-[13px] text-muted"
-          // A tag UID is guaranteed-Latin hex — pin it LTR inside RTL copy, the
-          // KeyValueRow `ltr` idiom.
-          style={detail.nfcTagId ? { writingDirection: "ltr" } : undefined}
           selectable={!!detail.nfcTagId}
         >
+          {/* The UID is guaranteed-Latin hex interpolated INTO an RTL sentence,
+              so it is LRI…PDI isolated (the CustodyCard/HistoryCard idiom) — not
+              given `writingDirection: "ltr"`. That prop belongs on a value-only
+              paragraph (the KeyValueRow `ltr` case); applied to the whole
+              interpolated sentence it flips the paragraph's bidi direction, and
+              the UID's leading digit run resolved to the far side of the Hebrew
+              label — the operator saw the UID split in two (#94). */}
           {detail.nfcTagId
-            ? t("equipmentDetail.nfc.bound", { tagId: detail.nfcTagId })
+            ? t("equipmentDetail.nfc.bound", { tagId: ltrIsolate(detail.nfcTagId) })
             : t("equipmentDetail.nfc.notBound")}
         </Text>
 

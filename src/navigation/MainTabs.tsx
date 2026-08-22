@@ -32,10 +32,21 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
  * stack (it is ALSO still registered there for the NFC advisory fallback).
  * The runtime navigation object of a nested tab reaches the same root stack
  * routes, so the cast is behavior-preserving.
+ * Tab mode has no native header, so this wrapper owns the top safe-area inset;
+ * without it the search header painted under the status bar (W3B run
+ * 2026-08-21). Reached instead via a stack push, the screen keeps its native
+ * header and this wrapper is not in play.
  */
-function EquipmentTabScreen(props: MainTabScreenProps<"EquipmentTab">) {
+export function EquipmentTabScreen(props: MainTabScreenProps<"EquipmentTab">) {
+  const insets = useSafeAreaInsets();
   return (
-    <EquipmentListScreen {...(props as unknown as RootStackScreenProps<"EquipmentList">)} />
+    <View
+      testID="equipment-tab-root"
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+    >
+      <EquipmentListScreen {...(props as unknown as RootStackScreenProps<"EquipmentList">)} />
+    </View>
   );
 }
 
