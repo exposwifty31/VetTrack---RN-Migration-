@@ -1,0 +1,68 @@
+---
+description: Swift 6 and SwiftUI — value semantics, strict concurrency, Observation, view composition, and Apple platform conventions.
+globs: **/*.swift,**/*.xcodeproj/**,Package.swift
+alwaysApply: false
+---
+
+# Swift & SwiftUI
+
+Swift 6 with strict concurrency checking on. The compiler errors it produces are real data races it found — treat them as bugs, not obstacles.
+
+## Value Semantics First
+
+`struct` and `enum` by default. Reach for `class` only for identity, reference sharing, or Objective-C interop.
+
+- `let` unless mutation is required.
+- Enums with associated values for state. Make invalid states unconstructible rather than guarding against them.
+- Protocol-oriented design: small protocols with default implementations in extensions, not deep class hierarchies.
+- `some` (opaque types) for return values, `any` (existentials) only when heterogeneous storage is genuinely needed — existentials cost a heap box and dynamic dispatch.
+
+## Concurrency
+
+- `@MainActor` on anything touching UI. Annotate the type, not each method.
+- `async/await` over completion handlers. Bridge legacy APIs with `withCheckedContinuation` — and resume the continuation exactly once on every path.
+- `async let` or a `TaskGroup` for parallel work. Sequential `await`s that do not depend on each other are latency you chose.
+- `Sendable` conformance is a promise about thread safety. Do not silence the warning with `@unchecked Sendable` unless you can name the mechanism that makes it safe.
+- Tasks started in a view are cancelled when it disappears — use `.task {}`, not `onAppear { Task { ... } }`, which leaks.
+
+## Observation
+
+`@Observable` replaces `ObservableObject`/`@Published`. It tracks property access at the field level, so a view re-renders only for the properties it actually read.
+
+```swift
+@Observable final class CartModel {
+    private(set) var items: [Item] = []
+    var total: Decimal { items.reduce(0) { $0 + $1.price } }   // computed, never stored+synced
+}
+```
+
+- `@State` for view-owned value state and for `@Observable` objects the view creates.
+- `@Bindable` when you need two-way bindings into an observable object.
+- `@Environment` for dependencies passed down a deep tree.
+- Derived values are computed properties. A stored property kept in sync by hand will desync.
+
+## Views
+
+- A view is a lightweight description, recreated constantly. Never do expensive work in `body`.
+- Extract subviews aggressively. `body` past ~50 lines is a composition problem, and `@ViewBuilder` extraction is free.
+- Stable, unique `id` in `ForEach` — index-based identity corrupts state on reorder.
+- `LazyVStack`/`List` for long content; a plain `VStack` builds every child immediately.
+- `.animation(_:value:)` scoped to a specific value, not the implicit whole-view form.
+- Modifier order matters: `.padding().background()` and `.background().padding()` render differently. Read them as wrapping, outward.
+
+## Platform Conventions
+
+- Dynamic Type support — never a fixed font size. Test at the largest accessibility size.
+- Semantic colors (`Color.primary`, `.secondarySystemBackground`) so dark mode and high contrast work for free.
+- SF Symbols with correct rendering modes and semantic weight.
+- Safe areas via the environment, never hardcoded insets.
+- VoiceOver labels on every non-decorative element; `.accessibilityHidden(true)` on decorative ones.
+- Respect Reduce Motion and Reduce Transparency.
+
+## NEVER
+
+- Force unwrap (`!`) outside a test or a provably-safe invariant with a comment.
+- Force try (`try!`) or `as!`.
+- Blocking the main thread with synchronous IO.
+- A retain cycle in a closure — `[weak self]` where the closure outlives the object.
+- Business logic in `body`.

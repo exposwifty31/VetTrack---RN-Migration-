@@ -1,0 +1,65 @@
+---
+description: Unit and integration testing — Vitest/Jest/pytest. What to test, what to mock, and how to write tests that survive refactoring.
+globs: **/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/test_*.py,**/*_test.go,**/__tests__/**
+alwaysApply: false
+---
+
+# Testing
+
+## Test Behavior, Not Implementation
+
+A test that breaks when you rename a private method — without any behavior changing — is a liability. It taxes every refactor and teaches the team to distrust the suite.
+
+Assert on: return values, rendered output, persisted state, emitted events, and calls to genuine external boundaries.
+Do not assert on: internal call counts, private state, or the order of operations that has no observable effect.
+
+## Structure
+
+```ts
+it('rejects a booking when the slot is already taken', async () => {
+  const slot = await seedSlot({ takenBy: 'user-1' })       // Arrange
+  const result = await bookSlot(slot.id, 'user-2')         // Act
+  expect(result).toEqual({ ok: false, reason: 'SLOT_TAKEN' })  // Assert
+})
+```
+
+- The name states the behavior and the condition. `it('works')` tells a future reader nothing when it fails at 2am.
+- One logical assertion per test. Several `expect`s describing one outcome is fine; testing three unrelated behaviors is not.
+- No conditionals or loops in a test body. If a test needs an `if`, it is two tests.
+- No shared mutable state between tests. Each one must pass when run alone and in any order.
+
+## The Shape of the Suite
+
+- **Many** fast unit tests over pure logic: calculations, reducers, validators, parsers. These are where edge cases belong.
+- **Some** integration tests over real seams: a route through to a real (test) database, a component with its real store. These catch the bugs unit tests structurally cannot.
+- **Few** end-to-end tests over critical user journeys only. They are slow and flaky in proportion to their number.
+
+Coverage percentage is a diagnostic, not a target. 100% coverage of getters proves nothing; a single test of the money-rounding path is worth more than a hundred of them.
+
+## Mocking
+
+Mock at the **boundary you do not own**: third-party HTTP, payment gateways, clocks, randomness, the filesystem.
+
+Do not mock your own modules to make a test easier. A test with five mocks tests the mocks. If a unit is hard to test without heavy mocking, the unit has too many dependencies — that is the real finding.
+
+- Prefer a fake (an in-memory implementation) over a mock with programmed expectations. Fakes survive refactors.
+- Intercept HTTP at the network layer (MSW, `responses`) instead of stubbing your own client.
+- Freeze time explicitly. A test that fails at midnight or in another timezone will be deleted rather than fixed.
+
+## Component Tests
+
+Query by accessible role and name — `getByRole('button', { name: /save/i })`. This tests what a screen-reader user perceives, so it doubles as an accessibility check. Test ids are a last resort for elements with no accessible identity.
+
+Never assert on class names or DOM structure. Use `findBy*` for async appearance, never a fixed `sleep`.
+
+## Failing First
+
+For a bug fix: write the test that reproduces it and watch it fail **before** the fix. A test written after the fix proves only that you can write a test that passes.
+
+## NEVER
+
+- `.skip` or `.only` committed.
+- A sleep to wait for async work.
+- Tests that depend on execution order.
+- Asserting on a snapshot nobody reads — an unreviewed snapshot update is just noise.
+- Weakening an assertion or deleting a test to get CI green.

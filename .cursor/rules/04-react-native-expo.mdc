@@ -1,0 +1,68 @@
+---
+description: React Native with Expo — New Architecture, navigation, lists, animations, native modules, offline behavior, and 60fps discipline.
+globs: **/*.native.tsx,app/**/*.tsx,src/**/*.tsx,app.json,app.config.*,eas.json,metro.config.js
+alwaysApply: false
+---
+
+# React Native + Expo
+
+Assume Expo SDK 52+, New Architecture (Fabric + TurboModules) enabled, Hermes, and expo-router.
+
+## Two Threads, One Rule
+
+The JS thread runs your logic; the UI thread paints frames. Anything that blocks JS for more than ~16ms drops a frame. Users do not read your profiler — they feel the stutter.
+
+- Animations run on the UI thread via **Reanimated worklets**. The `Animated` API from core drives most animations through JS — avoid it for anything gesture-driven.
+- `useAnimatedStyle`, `useSharedValue`, `withSpring` — a shared value mutation never triggers a React render, which is the point.
+- Gestures via `react-native-gesture-handler`, not `PanResponder`.
+- Heavy computation goes into `InteractionManager.runAfterInteractions` or off-thread entirely.
+
+## Lists
+
+`FlatList` degrades past a few hundred rows. Use **FlashList** and give it a real `estimatedItemSize` — a wrong estimate is worse than none.
+
+- Row components are `memo`'d with a stable `keyExtractor`.
+- Never an inline arrow in `renderItem` — it invalidates memoization on every parent render.
+- Fixed row heights wherever the design allows; dynamic measurement is the expensive path.
+
+## Navigation
+
+expo-router, file-based, typed routes on.
+
+- `_layout.tsx` per segment; `(tabs)`, `(auth)`, `(modal)` groups for structure without URL noise.
+- `<Redirect>` for auth gating, not an imperative `router.replace` inside an effect — the effect version flashes protected content first.
+- Deep links declared in `app.json` and tested on a real device before shipping.
+
+## Platform Differences Are Real
+
+- `Platform.select` for values; separate `.ios.tsx` / `.android.tsx` files when the divergence is structural.
+- Safe areas via `react-native-safe-area-context`. Never a hardcoded status-bar height.
+- Android back button, iOS swipe-back, keyboard avoidance, and haptics all need explicit handling.
+- Shadows: `shadowColor`/`shadowOffset` on iOS, `elevation` on Android. Neither is a substitute for the other.
+
+## Offline Is the Default State
+
+Mobile networks fail constantly. Design for it rather than treating it as an error case.
+
+- Persisted query cache so the app opens with data.
+- Mutations queue and replay; every write carries a client-generated idempotency key.
+- Optimistic updates with a real rollback path.
+- Reachability changes are a UI state, not a toast.
+
+## Native Modules
+
+Prefer an Expo package. If you must write native code, use **Expo Modules API** (Swift/Kotlin) with a config plugin — not manual `ios/` and `android/` edits, which a prebuild will overwrite.
+
+## Performance Discipline
+
+- Never report a perf number you did not measure. "Feels faster" is not a metric — use the profiler and report p95 frame time and dropped-frame counts.
+- Measure on a **low-end Android device**, not a simulator on an M-series Mac.
+- Track bundle size per release; check for accidental full-library imports (`lodash`, icon packs).
+
+## NEVER
+
+- `console.log` left in a shipped bundle — it crosses the bridge on every call.
+- `require` of a remote image without dimensions.
+- Inline styles recreated per render — hoist to `StyleSheet.create`.
+- Secrets in `app.json`/`app.config.js` — anything bundled is extractable from the IPA/APK.
+- `alert()` — it is not a React Native API.
