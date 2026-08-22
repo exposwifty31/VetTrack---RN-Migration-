@@ -245,9 +245,36 @@ blocks the very upload needed to satisfy it is not a gate.
 Consequence while unresolved: a deep link opens the browser instead of the app.
 It is not a review rejection and not a launch failure.
 
+### The Play wait-state — what it blocks, and what it does not
+
+The developer account is `danerez5@gmail.com`. It is a **personal** account, which
+is what makes `docs/G3-PLAN.md` §7 P5 apply. Its **identity verification is in
+flight with Google** (owner report, 2026-08-22; Google quoted days, not weeks).
+Nothing in this repo shortens that queue.
+
+The failure mode this table exists to prevent is treating the whole Android lane —
+and by extension the whole store push — as blocked, when only one column of it is.
+
+| Blocked until Google approves identity | Not blocked — do it now |
+|---|---|
+| The first AAB upload | The iOS store section: screenshots, metadata, age rating, privacy manifest |
+| The Play App Signing SHA-256, and therefore App Links (steps 2–5 below) | The G3 owner protocol (`docs/g3-results.md` §5) on both devices |
+| Recruiting into a track that does not exist yet | Diagnosing the push-subscribe failure (#98) |
+| Applying for Android production access | Source control, the 3.0 document, and the tech-debt PRs |
+
+Two things are worth starting **before** approval even though they belong to the
+blocked column: lining up twelve people with real Android devices, and writing the
+tester-facing instructions. Neither needs a Play account, and both are the part
+that actually sets the date — the upload is half an hour, the fourteen days of
+genuine use are not.
+
+**Sequence once approval lands:** upload the AAB to `alpha` → Google approves the
+release → ≥12 testers opt in → 14 continuous days of genuine use → only then apply
+for production access.
+
 ### Owner actions, in order
 
-1. Upload the first AAB. ~~(internal track is enough)~~ *Corrected 2026-08-22:* internal is enough **for this step** — any upload generates the Play App Signing key. It is **not** enough for the closed-testing requirement in `docs/G3-PLAN.md` §7 P5, which the owner confirmed applies to this account on 2026-08-22, and which only a **closed** track satisfies. Upload to the closed track (`alpha`) and both are served by one upload; upload to `internal` and the 14-day clock silently never starts.
+1. **Blocked until Google finishes identity verification** (see the wait-state above). Then upload the first AAB. ~~(internal track is enough)~~ *Corrected 2026-08-22:* internal is enough **for this step** — any upload generates the Play App Signing key. It is **not** enough for the closed-testing requirement in `docs/G3-PLAN.md` §7 P5, which only a **closed** track satisfies. ~~*Corrected later the same day:* the replacement account is **not registered yet**, so account type is not a fact.~~ *Settled 2026-08-22:* the replacement account is `danerez5@gmail.com` and it is **personal**, so P5 applies and the closed track is not merely the safe choice but the required one. Upload to `alpha`; upload to `internal` and the 14-day clock silently never starts.
 2. Play Console → your app → **Test and release → Setup → App integrity → App
    signing** → copy the *App signing key certificate* SHA-256 (upper-case,
    colon-separated). The same page emits a ready-made Digital Asset Links JSON

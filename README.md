@@ -31,7 +31,7 @@ repo); the table below is the repo-visible summary of gate status.
 
 | Gate | State |
 |---|---|
-| **G1 — Foundation** | **code complete; hardware verification open** — slices 0–7 merged to `main` (incl. 5 SSE + 6 i18n/RTL); CI (typecheck + test) green. Not labelled *done*: `AGENTS.md` §Working conventions requires a physical-device pass before native-module work counts, and slice 8's NFC real-tag read is unrun. Capability shipped in W3b (PR #68); `docs/device-test-w3b.md` is the written protocol with every result box unticked. |
+| **G1 — Foundation** | **code complete; lock still open** — slices 0–7 merged to `main` (incl. 5 SSE + 6 i18n/RTL); CI (typecheck + test) green. W3B stages 0–2 ran 2026-08-21 (`docs/device-test-w3b.md`; attested `nfc-write-readback-verified`): `writeNdefMessage` invoked on both platforms. Slice 8 lock (`makeReadOnly` / `queryNDEFStatus`) is still unrun — zero tags locked. Not labelled *done*: `AGENTS.md` §Working conventions requires a physical-device pass, and Stage 3 has not run. |
 | **G2 — Hero flow (delight)** | **PASSED 2026-08-07** — pre-registration v2 lock `63c36b3` (PR #17): O1 pooled UI p95 11.09ms · O2 0/2886 dropped · O3 0.2–1.4ms · O4 cold-to-Home median 260ms · S1 owner verdict "RN"; O5 waived (declared deviation). Record: `docs/g2-preregistration.md` + `docs/g2-results.csv` + `docs/g2-raw/` |
 | **G2.5 — Design language** | **implementation complete 2026-08-07** — Aurora shipped across Home + equipment list + checkout sheet (PRs #19/#21); exit bar passed on-device (UI pooled p95 11.08 ms, 0/2849 drops — `docs/g2_5-results.md`, PR #20). Open: combined three-screen device pass + light-theme seam. Scope + exit bar: `DESIGN-LANGUAGE.md` |
 | G3 — Daily-driver parity | **code complete; owner gate open** — all 13 slices merged. Automatable half of the exit checklist passed (`docs/g3-results.md` §1 items 2/3/4); Slice 13 iPad recorded in §7. The three on-device items (items 1/5/6) are unrun: `docs/g3-results.md:214-218` still reads "… to be filled by the owner …" for both Pixel 7 and iPhone 16 Plus. **This unfilled verdict is the gate the whole ladder is waiting on.** |
@@ -44,10 +44,10 @@ All foundation slices are merged to `main`: 0 (baseline), 1 (nav + Zustand), 1b 
 2 (fail-loud MMKV storage port), 3 (Clerk-Expo auth), 4 (API client + TanStack Query),
 5 (SSE, foreground-only), 6 (i18n + RTL), 7 (contracts/shared + Metro `.js`→`.ts` resolver).
 `tsc` is clean and CI (typecheck + test) is green on `main`. The one open G1 item is slice 8
-(NFC real-tag read). **Status corrected 2026-08-20:** it is no longer blocked on *capability* —
-W3b (PR #68) shipped NFC write + lock, so the app can program a sticker — but the read itself is
-still unproven on hardware. `docs/device-test-w3b.md` is the written protocol and its result boxes
-are all unticked; the doc states plainly at line 5 that the result "is untested — not passed".
+(NFC lock). **Status corrected 2026-08-22:** ~~"every W3B result box unticked / the result is
+untested"~~ is stale. Stages 0–2 ran on 2026-08-21 (`docs/device-test-w3b.md:1-28`); write +
+readback is attested (`nfc-write-readback-verified`). What remains unrun is Stage 3 — lock —
+and that is why zero of ten tags are permanently locked.
 
 ### NFC de-risk (done — kept here as reference)
 
