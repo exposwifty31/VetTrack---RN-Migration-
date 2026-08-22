@@ -415,6 +415,10 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
         <AlertsDropdownList
           rows={dropdownAlerts}
           isLoading={alertsEquipmentQuery.isPending}
+          // Equipment drives the alert set; an ack-list failure degrades to
+          // "unclaimed" rows rather than hiding alerts, matching AlertsScreen.
+          isError={alertsEquipmentQuery.isError}
+          onRetry={() => void alertsEquipmentQuery.refetch()}
           onRowPress={(equipmentId) => {
             setOpenDropdown(null);
             navigation.navigate("EquipmentDetail", { equipmentId });

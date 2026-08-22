@@ -148,7 +148,9 @@
     "alertsDropdownAll": "לחץ לכל ההתראות",
     "alertsDropdownEmpty": "אין התראות פתוחות",
     "settingsDropdownAll": "כל ההגדרות",
-    "dropdownCloseA11y": "סגירה"
+    "dropdownCloseA11y": "סגירה",
+    "alertsDropdownError": "לא ניתן לטעון התראות",
+    "alertsDropdownRetry": "נסה שוב"
   },
   "tabs": {
     "today": "היום",
