@@ -65,12 +65,14 @@ npm run release:preflight   # the same plus the networked half (needs EXPO_TOKEN
 ```
 
 **`lint` and `release:preflight:offline` are CI-enforced, but only indirectly — which is exactly why
-they are easy to miss.** Neither has a `run:` line of its own in `.github/workflows/ci.yml` —
-grepping it finds them only inside a step *name*, `Evidence gates (typecheck + lint + release
-config)`, which is not what executes them. That step runs `npm run verify:evidence`, which executes
-the gates declared in `verify.config.json` — among them `lint` (`verify.config.json:71-72`) and
-`release-preflight-offline` (`verify.config.json:75-76`). A slice that passes `typecheck` + `test` can still be
-refused by either, so run both before pushing.
+they are easy to miss.** Neither command appears anywhere in `.github/workflows/ci.yml`: grepping it
+for `npm run lint`, `max-warnings` or `release:preflight:offline` returns nothing at all. The word
+"lint" is in that file twice — once in an explanatory comment, once in the step *name* `Evidence
+gates (typecheck + lint + release config)` — and neither of those is what executes them. That step's
+`run:` line is `npm run verify:evidence`, which executes the gates declared in `verify.config.json` —
+among them `lint` (`verify.config.json:71-72`) and `release-preflight-offline`
+(`verify.config.json:75-76`). A slice that passes `typecheck` + `test` can still be refused by
+either, so run both before pushing.
 
 **Native builds go through Expo prebuild** (`expo run:ios` / `expo run:android` regenerate `ios/`+`android/` from
 `app.json`). Never commit the native dirs and never edit them by hand — change `app.json` / config plugins instead.
