@@ -54,7 +54,8 @@ RN's equivalents of logical CSS properties. Use these, not `marginLeft`/`marginR
 - `textAlign: 'auto'` (the default) follows the text's own direction. **Never hardcode `'left'`** — it will not flip.
 - `writingDirection: 'ltr'` on a `<Text>` to pin a value that must not reorder: phone numbers, IDs, IBANs, codes, version strings.
 - User-generated content of unknown direction gets `textAlign: 'auto'` and no forced `writingDirection`.
-- `<TextInput>` inherits direction from the value in most cases, but set `textAlign="auto"` explicitly on fields that may receive Latin input inside a Hebrew UI — an email field is the canonical case.
+- `<TextInput>` inherits direction from the value in most cases. Set `textAlign="auto"` explicitly on free-text fields that may receive Latin input inside a Hebrew UI.
+- Fixed-format fields are the exception: a phone number, IBAN, or account number contains no strong directional character, so auto-detection falls back to the base direction and renders RTL. Pin those to LTR (`textAlign: 'left'` with `writingDirection: 'ltr'`) rather than leaving them to auto.
 
 ## What Does Not Auto-Flip
 
