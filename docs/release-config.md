@@ -187,12 +187,24 @@ lane ships 29 before the acceptance run, raise the floor here to 29 **and** move
 `docs/ota-acceptance.md` as 30/31. The gate will catch it either way — this note
 exists so it is caught before the build minutes, not after.
 
-**The floor mirrors App Store truth, and that truth is recorded in the other
-lane** — `vettrack/ios/.last-shipped-build`. After an upload from either lane,
-both halves move together: raise the floor here, then raise the *other* lane's
-local number above it. Once this repo ships 30, the Capacitor lane goes from 29
-to 31. Doing only the first half is what turns a shared counter into a
-collision, which is why the rule is written here instead of remembered.
+**The floor mirrors App Store truth, and that truth is recorded twice** — as
+`scripts/release-config/ios-shipped-build-floor` here and
+`vettrack/ios/.last-shipped-build` in the Capacitor lane. Each lane's gate reads
+its own copy (`checkShippedBuildFloor()` here;
+`vettrack/scripts/verify-resubmission-static.sh` there), so the two must never hold different numbers.
+
+**The trigger is App Store Connect ACCEPTING a build, not an upload.** The
+acceptance run in `docs/ota-acceptance.md` is an internal `preview` build: it
+uploads to EAS and permanently consumes the number there, but never reaches App
+Store Connect. It must move **neither** shipped-build record. Raising a floor for
+a build App Store Connect never saw burns the next number for nothing.
+
+When App Store Connect does accept a build from either lane, three things move
+together: set **both** records to the accepted number, then raise the *other*
+lane's local number above it. Once this repo ships 30, both records read 30 and
+the Capacitor lane goes from 29 to 31. Doing only part of it is what turns a
+shared counter into a collision — and updating one record but not the other
+re-creates that collision one gate later, because each lane checks its own copy.
 
 ---
 
