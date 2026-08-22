@@ -56,10 +56,24 @@ three names, `preview` and `development` hold zero.
 `app.config.js` sets `android.googleServicesFile` from it and falls back to
 `./google-services.json`, which is gitignored and absent from a clean checkout.
 
-*Mechanism, not an observation* — zero Android builds have ever run on this EAS
-project, so there is no empirical data point. An Android build on `preview` or
+~~*Mechanism, not an observation* — zero Android builds have ever run on this EAS
+project, so there is no empirical data point.~~ An Android build on `preview` or
 `development` resolves an environment with no variables and should fail at
 **config resolution (build time)**, not at launch.
+
+*Corrected 2026-08-22 — there is an empirical data point now, and the mechanism was
+right.* `npx expo prebuild -p android --no-install` on a clean checkout with no
+`GOOGLE_SERVICES_JSON` in the environment fails exactly where predicted, in the
+config-plugin phase rather than at launch:
+
+```text
+[android.dangerous]: withAndroidDangerousBaseMod: Cannot copy google-services.json
+```
+
+It fails **late** — the Android project is written first, and only the dangerous mod
+throws — so the tree is left holding a half-configured `android/` that a subsequent
+command will happily build against. That is the part worth knowing before the first
+AAB: the failure is loud, but what it leaves behind is not.
 
 It is registered as a reported gap rather than a requirement: failing every build
 for an unexercised path is the false alarm that teaches people to ignore red.
@@ -233,7 +247,7 @@ It is not a review rejection and not a launch failure.
 
 ### Owner actions, in order
 
-1. Upload the first AAB (internal track is enough).
+1. Upload the first AAB. ~~(internal track is enough)~~ *Corrected 2026-08-22:* internal is enough **for this step** — any upload generates the Play App Signing key. It is **not** enough for the closed-testing requirement in `docs/G3-PLAN.md` §7 P5, which the owner confirmed applies to this account on 2026-08-22, and which only a **closed** track satisfies. Upload to the closed track (`alpha`) and both are served by one upload; upload to `internal` and the 14-day clock silently never starts.
 2. Play Console → your app → **Test and release → Setup → App integrity → App
    signing** → copy the *App signing key certificate* SHA-256 (upper-case,
    colon-separated). The same page emits a ready-made Digital Asset Links JSON
