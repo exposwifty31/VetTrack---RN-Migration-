@@ -144,7 +144,13 @@
     "settingsA11y": "הגדרות",
     "chatA11y": "צ'אט משמרת",
     "attentionAllA11y": "כל ההתראות",
-    "alertsA11y": "התראות"
+    "alertsA11y": "התראות",
+    "alertsDropdownAll": "לחץ לכל ההתראות",
+    "alertsDropdownEmpty": "אין התראות פתוחות",
+    "settingsDropdownAll": "כל ההגדרות",
+    "dropdownCloseA11y": "סגירה",
+    "alertsDropdownError": "לא ניתן לטעון התראות",
+    "alertsDropdownRetry": "נסה שוב"
   },
   "tabs": {
     "today": "היום",

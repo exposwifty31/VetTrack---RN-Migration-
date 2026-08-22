@@ -25,6 +25,14 @@
  * (dim backdrop + opaque surface), so it adds no blur layer.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { alertAcksApi, alertAckKeys } from "@/lib/api/alert-acks";
+import { ALERTS_EQUIPMENT_KEY, fetchAlertEquipment } from "@/lib/alerts-source";
+import { deriveAlertsView } from "@/lib/alerts-derive";
+import { selectDropdownAlerts } from "@/components/home/dropdown-rows";
+import { TopBarDropdown } from "@/components/home/TopBarDropdown";
+import { AlertsDropdownList } from "@/components/home/AlertsDropdownList";
+import { SettingsDropdownList } from "@/components/home/SettingsDropdownList";
 import type { ReactNode } from "react";
 import { View, useWindowDimensions } from "react-native";
 import type { ListRenderItem } from "@shopify/flash-list";
@@ -131,6 +139,7 @@ function BentoRow({
 export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
   const insets = useSafeAreaInsets();
   const identity = useIdentity();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   useEquipmentRealtimeSync();
   useRealtimeInvalidation(homePulseInvalidationSpec());
@@ -170,6 +179,36 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
     () => (items ? deriveExceptions(items, sampledAtMs) : []),
     [items, sampledAtMs],
   );
+
+  // ---- Top-bar dropdowns (bell / gear) ----------------------------------
+  // The bell and gear open a peek in place instead of navigating away; the
+  // footer link is the way through to the full page.
+  const [openDropdown, setOpenDropdown] = useState<"alerts" | "settings" | null>(null);
+
+  // Same key + fetcher as AlertsScreen, so the dropdown and the page can never
+  // show different alert sets, and opening the dropdown warms the page.
+  const alertsEquipmentQuery = useQuery({
+    queryKey: ALERTS_EQUIPMENT_KEY,
+    queryFn: fetchAlertEquipment,
+    enabled: openDropdown === "alerts",
+  });
+  // Acks are secondary: a failure still renders alerts (every row "unclaimed"),
+  // mirroring the AlertsScreen degrade rather than blanking the dropdown.
+  const alertAcksQuery = useQuery({
+    queryKey: alertAckKeys.list(),
+    queryFn: alertAcksApi.list,
+    enabled: openDropdown === "alerts",
+  });
+  const dropdownAlerts = useMemo(() => {
+    if (!alertsEquipmentQuery.data) return [];
+    return selectDropdownAlerts(
+      deriveAlertsView(
+        alertsEquipmentQuery.data,
+        alertAcksQuery.data,
+        alertsEquipmentQuery.dataUpdatedAt,
+      ),
+    );
+  }, [alertsEquipmentQuery.data, alertAcksQuery.data, alertsEquipmentQuery.dataUpdatedAt]);
 
   // ---- G3 Slice 5: daily pulse ------------------------------------------
 
@@ -362,10 +401,39 @@ export function HomeScreen({ navigation }: MainTabScreenProps<"Today">) {
         // G2.5 data seam: no notifications API yet — badge stays hidden.
         unreadCount={undefined}
         onSearchPress={() => setSearchOpen(true)}
-        onBellPress={() => navigation.navigate("Alerts")}
-        onSettingsPress={() => navigation.navigate("Settings")}
+        onBellPress={() => setOpenDropdown("alerts")}
+        onSettingsPress={() => setOpenDropdown("settings")}
         onChatPress={() => navigation.navigate("ShiftChat")}
       />
+      <TopBarDropdown
+        visible={openDropdown === "alerts"}
+        onClose={() => setOpenDropdown(null)}
+        topInset={insets.top}
+        footerLabel={t("aurora.alertsDropdownAll")}
+        onFooterPress={() => navigation.navigate("Alerts")}
+      >
+        <AlertsDropdownList
+          rows={dropdownAlerts}
+          isLoading={alertsEquipmentQuery.isPending}
+          // Equipment drives the alert set; an ack-list failure degrades to
+          // "unclaimed" rows rather than hiding alerts, matching AlertsScreen.
+          isError={alertsEquipmentQuery.isError}
+          onRetry={() => void alertsEquipmentQuery.refetch()}
+          onRowPress={(equipmentId) => {
+            setOpenDropdown(null);
+            navigation.navigate("EquipmentDetail", { equipmentId });
+          }}
+        />
+      </TopBarDropdown>
+      <TopBarDropdown
+        visible={openDropdown === "settings"}
+        onClose={() => setOpenDropdown(null)}
+        topInset={insets.top}
+        footerLabel={t("aurora.settingsDropdownAll")}
+        onFooterPress={() => navigation.navigate("Settings")}
+      >
+        <SettingsDropdownList />
+      </TopBarDropdown>
       <ShiftAdjustmentSheet
         kind={sheetKind}
         shiftStart={clockTimeFromIso(dashboard?.shift?.startedAt)}

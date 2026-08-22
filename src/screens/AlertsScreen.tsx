@@ -43,7 +43,7 @@ import {
   alertAcksApi,
 } from "@/lib/api/alert-acks";
 import { ApiCodedError, retryUnlessClientError } from "@/lib/api/coded-error";
-import { api } from "@/lib/api";
+import { ALERTS_EQUIPMENT_KEY, fetchAlertEquipment } from "@/lib/alerts-source";
 import {
   alertAckKey,
   canManageAlerts,
@@ -59,21 +59,8 @@ import type { RootStackParamList } from "../navigation/types";
  * beyond 1000 equipment would derive alerts only for the first page — acceptable
  * for the daily-driver bar; the full-fleet paging path is out of G3 scope.
  */
-const EQUIPMENT_FLEET_LIMIT = 1000;
-const ALERTS_EQUIPMENT_KEY = ["equipment", "alerts-source"] as const;
 
 type AlertsNavigation = NativeStackNavigationProp<RootStackParamList, "Alerts">;
-
-async function fetchAlertEquipment(): Promise<EquipmentRow[]> {
-  const res = await api.equipment.list({ limit: EQUIPMENT_FLEET_LIMIT });
-  // Throw on a non-200 so React Query marks the query failed and the list shows
-  // its honest error state with retry — never a misleading "All clear" over an
-  // outage.
-  if (res.status !== 200) {
-    throw new Error(`EQUIPMENT_LIST_FAILED_${res.status}`);
-  }
-  return res.data.items;
-}
 
 type AlertActionErrorKey = "alerts.actionError" | "alerts.actionForbidden";
 

@@ -143,7 +143,13 @@
     "settingsA11y": "Settings",
     "chatA11y": "Shift chat",
     "attentionAllA11y": "All alerts",
-    "alertsA11y": "Alerts"
+    "alertsA11y": "Alerts",
+    "alertsDropdownAll": "Tap for all alerts",
+    "alertsDropdownEmpty": "No open alerts",
+    "settingsDropdownAll": "All settings",
+    "dropdownCloseA11y": "Close",
+    "alertsDropdownError": "Couldn't load alerts",
+    "alertsDropdownRetry": "Try again"
   },
   "tabs": {
     "today": "Today",
