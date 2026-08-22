@@ -33,7 +33,7 @@
     },
     {
       "id": "nfc-write-readback-verified",
-      "claim": "NFC read, WRITE and read-back all work on physical hardware — iPhone 16 Plus (iOS 26.6) and Pixel 7 (Android 16). A blank tag yields the correct no-id diagnostic on both; a written tag reads back to the correct unit through the app's own parser. The iOS write succeeded under a TAG-only reader session (includeNdefEntitlement false), so the NDEF format entitlement is NOT required to write. LOCKING IS NOT COVERED: makeReadOnly has never been invoked from this codebase. Re-verify by re-running stages 1 and 2 of the script.",
+      "claim": "NFC read, WRITE and read-back all work on physical hardware — iPhone 16 Plus (iOS 26.6) and Pixel 7 (Android 16). A blank tag yields the correct no-id diagnostic on both; a written tag reads back to the correct unit through the app's own parser. The iOS write succeeded under a TAG-only reader session (includeNdefEntitlement false), so the NDEF format entitlement is NOT required to write. LOCKING IS NOT COVERED: makeReadOnly has never run against a physical tag or the real native implementation — unit tests cover the bridge contract against mocks only. Re-verify by re-running stages 1 and 2 of the script.",
       "target": "physical-device",
       "evidence": "docs/device-test-w3b.md",
       "attestedBy": "repo owner, with device syslog and logcat corroboration recorded in the run log",

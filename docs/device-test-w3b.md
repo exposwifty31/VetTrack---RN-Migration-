@@ -10,7 +10,10 @@
 > nothing tested is version-gated — but it is why the on-device build string will not
 > match the repo.
 >
-> **`makeReadOnly` has still never been invoked from this codebase.**
+> **`makeReadOnly` has still never run against a physical tag or the real native
+> implementation.** Unit tests cover the bridge contract only
+> (`src/lib/__tests__/nfc-provision.test.ts` asserts `native.ndefHandler.makeReadOnly`
+> is called against a mock).
 > <!-- vt-claim: attested nfc-write-readback-verified -->
 > <!-- vt-claim: attested text-size-cap-selectable -->
 >
@@ -27,7 +30,9 @@
 >
 > **This run closed one of the three.** `writeNdefMessage` executed on both
 > platforms (2.1 iOS, 2.3 Android) and read back correctly. `makeReadOnly` and
-> `queryNDEFStatus` remain uninvoked: every Stage 3 step is recorded NOT RUN and
+> `queryNDEFStatus` have still never reached their real native implementations —
+> unit tests exercise the bridge contract against mocks, which is precisely what
+> this document exists to go beyond. Every Stage 3 step is recorded NOT RUN and
 > 2.7 is deferred. Those two are what a future session still has to prove.
 
 **Order is load-bearing.** Stage 1 writes nothing. Stage 2 writes tags that can
@@ -401,7 +406,7 @@ write for want of the NDEF format.
   reopens the duplicate-row hazard against a global unique index. Record the
   exact string.
 
-Result: ☑ pass ☐ fail — WRITE passed and the bind to the equipment row succeeded. **The entitlement question is answered: TAG-only is sufficient to WRITE** — no format or session-invalidation error with `includeNdefEntitlement: false`. UID rendered lowercase, so `normalizeTagUid` holds and the duplicate-row hazard does not reproduce. **The bound-line RENDER failed** — see the bidi finding below.
+Result: ☐ pass ☑ fail — SPLIT, on the 1.5 convention. WRITE passed and the bind to the equipment row succeeded. **The entitlement question is answered: TAG-only is sufficient to WRITE** — no format or session-invalidation error with `includeNdefEntitlement: false`. UID rendered lowercase, so `normalizeTagUid` holds and the duplicate-row hazard does not reproduce. **The bound-line RENDER failed** — see the bidi finding below.
 
 ### 2.2 — iPhone: read it back through the app's own parser
 
@@ -565,7 +570,7 @@ confirm block **disarms itself** (it disarms on every outcome, pass or fail).
   outcome guarantee is broken. High severity: it leaves a hot confirm one tap
   from destroying the next tag.
 
-Result: ☐ pass ☐ fail — NOT RUN. `makeReadOnly` has still never been invoked from this codebase.
+Result: ☐ pass ☐ fail — NOT RUN. `makeReadOnly` has still never run against a physical tag or the real native implementation.
 
 ### 3.2 — Re-lock the now-locked tag (the step a mock cannot stand in for)
 
@@ -625,8 +630,8 @@ Result: ☐ pass ☐ fail — NOT RUN.
 |---|---|---|
 | 0 — Gate | 0.1–0.5 | ☑ pass ☐ fail — 0.5 reached detail by deep link; the step's instruction has since been corrected to match |
 | 1 — Diagnostic (nothing written) | 1.1–1.7 | ☐ pass ☑ **fail** — 1.5 split: preview recovers, iOS torch does not re-arm (D1). 1.1–1.4, 1.6, 1.7 pass |
-| 2 — Reversible writes | 2.1–2.7 | ☐ pass ☐ fail ☑ **partial** — 2.1–2.4 pass; 2.5/2.6 not run (optional); **2.7 not run**, and it gates Stage 3. Stage 2 is not complete, so the "Stages 1 and 2 have passed" precondition for Stage 3 is NOT met |
-| 3 — Irreversible | 3.1–3.3 | ☐ pass ☐ fail ☑ not reached — deferred; `makeReadOnly` has still never been invoked from this codebase |
+| 2 — Reversible writes | 2.1–2.7 | ☐ pass ☐ fail ☑ **partial, with a failure** — **2.1 SPLIT**: write and bind pass, the required bound-line render fails (D2). 2.2–2.4 pass; 2.5/2.6 not run (optional); **2.7 not run**, and it gates Stage 3. Stage 2 is neither complete nor clean, so the "Stages 1 and 2 have passed" precondition for Stage 3 is NOT met |
+| 3 — Irreversible | 3.1–3.3 | ☐ pass ☐ fail ☑ not reached — deferred; `makeReadOnly` has still never run against a physical tag or the real native implementation |
 
 **Tags consumed:** 2 (`S2-iOS`, `S2-AND` — both rewritable).  **Tags permanently locked:** 0.
 
