@@ -24,6 +24,13 @@ export type MainTabParamList = {
 export type RootStackParamList = {
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   SignIn: undefined;
+  /**
+   * Held while Clerk restores a persisted session. A real route rather than a
+   * bare `null`, because a Stack.Navigator must always have at least one screen
+   * — and because rendering SignIn during the restore flashes it in front of a
+   * session that is about to come back.
+   */
+  AuthLoading: undefined;
   ApiSmoke: undefined;
   NfcSpike: undefined;
   StorageDebug: undefined;

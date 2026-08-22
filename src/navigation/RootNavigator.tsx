@@ -1,4 +1,5 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
 import { BootstrapGate } from "../app/BootstrapGate";
@@ -21,9 +22,16 @@ import { ScanScreen } from "../screens/ScanScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { ShiftChatScreen } from "../screens/ShiftChatScreen";
 import { SignInScreen } from "../screens/SignInScreen";
+import { AuthLoadingScreen } from "../screens/AuthLoadingScreen";
 import { StorageDebugScreen } from "../screens/StorageDebugScreen";
 import { TasksScreen } from "../screens/TasksScreen";
 import { MainTabs } from "./MainTabs";
+import { resolveRootStackView } from "@/app/root-stack-view";
+import { resolveClerkPublishableKey } from "@/infrastructure/auth/AuthRoot";
+import {
+  getClerkAuthState,
+  subscribeClerkAuthState,
+} from "@/infrastructure/auth/clerk-auth-state";
 import type { RootStackParamList, RootStackScreenProps } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -135,9 +143,28 @@ function GatedAutopilotQueue() {
  * G2.5 Aurora: `Main` (the tab shell) replaces the old flat Home; every other
  * flow stays a stack route above the tabs. Chrome colors follow the Aurora
  * dark tokens (`--color-background` / `--color-foreground`).
+ *
+ * AUTH IS A CONDITIONAL STACK, not a screen you push. Previously `Main` was
+ * unconditionally the first route and `SignIn` sat above it, so a signed-out
+ * cold start mounted the tab shell and let each tab's BootstrapGate paint a
+ * re-auth wall INSIDE it — tab bar drawn around a red error, on an install that
+ * never had a session. Mounting one branch or the other is React Navigation's
+ * documented auth pattern and makes the illegal state unrepresentable: when the
+ * branch flips, the old stack unmounts and no screen has to navigate anywhere.
+ *
+ * `SignIn` stays registered in the app branch too — it is still the sign-out and
+ * re-auth destination, and `dismissToHome` still pops back off it.
  */
 export function RootNavigator() {
   const { t } = useTranslation();
+  const clerkAuth = useSyncExternalStore(subscribeClerkAuthState, getClerkAuthState);
+  const clerkConfigured = resolveClerkPublishableKey() !== "";
+  const view = resolveRootStackView({
+    clerkConfigured,
+    clerkLoaded: clerkAuth.isLoaded,
+    clerkSignedIn: clerkAuth.isSignedIn,
+  });
+
   return (
     <Stack.Navigator
       screenOptions={{
@@ -147,6 +174,18 @@ export function RootNavigator() {
         contentStyle: { backgroundColor: "#0D0B1C" },
       }}
     >
+      {view === "loading" ? (
+        <Stack.Screen
+          name="AuthLoading"
+          component={AuthLoadingScreen}
+          options={{ headerShown: false }}
+        />
+      ) : null}
+      {view === "auth" ? (
+        <Stack.Screen name="SignIn" component={SignInScreen} options={{ headerShown: false }} />
+      ) : null}
+      {view === "app" ? (
+      <Stack.Group>
       <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t("nav.settings") }} />
       <Stack.Screen
@@ -160,9 +199,18 @@ export function RootNavigator() {
         component={GatedScanConfirm}
         options={{ presentation: "transparentModal", headerShown: false }}
       />
-      {/* SignIn stays registered on every build — it is the real auth-flow
-          destination (sign-out / bootstrap reauth), not merely a dev shortcut. */}
-      <Stack.Screen name="SignIn" component={SignInScreen} options={{ title: t("nav.signIn") }} />
+      {/* SignIn is registered here ONLY on a no-key build. When Clerk IS
+          configured, the auth branch owns that route name: React Navigation
+          keeps the current route across a config change if the new config still
+          declares it, so registering "SignIn" in both branches left the user
+          sitting on the post-sign-in interstitial instead of landing on Main
+          (observed on the iPad sim). With the conditional stack nothing needs to
+          navigate to SignIn anyway — signing out flips `isSignedIn`, which flips
+          the branch. The no-key build has no auth branch, so it keeps the route
+          for BootstrapGate's sign-in affordance. */}
+      {!clerkConfigured ? (
+        <Stack.Screen name="SignIn" component={SignInScreen} options={{ title: t("nav.signIn") }} />
+      ) : null}
       {/* Pure-debug screens — registered only in a __DEV__ build, matching their
           gated Menu rows so a real release has no navigation target for them. */}
       {__DEV__ ? (
@@ -192,6 +240,8 @@ export function RootNavigator() {
       <Stack.Screen name="Handoff" component={GatedHandoff} options={{ title: t("nav.handoff") }} />
       <Stack.Screen name="Inventory" component={GatedInventory} options={{ title: t("nav.inventory") }} />
       <Stack.Screen name="AutopilotQueue" component={GatedAutopilotQueue} options={{ title: t("nav.autopilotQueue") }} />
+      </Stack.Group>
+      ) : null}
     </Stack.Navigator>
   );
 }
