@@ -1,5 +1,12 @@
 # VetTrack RN — G1 Scaffold Plan (proposed)
 
+> ## ⚠ 2026-08-22 — status banner; the slice log below is historical
+>
+> **This file is no longer the live gate table.** G1 slices 0–7 merged; G2 passed 2026-08-07;
+> G3 slices 1–13 and the G4 ladder are built; G5 store config is in `app.json` / `eas.json`.
+> Current gate state lives in `README.md` ("Where this is in the plan"). The store-compliance
+> clock (P5 Play account) lives in `docs/G3-PLAN.md` §7. Do not treat "Next: G2" below as operative.
+>
 > Per the Master Migration Anchor (`~/.claude/plans/goofy-mapping-hellman.md` §Anchor): the AI proposes a
 > documented work plan; **no Commit/Push/PR without explicit approval from Dan.** This is that proposal.
 > Stack is frozen by the Anchor — not up for debate here; only the slice sequence is.

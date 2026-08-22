@@ -686,10 +686,10 @@ an already-known set, and are recorded here so they are not re-found and re-file
 | Finding | Filed as | Disposition |
 |---|---|---|
 | F-TORCH | #93 | open — mechanism read in source, not instrumented |
-| F-BIDI | #94 | open — iOS bidi layout |
+| F-BIDI | #94 | **code-fixed, device re-verify owed** — `77abbc2` isolates the UID (`ltrIsolate`) instead of flipping the sentence; jest pins the mechanism in `NfcProvisionCard.test.tsx`. GitHub still OPEN because a renderer does not run bidi — the glyph order stays a device observation |
 | F-NOFEEDBACK | #97 | open — Android in-flight state |
 | F-NOEXIT | #96 | open — three problems on one surface |
-| F-SAFEAREA | #95 | open — blocks the Lane 1a screenshot milestone |
+| F-SAFEAREA | #95 | **CLOSED 2026-08-22** — `gh issue view 95` → `closedAt: 2026-08-22T02:32:56Z`. No longer blocks Lane 1a |
 | F-PUSH | #98 | open — cross-repo, server-side cause not diagnosed |
 | F-DETAIL | not filed | product decision, not a code defect |
 | F-SSO | not filed | resolved during the run |
